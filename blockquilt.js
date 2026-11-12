@@ -447,6 +447,29 @@ const Blocks = {
     blank: () => ({ src: '', alt: '' }),
   });
 
+  // Carrousel : `:::carousel`, une photo par ligne, `:::`. Rendu en défilement horizontal CSS (scroll-snap), sans JavaScript.
+  Blocks.register('carousel', {
+    label: 'Carrousel', short: 'Carrousel', icon: 'images', group: 'media',
+    tone: tone('bg-white border-stone-200/90 text-stone-800', 'bg-violet-100 text-violet-900 border-violet-200'),
+    match: (t) => {
+      const lines = t.split('\n');
+      if (lines[0] !== ':::carousel' || lines[lines.length - 1] !== ':::' || lines.length < 3) return null;
+      const items = lines.slice(1, -1).map((l) => Blocks.PHOTO.exec(l));
+      return items.every(Boolean) ? { items: items.map((m) => ({ src: m[2], alt: Blocks.plain(m[1]) })) } : null;
+    },
+    toMarkdown: (b) => {
+      const items = b.items.filter((x) => x.src);
+      return items.length ? [':::carousel', ...items.map((x) => Blocks.types.photo.toMarkdown(x)), ':::'].join('\n') : '';
+    },
+    toHtml: (b, ctx) => {
+      const items = b.items.filter((x) => x.src);
+      return `<div class="bq-carousel" role="group" aria-roledescription="carrousel" aria-label="${items.length} photos">`
+        + `<div class="bq-carousel-track">${items.map((x) => Blocks.types.photo.toHtml(x, ctx)).join('')}</div>`
+        + `<p class="bq-carousel-dots" aria-hidden="true">${items.map(() => '<span></span>').join('')}</p></div>`;
+    },
+    blank: () => ({ items: [] }),
+  });
+
   Blocks.register('video', {
     label: 'Vidéo', short: 'Vidéo', icon: 'video', group: 'media',
     tone: tone('bg-rose-50/50 border-rose-200/80 text-rose-950', 'bg-rose-100 text-rose-900 border-rose-200'),

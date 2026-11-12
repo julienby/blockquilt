@@ -351,6 +351,31 @@ try {
     return f.textContent.endsWith('🔑');
   })()`), 'barre de mise en forme : insère un emoji dans le texte');
 
+  // ---- Phase 7 : carrousel ----
+  await viewport(375);
+  await open();
+  const pngs = [1, 2, 3].map((i) => { const f = path.join(data, `p${i}.png`); fs.copyFileSync(png, f); return f; });
+  await ev(`document.querySelector('[data-insert="end"]').click()`);
+  await ev(`document.querySelector('[data-sheet="add"] [data-pick="carousel"]').click()`);
+  await setFiles('input[data-file]', pngs);
+  await waitFor(() => ev(`document.querySelectorAll('[data-bq] [data-car-item]').length === 3`), 'carrousel de 3 photos');
+  ok(true, 'envoi de 3 fichiers d’un coup : 3 vignettes dans un carrousel');
+  await ev(`(() => { ['Un', 'Deux', 'Trois'].forEach((t, i) => { const x = document.querySelectorAll('[data-car-alt]')[i]; x.value = t; x.dispatchEvent(new InputEvent('input', { bubbles: true })); }); })()`);
+  await ev(`document.querySelector('[data-car-item="0"] [data-car-act="right"]').click()`);
+  ok(await ev(`[...document.querySelectorAll('[data-car-alt]')].map((x) => x.value).join() === 'Deux,Un,Trois'`), 'carrousel : photo déplacée vers la droite, légendes suivies');
+  await ev(`document.querySelector('[data-save]').click()`);
+  md = await saved((x) => x.includes(':::carousel'), 'enregistrement du carrousel');
+  ok(/:::carousel\n!\[Deux\]\(media\/\w+\)\n!\[Un\]\(media\/\w+\)\n!\[Trois\]\(media\/\w+\)\n:::/.test(md), 'carrousel : l’ordre des lignes a changé dans document.md');
+  await ev(`document.querySelector('[data-car-item="2"] [data-car-act="remove"]').click()`);
+  ok(await ev(`document.querySelectorAll('[data-car-item]').length === 2`), 'carrousel : photo retirée');
+  await ev(`editor.undo()`);
+  await ev(`document.querySelector('[data-preview]').click()`);
+  await waitFor(() => ev(`!!document.querySelector('[data-canvas] .bq-carousel')`), 'aperçu du carrousel');
+  const track = await ev(`(() => { const t = document.querySelector('.bq-carousel-track'); return { figures: t.querySelectorAll('figure').length, sw: t.scrollWidth, cw: t.clientWidth, snap: getComputedStyle(t).scrollSnapType }; })()`);
+  ok(track.figures === 3 && track.sw > track.cw && track.snap.includes('x'), `carrousel : 3 <figure>, défilement horizontal à 375 px (${track.sw} > ${track.cw})`);
+  await ev(`document.querySelector('[data-preview]').click()`);
+  ok(await ev(`(() => { const t = ':::columns\\nGauche\\n\\nDroite\\n:::'; editor.setMarkdown(t); return !!document.querySelector('[data-bq] [data-raw]') && editor.getMarkdown() === t + '\\n'; })()`), ':::columns écrit à la main : bloc source, texte intact');
+
   ws.close();
 } catch (error) {
   ok(false, error.message);

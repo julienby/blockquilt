@@ -50,3 +50,11 @@
 .bq-content .bq-callout-success { background: var(--bq-success-bg); border-color: var(--bq-success-line); color: var(--bq-success-text); }
 .bq-content .bq-callout-warning { background: var(--bq-warning-bg); border-color: var(--bq-warning-line); color: var(--bq-warning-text); }
 .bq-content .bq-callout-danger { background: var(--bq-danger-bg); border-color: var(--bq-danger-line); color: var(--bq-danger-text); }
+
+/* Carrousel : défilement horizontal en CSS (scroll-snap), une photo par page, points de repère dessous. */
+.bq-content .bq-carousel { margin: 1.25rem 0; }
+.bq-content .bq-carousel-track { display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 1rem; padding-bottom: 0.25rem; scrollbar-width: thin; }
+.bq-content .bq-carousel-track > figure { flex: 0 0 88%; margin: 0; scroll-snap-align: center; }
+.bq-content .bq-carousel-track img { aspect-ratio: 4 / 3; object-fit: cover; }
+.bq-content .bq-carousel-dots { display: flex; justify-content: center; gap: 0.4rem; margin: 0.5rem 0 0; }
+.bq-content .bq-carousel-dots span { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--bq-line); }

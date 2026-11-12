@@ -11,7 +11,7 @@ const FIX = path.join(__dirname, 'fixtures');
 const expected = {
   'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
-  'raw.md': 'raw,raw,raw,raw', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
+  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
 };
 for (const file of fs.readdirSync(FIX).sort()) {
   const x = fs.readFileSync(path.join(FIX, file), 'utf8');
@@ -20,6 +20,14 @@ for (const file of fs.readdirSync(FIX).sort()) {
   ok(types(x) === expected[file], `types lus : ${file} → ${types(x)}`);
 }
 ok(Object.keys(expected).every((f) => fs.existsSync(path.join(FIX, f))), 'fixtures : toutes présentes');
+
+// ---- Carrousel ----
+const car = Blocks.fromMarkdown(fs.readFileSync(path.join(FIX, 'carousel.md'), 'utf8'));
+ok(car.type === 'carousel' && car.items.length === 3 && car.items[2].alt === 'La terrasse, côté sud' && car.items[1].alt === '' && car.items[0].src === 'media/aaaaaaaaaaaa', 'carrousel : trois photos et leurs légendes');
+const carHtml = Blocks.toHtml(':::carousel\n![a](media/x1)\n![b](media/x2)\n![c](media/x3)\n:::', { media: '/m/' });
+ok((carHtml.match(/<figure>/g) || []).length === 3 && carHtml.includes('<div class="bq-carousel-track">') && carHtml.includes('<figcaption>b</figcaption>') && carHtml.includes('src="/m/x3"'), 'carrousel : 3 <figure> avec <figcaption> dans le rendu');
+ok(Blocks.toMarkdown({ type: 'carousel', items: [{ src: 'media/b', alt: 'B' }, { src: 'media/a', alt: 'A' }] }) === ':::carousel\n![B](media/b)\n![A](media/a)\n:::' && Blocks.toMarkdown({ type: 'carousel', items: [] }) === '', 'carrousel : écrit dans l’ordre, vide il disparaît');
+ok(['::: carousel\n![a](media/x)\n:::', ':::carousel\ntexte\n:::', ':::carousel\n:::', ':::columns\n![a](media/x)\n:::'].every((x) => Blocks.fromMarkdown(x).type === 'raw' && Blocks.toMarkdown(Blocks.fromMarkdown(x)) === x), 'carrousel mal écrit ou :::columns : bloc source, texte intact');
 
 // ---- Frontmatter ----
 const fm = Blocks.parse(fs.readFileSync(path.join(FIX, 'frontmatter.md'), 'utf8'));

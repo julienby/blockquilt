@@ -20,6 +20,7 @@
     sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
     chevron_left: '<path d="m15 6-6 6 6 6"/>',
     chevron_down: '<path d="m6 9 6 6 6-6"/>',
+    chevron_right: '<path d="m9 18 6-6-6-6"/>',
     arrow_up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
     arrow_down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
     grip: '<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
@@ -76,6 +77,17 @@
       edit: (b, ui) => `<figure class="space-y-2">${b.src ? `<img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="max-h-72 w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">` : ''}
           ${editable('text-sm italic text-stone-600', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}</figure>`,
       read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
+    });
+    // Carrousel : vignettes en ligne ; légende, ordre et retrait par photo ; ajout de plusieurs fichiers à la fois.
+    Object.assign(Blocks.types.carousel, {
+      edit: (b, ui) => `<div class="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">${b.items.map((x, i) => `<figure data-car-item="${i}" class="w-40 shrink-0 snap-start rounded-xl border border-stone-200 bg-stone-50 p-1.5">
+          <img src="${attr(Blocks.mediaUrl(x.src, ui.media))}" alt="" class="aspect-[4/3] w-full rounded-lg bg-stone-200 object-cover">
+          <input data-car-alt value="${attr(x.alt)}" placeholder="Légende…" aria-label="Légende de la photo ${i + 1}" class="mt-1 h-9 w-full bg-transparent px-1 text-xs italic focus:outline-none">
+          <div class="flex justify-between"><button type="button" data-car-act="left" ${i === 0 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la gauche" class="bq-btn text-stone-500">${ic('chevron_left', 'size-4')}</button>
+            <button type="button" data-car-act="remove" aria-label="Retirer la photo ${i + 1}" class="bq-btn text-red-600">${ic('x', 'size-4')}</button>
+            <button type="button" data-car-act="right" ${i === b.items.length - 1 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la droite" class="bq-btn text-stone-500">${ic('chevron_right', 'size-4')}</button></div></figure>`).join('')}
+          <button type="button" data-car-add class="flex min-h-11 w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 text-xs font-bold text-stone-500 hover:border-stone-400">${ic('plus')}Ajouter des photos</button></div>`,
+      read: (card, b) => { card.querySelectorAll('[data-car-item]').forEach((el) => { b.items[Number(el.dataset.carItem)].alt = el.querySelector('[data-car-alt]').value; }); },
     });
     Object.assign(Blocks.types.video, {
       edit: (b) => `<input data-url type="url" value="${attr(b.url)}" class="h-11 w-full rounded-xl border border-rose-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo YouTube ou Vimeo">`,
@@ -141,7 +153,7 @@
       <div class="pointer-events-none fixed inset-x-0 top-16 z-[60] flex justify-center">
         <div data-toast role="status" class="rounded-full bg-stone-900/95 px-3.5 py-2 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-300"></div>
       </div>
-      <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" hidden aria-label="Choisir une photo">
+      <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden aria-label="Choisir une photo">
       ${sheet('add', 'Ajouter un bloc', '<div data-add-list></div>')}
       ${sheet('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}</div>`)}
       ${sheet('menu', 'Bloc', '<div data-menu-list class="grid gap-0.5"></div>')}
@@ -452,7 +464,7 @@
       const pick = e.target.closest('[data-pick]');
       if (!pick) return;
       sheets.add.close();
-      if (pick.dataset.pick === 'photo') return fileInput.click();
+      if (pick.dataset.pick === 'photo' || pick.dataset.pick === 'carousel') { fileTarget = { type: pick.dataset.pick, at: insertAt }; return fileInput.click(); }
       add(pick.dataset.pick, insertAt);
     });
     const upload = async (file) => {
@@ -462,18 +474,45 @@
       if (!r.ok || !(j.id || j.src)) throw new Error(j.error || 'Envoi impossible');
       return j.src || 'media/' + j.id;
     };
+    // Envoi de photos : plusieurs fichiers à la fois. Selon la demande : un bloc photo par fichier, un carrousel neuf, ou des photos ajoutées à un carrousel.
+    let fileTarget = null;
     on(fileInput, 'change', async () => {
       const files = [...fileInput.files];
+      const target = fileTarget || { type: 'photo', at: null };
       fileInput.value = '';
+      fileTarget = null;
       if (!files.length) return;
-      toast('Envoi de la photo…');
+      toast(files.length > 1 ? `Envoi de ${files.length} photos…` : 'Envoi de la photo…');
       try {
-        add('photo', insertAt, { src: await upload(files[0]) });
-        toast('Photo ajoutée');
+        const srcs = [];
+        for (const f of files) srcs.push(await upload(f));
+        const items = srcs.map((src) => ({ src, alt: '' }));
+        if (target.add) {
+          syncFromDom();
+          const b = blocks.find((x) => x.id === target.add);
+          if (b) change(() => b.items.push(...items));
+        } else if (target.type === 'carousel') add('carousel', target.at, { items });
+        else {
+          const at = target.at === null ? blocks.length : target.at;
+          const fresh = items.map((x) => ({ id: newId(), ...Blocks.blank('photo'), ...x }));
+          change(() => blocks.splice(at, 0, ...fresh));
+          focusCard(fresh[0].id);
+        }
+        toast(srcs.length > 1 ? `${srcs.length} photos ajoutées` : 'Photo ajoutée');
       } catch (error) {
         toast(error.message);
       }
     });
+    const carousel = (el, id) => {
+      const b = blocks.find((x) => x.id === id);
+      if (el.closest('[data-car-add]')) { fileTarget = { add: id }; return fileInput.click(); }
+      const i = Number(el.closest('[data-car-item]').dataset.carItem);
+      const act = el.closest('[data-car-act]').dataset.carAct;
+      syncFromDom();
+      const j = act === 'left' ? i - 1 : i + 1;
+      change(() => { if (act === 'remove') b.items.splice(i, 1); else [b.items[i], b.items[j]] = [b.items[j], b.items[i]]; });
+      canvas.querySelector(`[data-id="${id}"] [data-car-item="${act === 'remove' ? Math.max(0, i - 1) : j}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    };
 
     // ---- Menu du bloc « ⋯ » ----
     const openMenu = (id, from) => {
@@ -768,6 +807,7 @@
       if (el.closest('[data-merge]')) return merge(Number(el.closest('[data-merge]').dataset.merge));
       if (el.closest('[data-menu]')) return openMenu(id, el.closest('[data-menu]'));
       if (el.closest('[data-callout-icon]')) { syncFromDom(); return openIcon(id); }
+      if (el.closest('[data-car-act], [data-car-add]')) return carousel(el, id);
       if (el.closest('[data-save]')) return save();
       if (el.closest('[data-undo]')) return undo();
       if (el.closest('[data-redo]')) return redo();
