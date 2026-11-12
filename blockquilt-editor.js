@@ -143,6 +143,7 @@
         <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn text-stone-600">${ic('undo')}</button>
         <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('redo')}</button>
         <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn text-stone-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
+        ${o.aiUrl ? `<button type="button" data-ai aria-label="Assistant IA" title="Assistant IA" class="bq-btn hidden text-amber-600 sm:inline-flex">${ic('wand')}</button>` : ''}
         <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative text-stone-400">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
         <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('maximize')}</button>
         <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn text-stone-600 sm:hidden">${ic('more')}</button>
@@ -163,7 +164,21 @@
       </div>
       <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden aria-label="Choisir une photo">
       ${sheet('add', 'Ajouter un bloc', '<div data-add-list></div>')}
-      ${sheet('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}</div>`)}
+      ${sheet('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}${o.aiUrl ? item('data-more-act="ai"', 'wand', 'Assistant IA') : ''}</div>`)}
+      ${o.aiUrl ? sheet('ai', 'Assistant IA', `<div data-ai-form>
+          <p data-ai-scope class="mb-2 truncate rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900"></p>
+          <div class="flex flex-wrap gap-1.5">${[['Corriger', 'Corrige l’orthographe et la grammaire, sans changer le sens ni la structure.'], ['Raccourcir', 'Raccourcis le texte en gardant l’essentiel.'], ['En étapes', 'Réécris sous forme d’étapes numérotées.'], ['Traduire', 'Traduis en anglais, en gardant la structure.']].map(([l, t]) => `<button type="button" data-ai-preset="${attr(t)}" class="min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950 hover:bg-amber-100">${l}</button>`).join('')}</div>
+          <textarea data-ai-instruction rows="3" aria-label="Consigne" placeholder="Votre consigne, par exemple : ajoute une astuce sur le parking" class="mt-2 w-full rounded-xl border border-stone-300 p-3 text-[15px]"></textarea>
+          <button type="button" data-ai-run class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 font-semibold text-white disabled:opacity-60">${ic('wand', 'size-4')}<span>Envoyer</span></button></div>
+        <div data-ai-result hidden>
+          <ul data-ai-lint role="alert" class="mb-2 space-y-1 rounded-xl bg-red-50 p-3 text-xs text-red-800"></ul>
+          <label data-ai-force-wrap class="mb-2 flex min-h-11 items-center gap-2 text-sm font-semibold text-red-800"><input type="checkbox" data-ai-force class="size-5"> Appliquer malgré les alertes</label>
+          <p class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Avant</p>
+          <div data-ai-before class="bq-content mt-1 max-h-48 overflow-auto rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"></div>
+          <p class="mt-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">Après</p>
+          <div data-ai-after class="bq-content mt-1 max-h-64 overflow-auto rounded-xl border border-amber-200 bg-white p-3 text-sm"></div>
+          <div class="mt-3 grid grid-cols-2 gap-2"><button type="button" data-ai-ignore class="min-h-11 rounded-xl border border-stone-300 px-4 font-semibold">Ignorer</button>
+            <button type="button" data-ai-apply class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white disabled:opacity-40">Appliquer</button></div></div>`) : ''}
       ${sheet('menu', 'Bloc', '<div data-menu-list class="grid gap-0.5"></div>')}
       ${sheet('delete', 'Supprimer ce bloc ?', `<p data-del-preview class="line-clamp-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm italic text-stone-700"></p>
         <button type="button" data-del-confirm class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 font-semibold text-white hover:bg-red-700">${ic('trash')}Supprimer</button>`)}
@@ -541,6 +556,7 @@
         + item('data-act="cut"', 'cut', 'Couper')
         + item('data-act="paste"', 'paste', 'Coller dessous')
         + item('data-act="full"', 'maximize', 'Plein écran')
+        + (o.aiUrl ? item('data-act="ai"', 'wand', 'IA sur ce bloc', 'text-amber-800') : '')
         + item('data-act="delete"', 'trash', 'Supprimer…', 'text-red-700 hover:bg-red-50');
       openSheet('menu', from);
     };
@@ -562,6 +578,7 @@
         toast(act === 'cut' ? 'Bloc coupé' : 'Bloc copié');
       } else if (act === 'paste') pasteBelow(id);
       else if (act === 'full') openBlockFull(id);
+      else if (act === 'ai') openAi(id);
       else if (act === 'delete') {
         const preview = Blocks.stripTags(Blocks.toMarkdown(blocks[i])).replace(/\n/g, ' • ').trim();
         $('[data-del-preview]', sheets.delete).textContent = preview ? `« ${preview.slice(0, 160)}${preview.length > 160 ? '…' : ''} »` : '(Bloc vide)';
@@ -573,6 +590,79 @@
       sheets.delete.close();
       remove(menuId);
     });
+
+    // ---- Assistant IA : l'hôte fournit `aiUrl` ; l'éditeur n'appelle aucun modèle lui-même et ne contient aucune clé ----
+    // Envoi : scope (document | block), instruction, text (document), block (Markdown du bloc). Réponse : { markdown }.
+    // La réponse passe par Blocks.lint, s'affiche avant / après, puis « Appliquer » (annulable) ou « Ignorer ».
+    let ai = null; // { id, markdown }
+    const aiSheet = sheets.ai;
+    const openAi = (id) => {
+      if (!aiSheet) return;
+      syncFromDom();
+      ai = { id };
+      const b = id && blocks.find((x) => x.id === id);
+      $('[data-ai-scope]', aiSheet).textContent = b ? `Sur ce bloc : ${def(b).label}` : 'Sur tout le document';
+      $('[data-ai-form]', aiSheet).hidden = false;
+      $('[data-ai-result]', aiSheet).hidden = true;
+      $('[data-ai-instruction]', aiSheet).value = '';
+      openSheet('ai');
+    };
+    const runAi = async () => {
+      const instruction = $('[data-ai-instruction]', aiSheet).value.trim();
+      if (!instruction) return toast('Écrivez une consigne');
+      const text = markdown();
+      const b = ai.id && blocks.find((x) => x.id === ai.id);
+      if (ai.id && !b) return aiSheet.close();
+      const run = $('[data-ai-run]', aiSheet);
+      run.disabled = true;
+      run.querySelector('span').textContent = 'L’IA travaille…';
+      try {
+        const r = await fetch(o.aiUrl, { method: 'POST', body: form({ scope: b ? 'block' : 'document', instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}) }), headers: { Accept: 'application/json' }, signal: ac.signal });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || typeof j.markdown !== 'string') throw new Error(j.error || 'Pas de réponse de l’IA');
+        ai.markdown = j.markdown.replace(/\r\n/g, '\n');
+        const problems = Blocks.lint(ai.markdown);
+        const lint = $('[data-ai-lint]', aiSheet);
+        lint.hidden = !problems.length;
+        lint.innerHTML = problems.map((p) => `<li>Ligne ${p.line} : ${esc(p.message)}</li>`).join('');
+        $('[data-ai-force-wrap]', aiSheet).hidden = !problems.length;
+        $('[data-ai-force]', aiSheet).checked = false;
+        $('[data-ai-apply]', aiSheet).disabled = problems.length > 0;
+        const show = (md) => Blocks.toHtml(md, { media: o.media, title: !b });
+        $('[data-ai-before]', aiSheet).innerHTML = show(b ? Blocks.toMarkdown(b) : text);
+        $('[data-ai-after]', aiSheet).innerHTML = show(ai.markdown);
+        $('[data-ai-form]', aiSheet).hidden = true;
+        $('[data-ai-result]', aiSheet).hidden = false;
+      } catch (error) {
+        if (error.name !== 'AbortError') toast(error.message);
+      } finally {
+        run.disabled = false;
+        run.querySelector('span').textContent = 'Envoyer';
+      }
+    };
+    const applyAi = () => {
+      const parsed = Blocks.parse(ai.markdown);
+      const fresh = parsed.blocks.map((b) => ({ id: newId(), ...b }));
+      if (ai.id) {
+        const i = blocks.findIndex((x) => x.id === ai.id);
+        if (i < 0) return;
+        change(() => blocks.splice(i, 1, ...fresh));
+      } else {
+        change(() => {
+          if (Object.keys(parsed.meta).length) { meta = parsed.meta; icon = meta.icon || ''; titleEl.textContent = meta.title || ''; showIcon(); }
+          blocks = fresh.length ? fresh : [{ id: newId(), ...Blocks.blank('text') }];
+        });
+      }
+      toast('Proposition appliquée');
+    };
+    on(aiSheet, 'click', (e) => {
+      const preset = e.target.closest('[data-ai-preset]');
+      if (preset) { $('[data-ai-instruction]', aiSheet).value = preset.dataset.aiPreset; return runAi(); }
+      if (e.target.closest('[data-ai-run]')) return runAi();
+      if (e.target.closest('[data-ai-ignore]')) { aiSheet.close(); return; }
+      if (e.target.closest('[data-ai-apply]')) { aiSheet.close(); applyAi(); }
+    });
+    on(aiSheet, 'change', (e) => { if (e.target.matches('[data-ai-force]')) $('[data-ai-apply]', aiSheet).disabled = !e.target.checked; });
 
     // ---- Copier / coller : du Markdown, découpé en blocs par Blocks.parse ----
     const copyText = (text) => {
@@ -822,6 +912,7 @@
       if (el.closest('[data-undo]')) return undo();
       if (el.closest('[data-redo]')) return redo();
       if (el.closest('[data-full]')) return toggleEditorFull();
+      if (el.closest('[data-ai]')) return openAi(null);
       if (el.closest('[data-more]')) return openSheet('more', el.closest('[data-more]'));
       if (el.closest('[data-block-full-close]')) return blockFull.close();
       if (el.closest('[data-preview]')) return setPreview(!preview);
@@ -834,6 +925,7 @@
       sheets.more.close();
       if (act === 'redo') redo();
       else if (act === 'full') toggleEditorFull();
+      else if (act === 'ai') openAi(null);
     });
     on(sheets.leave, 'click', async (e) => {
       if (e.target.closest('[data-leave-discard]')) { setDirty(false); location.href = o.backUrl; }

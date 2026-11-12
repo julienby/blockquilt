@@ -31,7 +31,47 @@ const page = () => {
   return html.replace(/(<textarea id="source" hidden>)[\s\S]*?(<\/textarea>)/, (_, open, close) => open + esc(fs.readFileSync(DOC, 'utf8')) + close);
 };
 
+// IA de démo : transformation fixe et prévisible (texte en majuscules), sauf si ANTHROPIC_API_KEY donne accès à un vrai modèle.
+// La consigne système est FORMAT.md : le modèle répond dans le format que l'éditeur relit sans perte.
+const shout = (markdown) => {
+  const up = (html) => html.replace(/(^|>)([^<]+)/g, (_, a, t) => a + Blocks.esc(Blocks.unesc(t).toUpperCase()));
+  const { meta, blocks } = Blocks.parse(markdown);
+  return Blocks.serialize(meta, blocks.map((b) => ({ ...b, ...(b.html !== undefined && b.type !== 'html' ? { html: up(b.html) } : {}), ...(b.title ? { title: b.title.toUpperCase() } : {}) })));
+};
+const model = async (scope, instruction, text, block) => {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: process.env.AI_MODEL || 'claude-sonnet-4-5',
+      max_tokens: 4000,
+      system: 'Tu modifies un document au format blockquilt. Réponds uniquement avec le Markdown demandé, sans explication ni bloc de code autour.\n\n' + fs.readFileSync(path.join(ROOT, 'FORMAT.md'), 'utf8'),
+      messages: [{ role: 'user', content: scope === 'block'
+        ? `Document complet, pour le contexte :\n\n${text}\n\n---\n\nBloc à modifier :\n\n${block}\n\nConsigne : ${instruction}\n\nRéponds avec le ou les blocs qui remplacent ce bloc.`
+        : `Document :\n\n${text}\n\nConsigne : ${instruction}\n\nRéponds avec le document complet, frontmatter compris.` }],
+    }),
+  });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error?.message || 'Modèle indisponible');
+  return j.content.map((c) => c.text || '').join('').trim().replace(/^```(?:markdown)?\n([\s\S]*)\n```$/, '$1') + '\n';
+};
+
 const routes = {
+  // IA : champs scope (document | block), instruction, text, block ; réponse JSON { markdown }.
+  'POST /api/ai': async (req, res) => {
+    const data = await form(req);
+    const get = (k) => String(data.get(k) ?? '').replace(/\r\n/g, '\n');
+    const scope = get('scope') === 'block' ? 'block' : 'document';
+    const instruction = get('instruction');
+    const source = scope === 'block' ? get('block') : get('text');
+    try {
+      if (process.env.ANTHROPIC_API_KEY) return json(res, 200, { markdown: await model(scope, instruction, get('text'), get('block')) });
+      // Démo : « non fermé » dans la consigne donne une réponse fautive, pour essayer les alertes.
+      json(res, 200, { markdown: shout(source) + (/non fermé/i.test(instruction) ? '\n:::html\n<p>bloc sans fin</p>\n' : '') });
+    } catch (error) {
+      json(res, 502, { error: error.message });
+    }
+  },
   // Enregistrer : le Markdown complet (champ `text`), réponse JSON { ok: true }.
   'POST /api/save': async (req, res) => {
     const data = await form(req);

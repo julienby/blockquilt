@@ -392,6 +392,57 @@ try {
   ok(await ev(`!window.pwned && !document.querySelector('[data-canvas] script, [data-canvas] [onclick], [data-canvas] [onerror]') && document.querySelector('[data-canvas] .bq-html strong')?.textContent === 'Gras'`), 'bloc HTML : rendu filtré, aucun script exécuté');
   ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: ':::html\\n<b>x</b>\\n:::' }); el.querySelector('[data-insert="end"]').click(); const has = !!el.querySelector('[data-pick="html"]'); const raw = !!el.querySelector('[data-id] [data-raw]') && !el.querySelector('[data-html-preview]'); e.destroy(); el.remove(); return !has && raw; })()`), 'bloc HTML désactivé par défaut : absent du menu, édité comme texte source');
 
+  // ---- Phase 9 : IA ----
+  await viewport(375);
+  await open();
+  const tipIndex = await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].findIndex((c) => c.querySelector('[data-convert]')?.value === 'tip')`);
+  const docBefore = await mdNow();
+  await ev(`document.querySelectorAll('[data-bq] [data-id]')[${tipIndex}].querySelector('[data-menu]').click()`);
+  await ev(`document.querySelector('[data-sheet="menu"] [data-act="ai"]').click()`);
+  ok(await ev(`document.querySelector('[data-sheet="ai"]').open && document.querySelector('[data-ai-scope]').textContent.includes('Astuce')`), 'IA sur un bloc : ouverte depuis le menu « ⋯ »');
+  await ev(`document.querySelector('[data-ai-preset]').click()`);
+  await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden`), 'réponse de l’IA');
+  ok(await ev(`document.querySelector('[data-ai-before]').textContent.includes('Garez-vous') && document.querySelector('[data-ai-after]').textContent.includes('GAREZ-VOUS') && document.querySelector('[data-ai-lint]').hidden`), 'IA : aperçu avant / après, sans alerte');
+  await ev(`document.querySelector('[data-ai-apply]').click()`);
+  await ev(`document.querySelector('[data-save]').click()`);
+  md = await saved((x) => x.includes('GAREZ-VOUS'), 'enregistrement après IA sur un bloc');
+  {
+    const a = (await import('../blockquilt.js')).default;
+    const pb = a.parse(docBefore).blocks.map(a.toMarkdown);
+    const pa = a.parse(md).blocks.map(a.toMarkdown);
+    const changed = pa.map((x, i) => x !== pb[i]).reduce((n, x) => n + x, 0);
+    ok(pa.length === pb.length && changed === 1 && pa[tipIndex].startsWith('> [!tip]') && pa[tipIndex].includes('GAREZ-VOUS'), 'IA sur un bloc : seul ce bloc change dans document.md');
+  }
+  const docMid = await mdNow();
+  await ev(`document.querySelector('[data-more]').click()`);
+  await ev(`document.querySelector('[data-more-act="ai"]').click()`);
+  ok(await ev(`document.querySelector('[data-ai-scope]').textContent.includes('document')`), 'IA sur le document : ouverte depuis l’en-tête');
+  await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'Tout en majuscules'; document.querySelector('[data-ai-run]').click(); })()`);
+  await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden`), 'réponse de l’IA (document)');
+  ok((await mdNow()) === docMid, 'IA sur le document : rien ne change avant « Appliquer »');
+  await ev(`document.querySelector('[data-ai-apply]').click()`);
+  ok(await ev(`editor.getMarkdown().includes('LA CLÉ EST DANS LA BOÎTE AUX LETTRES.') && editor.getMarkdown().startsWith('---\\ntitle: ')`), 'IA sur le document : remplacé après « Appliquer »');
+  await ev(`document.activeElement.blur()`);
+  await key('z', 'KeyZ', 90, CTRL);
+  ok((await mdNow()) === docMid, 'IA sur le document : restauré par Ctrl+Z');
+  await ev(`document.querySelector('[data-more]').click()`);
+  await ev(`document.querySelector('[data-more-act="ai"]').click()`);
+  await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'Réponse avec un bloc non fermé'; document.querySelector('[data-ai-run]').click(); })()`);
+  await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden`), 'réponse fautive de l’IA');
+  ok(await ev(`!document.querySelector('[data-ai-lint]').hidden && document.querySelector('[data-ai-lint]').textContent.includes('non fermé') && document.querySelector('[data-ai-apply]').disabled`), 'IA : « ::: » non fermé → alerte lint, « Appliquer » bloqué');
+  await ev(`(() => { const c = document.querySelector('[data-ai-force]'); c.click(); })()`);
+  ok(await ev(`!document.querySelector('[data-ai-apply]').disabled`), 'IA : appliquer seulement après confirmation');
+  await ev(`document.querySelector('[data-ai-ignore]').click()`);
+  ok((await mdNow()) === docMid, 'IA : « Ignorer » ne change rien');
+  ok(await ev(`(() => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Texte' });
+    el.querySelector('[data-menu]').click();
+    const none = !el.querySelector('[data-ai], [data-more-act="ai"], [data-act="ai"], [data-sheet="ai"]');
+    e.destroy(); el.remove();
+    return none;
+  })()`), 'sans aiUrl : aucun bouton IA');
+
   ws.close();
 } catch (error) {
   ok(false, error.message);

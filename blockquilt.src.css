@@ -16,6 +16,7 @@
   .bq-btn { @apply inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-30; }
 }
 .bq-app :focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
+.bq-app [tabindex="-1"]:focus-visible { outline: none; }
 .bq-bar .bq-btn:hover { background: rgb(255 255 255 / 0.1); }
 .bq-bar .bq-btn:active { background: rgb(255 255 255 / 0.2); }
 
