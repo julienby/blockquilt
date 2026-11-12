@@ -134,6 +134,7 @@
         <button type="button" data-fmt="underline" aria-label="Souligner" class="bq-btn underline">U</button>
         <button type="button" data-fmt="highlight" aria-label="Surligner" class="bq-btn"><span class="size-4 rounded bg-amber-300"></span></button>
         <button type="button" data-fmt="insertUnorderedList" aria-label="Liste à puces" class="bq-btn">${ic('list')}</button>
+        <button type="button" data-emoji-insert aria-label="Insérer un emoji" class="bq-btn">${ic('smile')}</button>
         <button type="button" data-fmt="clear" aria-label="Effacer la mise en forme" class="bq-btn text-stone-300">${ic('eraser')}</button>
         <button type="button" data-split aria-label="Scinder le bloc au curseur" class="bq-btn text-stone-300">${ic('split')}</button>
       </div>
@@ -148,9 +149,11 @@
         <button type="button" data-del-confirm class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 font-semibold text-white hover:bg-red-700">${ic('trash')}Supprimer</button>`)}
       ${sheet('leave', 'Modifications non enregistrées', `<div class="grid gap-2"><button type="button" data-leave-save class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Enregistrer et quitter</button>
         <button type="button" data-leave-discard class="min-h-11 rounded-xl bg-red-600 px-4 font-semibold text-white">Quitter sans enregistrer</button></div>`)}
-      ${sheet('icon', 'Icône', `<ul data-icon-grid class="grid grid-cols-6 gap-1.5">${['🏡', '🔑', '📶', '🗑️', '🍽️', '🚗', '📞', '🛏️', '☕', '🔥', '❄️', '📍', '💡', 'ℹ️', '✅', '⚠️', '🚨', '🚭', '📝', '📌', '⭐', '❤️', '🎉', '📷'].map((e) => `<li><button type="button" data-icon-pick="${e}" class="flex aspect-square w-full items-center justify-center rounded-xl bg-stone-100 text-2xl hover:bg-stone-200">${e}</button></li>`).join('')}</ul>
-        <div class="mt-3 flex gap-2"><input data-icon-input aria-label="Votre emoji" placeholder="Collez un emoji" class="h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-xl"><button type="button" data-icon-use class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Utiliser</button></div>
-        <button type="button" data-icon-pick="" class="mt-2 min-h-11 rounded-xl px-3 font-medium text-brand-700 hover:bg-brand-50">Aucune icône</button>`)}
+      ${sheet('icon', 'Emoji', `<input data-emoji-search type="search" enterkeyhint="search" aria-label="Chercher un emoji" placeholder="Chercher : clé, maison, attention…" class="h-11 w-full rounded-xl border border-stone-300 px-3 text-[15px]">
+        <div data-emoji-tabs role="tablist" aria-label="Catégories" class="-mx-1 mt-2 flex gap-1 overflow-x-auto pb-1"></div>
+        <div data-emoji-grid class="mt-1 grid h-[min(19rem,42dvh)] grid-cols-7 content-start overflow-y-auto sm:grid-cols-9"></div>
+        <div class="mt-3 flex gap-2"><input data-icon-input aria-label="Votre emoji" placeholder="Ou collez un emoji" class="h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-xl"><button type="button" data-icon-use class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Utiliser</button></div>
+        <button type="button" data-icon-pick="" data-emoji-none class="mt-2 min-h-11 rounded-xl px-3 font-medium text-brand-700 hover:bg-brand-50">Aucune icône</button>`)}
       <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full bg-stone-50">
         <div class="sticky top-0 z-10 flex min-h-14 items-center gap-2 border-b border-stone-200/80 bg-white/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
           <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-600"></span>
@@ -660,26 +663,72 @@
     });
 
     // ---- Icône du document ou d'un encadré ----
+    // Trois usages du même sélecteur : icône du document (null), icône d'un encadré (id du bloc), insertion dans le texte ({ field, range }).
     const setIcon = (value) => {
       if (iconTarget === null) { checkpoint(); icon = value; showIcon(); setDirty(true); checkpoint(); return; }
+      if (typeof iconTarget === 'object') {
+        const { field, range } = iconTarget;
+        if (!value) return;
+        field.focus();
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        document.execCommand('insertText', false, value);
+        return;
+      }
       syncFromDom();
       const b = blocks.find((x) => x.id === iconTarget);
       if (b) change(() => { b.icon = value; });
     };
     const openIcon = (target) => {
       iconTarget = target;
-      sheets.icon.querySelector('h2').textContent = target === null ? 'Icône du document' : 'Icône de l’encadré';
+      sheets.icon.querySelector('h2').textContent = target === null ? 'Icône du document' : typeof target === 'object' ? 'Insérer un emoji' : 'Icône de l’encadré';
+      $('[data-emoji-none]', sheets.icon).hidden = typeof target === 'object';
+      const search = $('[data-emoji-search]', sheets.icon);
+      search.value = '';
       openSheet('icon');
+      search.focus({ preventScroll: true });
+      Blockquilt.emoji(o.emojiUrl).then(() => showEmoji(recent().length ? -1 : 0)).catch(() => {
+        $('[data-emoji-grid]', sheets.icon).innerHTML = '<p class="col-span-full p-3 text-sm text-stone-500">Bibliothèque indisponible : collez un emoji ci-dessous.</p>';
+      });
     };
+    const recent = () => { try { return JSON.parse(localStorage.getItem('blockquilt.emoji') || '[]'); } catch { return []; } };
+    const remember = (e) => { try { localStorage.setItem('blockquilt.emoji', JSON.stringify([e, ...recent().filter((x) => x !== e)].slice(0, 28))); } catch { /* stockage refusé */ } };
+    let emojiTab = 0;
+    const emojiButton = (e) => `<button type="button" data-icon-pick="${attr(e[0])}" title="${attr(e[1])}" aria-label="${attr(e[1])}" class="flex aspect-square items-center justify-center rounded-xl text-[26px] leading-none hover:bg-stone-100 active:bg-stone-200">${esc(e[0])}</button>`;
+    const showEmoji = (tab) => {
+      const data = Blockquilt.emojiData;
+      if (!data) return;
+      emojiTab = tab;
+      const cats = [['Récents', -1], ...data.categories.map((c, i) => [c, i])];
+      $('[data-emoji-tabs]', sheets.icon).innerHTML = cats.map(([c, i]) => `<button type="button" role="tab" data-emoji-tab="${i}" aria-selected="${i === tab}" class="min-h-9 shrink-0 rounded-full px-3 text-xs font-bold text-stone-600 aria-selected:bg-stone-900 aria-selected:text-white">${esc(c)}</button>`).join('');
+      const byChar = new Map(data.emoji.map((e) => [e[0], e]));
+      const list = tab === -1 ? recent().map((c) => byChar.get(c) || [c, c]) : data.emoji.filter((e) => e[e.length - 1] === tab);
+      $('[data-emoji-grid]', sheets.icon).innerHTML = list.length ? list.map(emojiButton).join('') : '<p class="col-span-full p-3 text-sm text-stone-500">Aucun emoji récent.</p>';
+    };
+    const fold = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    on($('[data-emoji-search]', sheets.icon), 'input', (e) => {
+      const q = fold(e.target.value.trim());
+      if (!q) return showEmoji(emojiTab);
+      const data = Blockquilt.emojiData;
+      if (!data) return;
+      // Nom exact, puis nom qui commence par la recherche, puis nom qui la contient, puis mots-clés.
+      const rank = (x) => { const n = fold(x[1]); const k = typeof x[2] === 'string' ? fold(x[2]) : ''; return n === q ? 0 : n.startsWith(q) ? 1 : (' ' + n).includes(' ' + q) ? 2 : n.includes(q) ? 3 : k.split('|').some((w) => w.startsWith(q)) ? 4 : k.includes(q) ? 5 : 9; };
+      const found = data.emoji.map((x) => [rank(x), x]).filter(([r]) => r < 9).sort((a, b) => a[0] - b[0]).slice(0, 140).map(([, x]) => x);
+      $('[data-emoji-tabs]', sheets.icon).querySelectorAll('[aria-selected]').forEach((t) => t.setAttribute('aria-selected', 'false'));
+      $('[data-emoji-grid]', sheets.icon).innerHTML = found.length ? found.map(emojiButton).join('') : '<p class="col-span-full p-3 text-sm text-stone-500">Aucun emoji trouvé.</p>';
+    });
     on(sheets.icon, 'click', (e) => {
+      const tab = e.target.closest('[data-emoji-tab]');
+      if (tab) { $('[data-emoji-search]', sheets.icon).value = ''; return showEmoji(Number(tab.dataset.emojiTab)); }
       const pick = e.target.closest('[data-icon-pick]');
-      if (pick) { sheets.icon.close(); setIcon(pick.dataset.iconPick); return; }
+      if (pick) { sheets.icon.close(); if (pick.dataset.iconPick) remember(pick.dataset.iconPick); setIcon(pick.dataset.iconPick); return; }
       if (e.target.closest('[data-icon-use]')) {
         const input = $('[data-icon-input]', sheets.icon);
         const picked = Blocks.firstEmoji(input.value);
         if (!picked) return toast('Collez un emoji, par exemple 🏡');
         input.value = '';
         sheets.icon.close();
+        remember(picked);
         setIcon(picked);
       }
     });
@@ -814,6 +863,13 @@
     on(bar, 'click', (e) => {
       const sel = getSelection();
       if (e.target.closest('[data-split]')) { if (sel.rangeCount) split(sel.getRangeAt(0)); return; }
+      if (e.target.closest('[data-emoji-insert]')) {
+        const field = barField;
+        if (!field || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0).cloneRange();
+        hideBar();
+        return openIcon({ field, range });
+      }
       const button = e.target.closest('[data-fmt]');
       if (!button || !sel.rangeCount) return;
       const what = button.dataset.fmt;
@@ -861,5 +917,15 @@
     };
   }
 
-  window.Blockquilt = { mount, icons: ICONS };
+  // Bibliothèque d'emoji : chargée au premier usage seulement (emoji.json, à côté de ce script par défaut).
+  const scriptUrl = document.currentScript?.src || location.href;
+  let emojiLoad = null;
+  const emoji = (url) => {
+    emojiLoad = emojiLoad || fetch(url || new URL('emoji.json', scriptUrl)).then((r) => { if (!r.ok) throw new Error('emoji.json'); return r.json(); })
+      .then((data) => { Blockquilt.emojiData = data; return data; })
+      .catch((error) => { emojiLoad = null; throw error; });
+    return emojiLoad;
+  };
+
+  window.Blockquilt = { mount, icons: ICONS, emoji, emojiData: null, clipboard: '' };
 })();

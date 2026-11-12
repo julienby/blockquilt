@@ -36,7 +36,14 @@ try {
   await new Promise((r) => ws.addEventListener('open', r));
   let n = 0;
   const pending = {};
-  ws.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (m.id && pending[m.id]) { pending[m.id](m); delete pending[m.id]; } });
+  const requests = [];
+  ws.addEventListener('message', (e) => {
+    const m = JSON.parse(e.data);
+    if (m.method === 'Network.requestWillBeSent') requests.push(m.params.request.url);
+    // « Quitter la page ? » (modifications non enregistrées) : on accepte, pour recharger la démo.
+    if (m.method === 'Page.javascriptDialogOpening') ws.send(JSON.stringify({ id: 1e9 + Math.floor(Math.random() * 1e6), method: 'Page.handleJavaScriptDialog', params: { accept: true } }));
+    if (m.id && pending[m.id]) { pending[m.id](m); delete pending[m.id]; }
+  });
   const send = (method, params = {}) => new Promise((r) => { const id = ++n; pending[id] = r; ws.send(JSON.stringify({ id, method, params })); });
   const ev = async (expr) => {
     const m = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
@@ -56,6 +63,7 @@ try {
 
   await send('Browser.grantPermissions', { origin: BASE, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  await send('Network.enable');
   await send('Page.enable');
   await send('Runtime.enable');
   await send('DOM.enable');
@@ -306,6 +314,42 @@ try {
     ok(await ev(`!document.querySelector('[data-block-full]').open && editor.getMarkdown().includes(' Plein${width}')`), `${width} px : Échap ferme, le texte tapé est dans le document`);
   }
   await viewport(375);
+
+  // ---- Phase 6 : emoji ----
+  ok(fs.statSync(path.join(DIR, '..', 'emoji.json')).size < 150 * 1024, 'emoji.json : moins de 150 ko');
+  requests.length = 0;
+  await open();
+  await sleep(300);
+  ok(!requests.some((u) => u.includes('emoji.json')), 'emoji.json : pas demandé au chargement de la page');
+  await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'tip').querySelector('[data-callout-icon]').click()`);
+  await waitFor(() => ev(`document.querySelectorAll('[data-sheet="icon"] [data-emoji-grid] button').length > 50`), 'bibliothèque d’emoji');
+  ok(requests.some((u) => u.includes('emoji.json')), 'emoji.json : chargé à la première ouverture du sélecteur');
+  ok(await ev(`document.querySelectorAll('[data-sheet="icon"] [data-emoji-tab]').length === 10`), 'sélecteur : onglets « Récents » + 9 catégories');
+  await ev(`(() => { const i = document.querySelector('[data-emoji-search]'); i.value = 'clé'; i.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+  ok(await ev(`[...document.querySelectorAll('[data-sheet="icon"] [data-emoji-grid] button')].slice(0, 3).some((b) => b.dataset.iconPick === '🔑')`), 'recherche « clé » : propose 🔑');
+  await ev(`document.querySelector('[data-sheet="icon"] [data-icon-pick="🔑"]').click()`);
+  ok(await ev(`!document.querySelector('[data-sheet="icon"]').open && editor.getMarkdown().includes('> [!tip] 🔑\\n')`), 'icône d’encadré : écrite sur la ligne « > [!tip] 🔑 »');
+  await ev(`document.querySelector('[data-save]').click()`);
+  md = await saved((x) => x.includes('> [!tip] 🔑\n'), 'enregistrement de l’icône');
+  ok(true, 'icône d’encadré : enregistrée dans document.md');
+  await open();
+  ok(await ev(`[...document.querySelectorAll('[data-callout-icon]')].some((b) => b.textContent === '🔑')`), 'icône d’encadré : revient à l’ouverture');
+  ok(await ev(`(async () => {
+    document.querySelector('[data-doc-icon]').click();
+    await new Promise((r) => setTimeout(r, 100));
+    const recents = [...document.querySelectorAll('[data-sheet="icon"] [data-emoji-grid] button')].map((b) => b.dataset.iconPick);
+    document.querySelector('[data-sheet="icon"] [data-icon-pick="🔑"]').click();
+    return recents[0] === '🔑' && document.querySelector('[data-doc-icon]').textContent === '🔑' && editor.getMarkdown().includes('icon: 🔑');
+  })()`), 'icône du document : choisie dans « Récents » (localStorage), écrite dans le frontmatter');
+  ok(await ev(`(async () => {
+    const f = document.querySelector('[data-bq] [data-rich]'); f.focus();
+    getSelection().selectAllChildren(f); getSelection().collapseToEnd();
+    f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    document.querySelector('[data-emoji-insert]').click();
+    await new Promise((r) => setTimeout(r, 100));
+    document.querySelector('[data-sheet="icon"] [data-icon-pick="🔑"]').click();
+    return f.textContent.endsWith('🔑');
+  })()`), 'barre de mise en forme : insère un emoji dans le texte');
 
   ws.close();
 } catch (error) {
