@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* Polices du kit éditeur (latin, hébergées : aucun appel à un service tiers). */
+@font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/plus-jakarta-sans.woff2") format("woff2"); font-weight: 400 800; font-display: swap; }
+@font-face { font-family: Newsreader; src: url("fonts/newsreader.woff2") format("woff2"); font-weight: 500 600; font-display: swap; }
+
+/* Un élément caché par l'attribut `hidden` le reste, même avec une classe flex ou grid. */
+[hidden] { display: none !important; }
+
+/* Éditeur de rubrique */
+.ehg-edit { -webkit-touch-callout: none; }
+.ehg-edit:focus { outline: none; }
+.ehg-edit:empty::before { content: attr(data-placeholder); color: #a8a29e; pointer-events: none; display: block; }
+.ehg-edit ul { list-style: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
+.ehg-edit ol { list-style: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
+.ehg-highlight { background-color: #fde68a; padding: 0.05rem 0.28rem; border-radius: 0.3rem; color: inherit; }
+/* Impression : seul le contenu de la page reste (barres de l'app et actions masquées). */
+@media print {
+  body { background: #fff; }
+  body > header, body > nav, .no-print { display: none !important; }
+}
+.ehg-card { transition: box-shadow 0.2s ease, transform 0.18s ease; }
+.ehg-card:focus-within { box-shadow: 0 0 0 2px rgb(2 132 199 / 0.35); }
+.ehg-fullscreen { position: fixed; inset: 0.75rem; z-index: 40; max-width: 48rem; margin: auto; box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35); overflow: auto; }
+.ehg-dragging { opacity: 0.5; transform: scale(0.98); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.15); }
+@media (prefers-reduced-motion: no-preference) {
+  .ehg-new { animation: ehg-pop 0.2s ease-out; }
+  @keyframes ehg-pop { from { opacity: 0; transform: translateY(-0.5rem) scale(0.97); } }
+  @keyframes ehg-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .ehg-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .ehg-shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: ehg-shimmer 1.8s infinite;
+  }
+  @keyframes ehg-pulse-glow {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
+  }
+  .ehg-pulse-glow {
+    animation: ehg-pulse-glow 2s ease-in-out infinite;
+  }
+}

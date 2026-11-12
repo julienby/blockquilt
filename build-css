@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Génère blockquilt.css (Tailwind 3.4.17, binaire autonome, téléchargé une fois hors du repo).
+# À relancer après tout changement de classes dans index.html, blockquilt.js ou app.js, puis commiter blockquilt.css.
+set -euo pipefail
+VERSION=3.4.17
+BIN="${XDG_CACHE_HOME:-$HOME/.cache}/tailwindcss-$VERSION"
+cd "$(dirname "$0")"
+if [ ! -x "$BIN" ]; then
+  mkdir -p "$(dirname "$BIN")"
+  curl -fsSL -o "$BIN.tmp" "https://github.com/tailwindlabs/tailwindcss/releases/download/v$VERSION/tailwindcss-linux-x64"
+  chmod +x "$BIN.tmp" && mv "$BIN.tmp" "$BIN"
+fi
+"$BIN" -c tailwind.config.js -i blockquilt.src.css -o blockquilt.css --minify

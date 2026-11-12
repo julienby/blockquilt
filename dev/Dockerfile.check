@@ -1,0 +1,7 @@
+# Environnement de validation : Node + Chromium (paquets Debian), aucune dépendance npm.
+FROM node:22-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends chromium fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
+ENV CHROME=/usr/bin/chromium
+WORKDIR /app

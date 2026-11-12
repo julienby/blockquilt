@@ -1,0 +1,21 @@
+# docker compose up                → démo sur http://localhost:8080/ (enregistrement dans dev/data/)
+# docker compose run --rm check    → tests Node + essai dans Chromium ; exit ≠ 0 si rouge
+name: blockquilt
+services:
+  demo:
+    image: node:22-alpine
+    user: "${UID:-1000}:${GID:-1000}"   # les fichiers de dev/data/ restent à toi
+    working_dir: /app
+    command: node dev/server.js
+    volumes:
+      - .:/app
+    ports:
+      - "127.0.0.1:8080:8080"
+  check:
+    build:
+      context: dev
+      dockerfile: Dockerfile.check
+    profiles: [check]
+    volumes:
+      - .:/app:ro
+    command: sh -c "node tests/blocks_test.cjs && node dev/check.mjs"

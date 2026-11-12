@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-stone-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyHomeGuide — Kit UI Bento Pastel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        serif: ['"Newsreader"', 'serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f3f7f4',
+                            100: '#e2ece5',
+                            500: '#3f6e4e',
+                            600: '#32593e',
+                            700: '#274631',
+                            900: '#192d20',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
+
+        [contenteditable]:focus { outline: none; }
+        [contenteditable]:empty:before {
+            content: attr(data-placeholder);
+            color: #a8a29e;
+            pointer-events: none;
+            display: block;
+        }
+
+        .bento-card {
+            transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease;
+        }
+        .bento-card.dragging {
+            opacity: 0.45;
+            transform: scale(0.98);
+        }
+        .bento-card.drag-over-top {
+            border-top: 3px solid #32593e !important;
+        }
+        .bento-card.drag-over-bottom {
+            border-bottom: 3px solid #32593e !important;
+        }
+
+        mark, .ehg-highlight {
+            background-color: #fde68a;
+            color: #1c1917;
+            padding: 0.05rem 0.28rem;
+            border-radius: 0.3rem;
+        }
+
+        #floating-text-toolbar {
+            transition: opacity 0.12s ease, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes pulse-bar {
+            0%, 100% { transform: scaleY(0.35); }
+            50% { transform: scaleY(1); }
+        }
+        .wave-playing span {
+            animation: pulse-bar 0.85s ease-in-out infinite;
+        }
+        .wave-playing span:nth-child(2) { animation-delay: 0.15s; }
+        .wave-playing span:nth-child(3) { animation-delay: 0.3s; }
+        .wave-playing span:nth-child(4) { animation-delay: 0.45s; }
+        .wave-playing span:nth-child(5) { animation-delay: 0.2s; }
+    </style>
+</head>
+<body class="h-full font-sans text-stone-800 antialiased flex flex-col justify-start items-center p-0 sm:p-4 md:p-6 overflow-hidden select-none sm:select-auto">
+
+    <!-- COQUE PRINCIPALE RESPONSIVE (PLEIN ÉCRAN MOBILE / MAX-W-3XL SUR PC) -->
+    <div id="editor-shell" class="w-full max-w-3xl h-full bg-white sm:rounded-3xl sm:shadow-xl sm:border sm:border-stone-200/90 flex flex-col overflow-hidden relative">
+
+        <!-- EN-TÊTE : FICHE ACTIVE + SÉLECTEUR COMBOBOX + BASCULE ÉDITION / VISUALISATION -->
+        <header class="px-3.5 sm:px-6 pt-3 pb-3 border-b border-stone-200/80 bg-white/95 backdrop-blur-md sticky top-0 z-20 space-y-2.5 shrink-0">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                    <button onclick="openRubriqueModal()" class="w-10 h-10 rounded-2xl bg-stone-100 hover:bg-stone-200/80 border border-stone-200 flex items-center justify-center text-xl shrink-0 transition-transform active:scale-95" title="Changer d'icône">
+                        <span id="fiche-icon">☕</span>
+                    </button>
+                    <div class="min-w-0 flex-1">
+                        <span id="fiche-category" class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-brand-600 block truncate">Équipements</span>
+                        <h1 id="fiche-title" contenteditable="true" onblur="updateFicheTitle(this.innerText)" class="font-extrabold text-stone-900 text-base sm:text-lg leading-snug truncate focus:bg-stone-100 focus:px-1.5 rounded-lg transition-all" title="Cliquer pour renommer la fiche">Cafetière & Petit-déjeuner</h1>
+                    </div>
+                </div>
+
+                <!-- Sélecteur rapide de fiche (Combobox standard) -->
+                <select id="fiche-combobox" onchange="selectFiche(this.value)" class="bg-stone-100 border border-stone-200/90 rounded-xl px-2.5 py-1.5 text-xs font-bold text-stone-800 cursor-pointer focus:outline-none"></select>
+            </div>
+
+            <!-- Bascule unique : Mode Édition / Visualisation Invité -->
+            <div class="flex items-center bg-stone-100 p-1 rounded-xl border border-stone-200/80">
+                <button onclick="setViewMode(false)" id="tab-btn-edit" class="flex-1 py-1.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all bg-white text-stone-900 shadow-xs">
+                    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-brand-600"></i>
+                    <span>Mode Édition</span>
+                </button>
+                <button onclick="setViewMode(true)" id="tab-btn-preview" class="flex-1 py-1.5 px-3 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-all text-stone-600 hover:text-stone-900">
+                    <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                    <span>Visualisation Invité</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- MINI-BARRE CONTEXTUELLE DE TEXTE (GRAS, ITALIQUE, SOULIGNER, SURLIGNER — SANS AUCUNE COMBOBOX) -->
+        <div id="floating-text-toolbar"
+             onmousedown="event.preventDefault()"
+             class="hidden absolute z-40 bg-stone-900/95 backdrop-blur-md text-white rounded-full shadow-2xl px-2.5 py-1 flex items-center gap-0.5 border border-stone-700/90 text-xs">
+            <button type="button" onclick="applyInlineFormat('bold')" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full hover:bg-stone-800 active:scale-95 flex items-center justify-center font-extrabold text-xs" title="Gras">B</button>
+            <button type="button" onclick="applyInlineFormat('italic')" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full hover:bg-stone-800 active:scale-95 flex items-center justify-center italic font-serif text-sm" title="Italique">I</button>
+            <button type="button" onclick="applyInlineFormat('underline')" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full hover:bg-stone-800 active:scale-95 flex items-center justify-center underline font-semibold text-xs" title="Souligner">U</button>
+            <div class="w-px h-4 bg-stone-700 mx-0.5"></div>
+            <button type="button" onclick="applyInlineFormat('highlight')" class="px-2.5 h-7 sm:h-8 rounded-full hover:bg-stone-800 active:scale-95 flex items-center gap-1.5 text-[11px] font-semibold" title="Surligner pastel">
+                <span class="w-2.5 h-2.5 rounded-xs bg-amber-300 inline-block"></span> Surligner
+            </button>
+            <button type="button" onclick="applyInlineFormat('clear')" class="w-7 h-7 sm:w-8 sm:h-8 rounded-full hover:bg-stone-800 text-stone-400 hover:text-white active:scale-95 flex items-center justify-center" title="Effacer mise en forme">
+                <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+            </button>
+            <div class="w-2.5 h-2.5 bg-stone-900 border-r border-b border-stone-700 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2 pointer-events-none"></div>
+        </div>
+
+        <!-- ZONE DE CONTENU DÉFILANTE (CANVAS BENTO) -->
+        <main id="bento-canvas" onscroll="hideFloatingToolbar()" class="flex-1 overflow-y-auto px-3.5 sm:px-6 py-4 space-y-1 relative bg-stone-50/50"></main>
+
+        <!-- BARRE D'ACTION INFÉRIEURE UNIQUE : + AJOUTER UN BLOC & ✨ MAGIE IA -->
+        <footer id="bottom-action-bar" class="p-3 sm:px-6 sm:py-3.5 bg-white/95 backdrop-blur-md border-t border-stone-200/80 shrink-0 flex items-center gap-2.5">
+            <button onclick="openAddBlockModal(null)" class="flex-1 py-2.5 sm:py-3 px-4 rounded-2xl bg-brand-600 hover:bg-brand-700 active:scale-[0.99] text-white font-bold text-xs sm:text-sm shadow-xs flex items-center justify-center gap-2 transition-all">
+                <span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                </span>
+                <span>Ajouter un bloc</span>
+            </button>
+            <button onclick="openAiMagicModal()" class="py-2.5 sm:py-3 px-3.5 sm:px-4 rounded-2xl bg-amber-50 hover:bg-amber-100/90 active:scale-95 text-amber-950 border border-amber-300/90 font-bold text-xs sm:text-sm shadow-xs flex items-center justify-center gap-2 transition-all shrink-0">
+                <span class="w-5 h-5 rounded-full bg-amber-400/30 text-amber-700 flex items-center justify-center shrink-0">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                </span>
+                <span>Magie IA</span>
+            </button>
+        </footer>
+
+        <!-- TOAST FEEDBACK DISCRET -->
+        <div id="toast" class="pointer-events-none transition-all duration-300 absolute bottom-16 left-1/2 -translate-x-1/2 z-40 bg-stone-900/95 text-white text-xs font-medium px-3.5 py-2 rounded-full shadow-lg flex items-center gap-2 opacity-0 whitespace-nowrap">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="toast-text">Action effectuée</span>
+        </div>
+    </div>
+
+    <!-- MODALE 1 : SÉLECTIONNER UN TYPE DE BLOC À AJOUTER / INSÉRER -->
+    <div id="modal-add-block" class="hidden fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-stone-100 flex items-center justify-between bg-stone-50/70">
+                <div>
+                    <span id="modal-add-subtitle" class="text-[11px] font-bold uppercase tracking-wider text-brand-600 block">Insertion Sémantique</span>
+                    <h3 class="font-extrabold text-stone-900 text-base">Quel type de bloc ajouter ?</h3>
+                </div>
+                <button onclick="closeAddBlockModal()" class="w-8 h-8 rounded-full bg-stone-200/70 hover:bg-stone-300/70 text-stone-700 flex items-center justify-center">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-4 sm:p-5 max-h-[75vh] overflow-y-auto space-y-4">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-stone-400 block mb-2">Blocs Textuels (Tous convertibles entre eux)</span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="modal-textual-grid"></div>
+                </div>
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-stone-400 block mb-2">Blocs Médias</span>
+                    <div class="grid grid-cols-3 gap-2" id="modal-media-grid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE 2 : ASSISTANT MAGIQUE IA (✨) -->
+    <div id="modal-ai-magic" class="hidden fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-stone-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-stone-100 flex items-center justify-between bg-gradient-to-r from-amber-50 via-stone-50 to-emerald-50/60">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-9 h-9 rounded-2xl bg-amber-100 text-amber-700 border border-amber-200/80 flex items-center justify-center">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    </span>
+                    <div>
+                        <h3 class="font-extrabold text-stone-900 text-base">Assistant Magique IA</h3>
+                        <p class="text-[11px] text-stone-500">Transformez des notes brutes ou reformulez un bloc</p>
+                    </div>
+                </div>
+                <button onclick="closeAiMagicModal()" class="w-8 h-8 rounded-full bg-stone-200/70 text-stone-600 flex items-center justify-center">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+                <div id="ai-active-block-section" class="rounded-2xl bg-[#FAF8F5] border border-stone-200/90 p-3.5 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">Agir sur le bloc sélectionné</span>
+                        <span id="ai-active-block-badge" class="text-[10px] text-stone-500 font-semibold"></span>
+                    </div>
+                    <p id="ai-active-block-preview" class="text-xs text-stone-700 italic line-clamp-2"></p>
+                    <div class="grid grid-cols-3 gap-1.5 pt-1">
+                        <button onclick="applyAiToBlock('clarify')" class="p-2 rounded-xl bg-white hover:bg-amber-50 border border-stone-200 text-[11px] font-bold text-stone-800">Reformuler clair</button>
+                        <button onclick="applyAiToBlock('shorten')" class="p-2 rounded-xl bg-white hover:bg-amber-50 border border-stone-200 text-[11px] font-bold text-stone-800">Plus concis</button>
+                        <button onclick="applyAiToBlock('steps')" class="p-2 rounded-xl bg-white hover:bg-amber-50 border border-stone-200 text-[11px] font-bold text-stone-800">Découper étapes</button>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-stone-800 block">Ou écrivez un prompt / collez du texte en vrac :</label>
+                    <textarea id="ai-raw-input" rows="4" placeholder="Ex: Le lave-vaisselle s'ouvre fort. Programme Eco 50. Attention : ne pas mettre les couteaux bois. Astuce : pastilles sous l'évier. Code boîtier : 4829..." class="w-full rounded-2xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-800 focus:outline-none focus:bg-white leading-relaxed"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-1 border-t border-stone-100">
+                    <button onclick="closeAiMagicModal()" class="px-4 py-2.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-600">Annuler</button>
+                    <button onclick="runAiGeneration()" class="px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+                        <span>Générer les blocs Bento</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE 3 : CONFIRMATION DE SUPPRESSION SÉCURISÉE -->
+    <div id="modal-delete" class="hidden fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-stone-200 p-5 sm:p-6 space-y-4">
+            <div class="flex items-start gap-3.5">
+                <div class="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="font-extrabold text-stone-900 text-base">Supprimer ce bloc ?</h3>
+                    <p class="text-xs text-stone-500 mt-0.5">Cette action retirera définitivement l'élément de la fiche.</p>
+                </div>
+            </div>
+            <div class="rounded-2xl bg-stone-50 border border-stone-200 p-3 space-y-1">
+                <span id="delete-block-badge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-stone-200 text-stone-700 inline-block"></span>
+                <p id="delete-block-preview" class="text-xs text-stone-700 italic line-clamp-2"></p>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-1">
+                <button onclick="closeDeleteModal()" class="px-4 py-2.5 rounded-xl border border-stone-200 text-xs font-bold text-stone-600">Annuler</button>
+                <button onclick="confirmDeleteBlock()" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold">Supprimer définitivement</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALE 4 : CHANGEMENT D'ICÔNE ET DE RUBRIQUE -->
+    <div id="modal-rubrique" class="hidden fixed inset-0 z-50 bg-stone-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-stone-200 p-5 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-stone-900 text-sm">Choisir une icône</h3>
+                <button onclick="closeRubriqueModal()" class="w-8 h-8 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <div class="grid grid-cols-5 gap-2">
+                <button onclick="setFicheIcon('☕')" class="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-xl">☕</button>
+                <button onclick="setFicheIcon('🔑')" class="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-xl">🔑</button>
+                <button onclick="setFicheIcon('♻️')" class="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-xl">♻️</button>
+                <button onclick="setFicheIcon('🏊')" class="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-xl">🏊</button>
+                <button onclick="setFicheIcon('📶')" class="p-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-xl">📶</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // DESIGN SYSTEM BENTO PASTEL (SÉMANTIQUE & CONVERSION UNIVERSELLE)
+        // ============================================================================
+        const SEMANTICS = {
+            title:   { id: 'title',   convertible: true,  label: 'Titre de section',   card: 'bg-white border-stone-300/90 text-stone-900',         select: 'bg-stone-900 text-white border-stone-900',         icon: 'heading' },
+            text:    { id: 'text',    convertible: true,  label: 'Texte / Explication',card: 'bg-[#FAF8F5] border-stone-200/90 text-stone-800',     select: 'bg-stone-200 text-stone-800 border-stone-300',     icon: 'align-left' },
+            tip:     { id: 'tip',     convertible: true,  label: 'Astuce pratique',    card: 'bg-[#EEF6F0] border-emerald-200/90 text-emerald-950', select: 'bg-emerald-100 text-emerald-900 border-emerald-300', icon: 'sparkles' },
+            advice:  { id: 'advice',  convertible: true,  label: 'Conseil local',      card: 'bg-[#F3F1FA] border-indigo-200/90 text-indigo-950',   select: 'bg-indigo-100 text-indigo-900 border-indigo-300',   icon: 'compass' },
+            warning: { id: 'warning', convertible: true,  label: 'Consigne / Vigilance',card: 'bg-[#FDF6E9] border-amber-200/90 text-amber-950',    select: 'bg-amber-100 text-amber-900 border-amber-300',     icon: 'alert-triangle' },
+            list:    { id: 'list',    convertible: true,  label: 'Liste à puces',      card: 'bg-[#F5F5F0] border-stone-300/80 text-stone-900',     select: 'bg-stone-200 text-stone-800 border-stone-300',     icon: 'list-checks' },
+            secret:  { id: 'secret',  convertible: true,  label: 'Code / Clé / Wi-Fi', card: 'bg-[#EFF5FB] border-sky-200/90 text-sky-950',         select: 'bg-sky-100 text-sky-900 border-sky-300',         icon: 'key-round' },
+            photo:   { id: 'photo',   convertible: false, label: 'Photo',              card: 'bg-white border-stone-200 text-stone-800',             select: 'bg-stone-100 text-stone-700 border-stone-200',     icon: 'image' },
+            audio:   { id: 'audio',   convertible: false, label: 'Mémo Vocal',         card: 'bg-purple-50/70 border-purple-200 text-purple-950',    select: 'bg-purple-100 text-purple-900 border-purple-200',   icon: 'mic' },
+            video:   { id: 'video',   convertible: false, label: 'Mini Vidéo',         card: 'bg-rose-50/70 border-rose-200 text-rose-950',         select: 'bg-rose-100 text-rose-900 border-rose-200',       icon: 'video' },
+        };
+
+        const CONVERTIBLES = Object.keys(SEMANTICS).filter(k => SEMANTICS[k].convertible);
+
+        // Données d'exemple
+        let fiches = {
+            cafe: {
+                id: 'cafe',
+                icon: '☕',
+                category: 'Équipements',
+                title: 'Cafetière & Petit-déjeuner',
+                blocks: [
+                    { id: 'b1', type: 'title', content: 'Mise en route de la machine à grains' },
+                    { id: 'b2', type: 'text', content: 'La machine expresso broie le café à la demande. Le <b>réservoir d’eau</b> s’extrait par <mark class="ehg-highlight">l’avant droit</mark>.' },
+                    { id: 'b3', type: 'list', content: 'Allumez avec le bouton latéral\nAttendez 15 secondes le rinçage\nPlacez votre tasse et appuyez sur 1 Tasse' },
+                    { id: 'b4', type: 'tip', content: 'Du café en grain bio vous attend dans le bocal hermétique sur l’étagère.' },
+                    { id: 'b5', type: 'warning', content: 'Ne jamais verser de café moulu ou de cacao dans le bac supérieur.' }
+                ]
+            },
+            arrivee: {
+                id: 'arrivee',
+                icon: '🔑',
+                category: 'Arrivée & Accès',
+                title: 'Arrivée autonome & Wi-Fi',
+                blocks: [
+                    { id: 'a1', type: 'title', content: 'Accès au logement & Boîte à clés' },
+                    { id: 'a2', type: 'secret', keyLabel: 'Code Boîte à clés (Portail noir)', content: '4829 B' },
+                    { id: 'a3', type: 'secret', keyLabel: 'Wi-Fi Fibre (Mot de passe)', content: 'MaisonDesPommiers2026' }
+                ]
+            }
+        };
+
+        let currentFicheId = 'cafe';
+        let isGuestMode = false;
+        let activeBlockId = null;
+        let pendingInsertIndex = null;
+        let pendingDeleteBlockId = null;
+        let draggedIndex = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderFicheSelect();
+            renderModalGrids();
+            renderHeader();
+            renderCanvas();
+            setupTextSelectionListener();
+        });
+
+        function renderFicheSelect() {
+            const select = document.getElementById('fiche-combobox');
+            select.innerHTML = Object.values(fiches).map(f => `
+                <option value="${f.id}" ${f.id === currentFicheId ? 'selected' : ''}>${f.icon} ${f.title}</option>
+            `).join('');
+        }
+
+        function renderHeader() {
+            const f = fiches[currentFicheId];
+            document.getElementById('fiche-icon').textContent = f.icon;
+            document.getElementById('fiche-category').textContent = f.category;
+            document.getElementById('fiche-title').textContent = f.title;
+        }
+
+        // ============================================================================
+        // RENDU DU FLUX BENTO PASTEL
+        // ============================================================================
+        function renderCanvas() {
+            const canvas = document.getElementById('bento-canvas');
+            const f = fiches[currentFicheId];
+            const bottomBar = document.getElementById('bottom-action-bar');
+            hideFloatingToolbar();
+
+            if (isGuestMode) {
+                bottomBar.classList.add('hidden');
+                canvas.innerHTML = `
+                    <div class="space-y-3 pb-6">
+                        ${f.blocks.map(b => {
+                            const sem = SEMANTICS[b.type];
+                            if (b.type === 'title') return `<h2 class="font-serif font-bold text-lg text-stone-900 pt-2 border-b border-stone-200 pb-1">${b.content}</h2>`;
+                            if (b.type === 'secret') return `
+                                <div class="rounded-2xl border p-4 flex items-center justify-between gap-2 ${sem.card}">
+                                    <div>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-sky-800 block">${b.keyLabel || 'Code'}</span>
+                                        <span class="font-mono font-bold text-base text-sky-950">${stripHtml(b.content)}</span>
+                                    </div>
+                                    <button onclick="navigator.clipboard.writeText('${stripHtml(b.content)}'); showToast('Copié !')" class="px-3 py-1.5 rounded-xl bg-white border border-sky-200 text-xs font-bold text-sky-900 shadow-2xs">Copier</button>
+                                </div>
+                            `;
+                            if (b.type === 'list') {
+                                const lines = b.content.split('\n').filter(Boolean);
+                                return `
+                                    <div class="rounded-2xl border p-4 space-y-2 ${sem.card}">
+                                        ${lines.map((l, i) => `
+                                            <div class="flex items-start gap-2.5 text-xs sm:text-sm">
+                                                <span class="w-5 h-5 rounded-full bg-stone-900 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">${i + 1}</span>
+                                                <span>${l}</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                `;
+                            }
+                            return `<div class="rounded-2xl border p-4 text-xs sm:text-sm leading-relaxed ${sem.card}">${b.content}</div>`;
+                        }).join('')}
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            bottomBar.classList.remove('hidden');
+
+            let html = '<div class="pb-6">';
+            f.blocks.forEach((b, idx) => {
+                const sem = SEMANTICS[b.type];
+                const isFirst = idx === 0;
+                const isLast = idx === f.blocks.length - 1;
+
+                html += `
+                    <article id="card-${b.id}"
+                             draggable="true"
+                             ondragstart="onDragStart(event, ${idx})"
+                             ondragover="onDragOver(event, ${idx})"
+                             ondragleave="onDragLeave(event)"
+                             ondrop="onDrop(event, ${idx})"
+                             ondragend="onDragEnd(event)"
+                             class="bento-card rounded-2xl border ${sem.card} flex items-stretch overflow-hidden">
+
+                        <!-- CORPS GAUCHE DE LA CARTE -->
+                        <div class="flex-1 p-3.5 sm:p-4 min-w-0 flex flex-col justify-between">
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                ${sem.convertible ? `
+                                    <select onchange="convertBlock('${b.id}', this.value)" class="rounded-full text-[11px] sm:text-xs font-bold px-3 py-1 border cursor-pointer ${sem.select}">
+                                        ${CONVERTIBLES.map(k => `<option value="${k}" ${b.type === k ? 'selected' : ''}>${SEMANTICS[k].label}</option>`).join('')}
+                                    </select>
+                                ` : `
+                                    <span class="rounded-full text-[11px] font-bold px-3 py-1 border ${sem.select}">${sem.label}</span>
+                                `}
+
+                                <button onclick="askDelete('${b.id}')" class="p-1.5 rounded-xl text-stone-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+
+                            <!-- ZONE ÉDITABLE SELON TYPE -->
+                            ${renderEditable(b)}
+                        </div>
+
+                        <!-- RAIL DROIT : ▲ MONTER / ⋮⋮ GLISSER-DÉPOSER / ▼ DESCENDRE -->
+                        <aside class="w-10 sm:w-11 border-l border-black/5 bg-black/[0.02] flex flex-col items-center justify-between py-1.5 shrink-0 select-none">
+                            <button onclick="moveBlock(${idx}, -1)" ${isFirst ? 'disabled' : ''} class="w-8 h-8 rounded-lg flex items-center justify-center text-stone-500 hover:text-stone-900 disabled:opacity-20"><i data-lucide="chevron-up" class="w-4 h-4"></i></button>
+                            <div class="w-8 h-8 flex items-center justify-center text-stone-400 cursor-grab active:cursor-grabbing"><i data-lucide="grip-vertical" class="w-4 h-4"></i></div>
+                            <button onclick="moveBlock(${idx}, 1)" ${isLast ? 'disabled' : ''} class="w-8 h-8 rounded-lg flex items-center justify-center text-stone-500 hover:text-stone-900 disabled:opacity-20"><i data-lucide="chevron-down" class="w-4 h-4"></i></button>
+                        </aside>
+                    </article>
+                `;
+
+                // Petit bouton + strictement entre 2 blocs
+                if (idx < f.blocks.length - 1) {
+                    html += `
+                        <div class="relative py-1 flex items-center justify-center group">
+                            <div class="w-full h-px bg-stone-200 group-hover:bg-brand-500/50"></div>
+                            <button onclick="openAddBlockModal(${idx + 1})" class="relative z-10 px-2.5 py-0.5 rounded-full bg-white hover:bg-brand-600 text-stone-400 hover:text-white border border-stone-200 text-[10px] font-bold shadow-2xs transition-all">+ Insérer</button>
+                        </div>
+                    `;
+                }
+            });
+            html += '</div>';
+
+            canvas.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function renderEditable(b) {
+            if (b.type === 'title') {
+                return `<div contenteditable="true" data-rich-text="true" data-id="${b.id}" onfocus="activeBlockId='${b.id}'" onblur="saveContent('${b.id}', this.innerHTML)" class="font-serif font-bold text-base sm:text-lg text-stone-900 leading-snug">${b.content}</div>`;
+            }
+            if (b.type === 'list') {
+                return `<textarea rows="${Math.max(2, b.content.split('\n').length)}" onfocus="activeBlockId='${b.id}'" onblur="saveContent('${b.id}', this.value)" class="w-full rounded-xl bg-white/80 border border-stone-300 p-2 text-xs sm:text-sm font-medium focus:outline-none">${stripHtml(b.content)}</textarea>`;
+            }
+            if (b.type === 'secret') {
+                return `
+                    <div class="space-y-1.5">
+                        <input type="text" value="${escapeHtml(b.keyLabel || 'Code / Clé / Wi-Fi')}" onblur="saveSecretLabel('${b.id}', this.value)" class="w-full bg-white/70 border border-sky-200 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-sky-900">
+                        <input type="text" value="${escapeHtml(stripHtml(b.content))}" onblur="saveContent('${b.id}', this.value)" class="w-full bg-white rounded-xl px-3 py-2 border border-sky-200 font-mono font-bold text-sm sm:text-base text-sky-950">
+                    </div>
+                `;
+            }
+            return `<div contenteditable="true" data-rich-text="true" data-id="${b.id}" onfocus="activeBlockId='${b.id}'" onblur="saveContent('${b.id}', this.innerHTML)" class="text-xs sm:text-sm leading-relaxed font-medium">${b.content}</div>`;
+        }
+
+        // ============================================================================
+        // MINI-BARRE DE FORMATAGE TEXTE FLOTTANTE (MEDIUM STYLE)
+        // ============================================================================
+        function setupTextSelectionListener() {
+            document.addEventListener('selectionchange', () => {
+                if (isGuestMode) return;
+                const toolbar = document.getElementById('floating-text-toolbar');
+                const shell = document.getElementById('editor-shell');
+                const sel = window.getSelection();
+
+                if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+                    toolbar.classList.add('hidden');
+                    return;
+                }
+
+                const anchor = sel.anchorNode;
+                const editable = (anchor.nodeType === 1 ? anchor : anchor.parentElement)?.closest('[data-rich-text="true"]');
+                if (!editable) {
+                    toolbar.classList.add('hidden');
+                    return;
+                }
+
+                const rect = sel.getRangeAt(0).getBoundingClientRect();
+                const shellRect = shell.getBoundingClientRect();
+                toolbar.classList.remove('hidden');
+
+                const toolbarWidth = toolbar.offsetWidth || 210;
+                let top = rect.top - shellRect.top - 44;
+                let left = (rect.left - shellRect.left) + (rect.width / 2) - (toolbarWidth / 2);
+
+                top = Math.max(50, Math.min(shellRect.height - 80, top));
+                left = Math.max(10, Math.min(shellRect.width - toolbarWidth - 10, left));
+
+                toolbar.style.top = `${top}px`;
+                toolbar.style.left = `${left}px`;
+            });
+        }
+
+        function hideFloatingToolbar() {
+            document.getElementById('floating-text-toolbar')?.classList.add('hidden');
+        }
+
+        function applyInlineFormat(cmd) {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return;
+            const editable = (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement)?.closest('[data-rich-text="true"]');
+            if (!editable) return;
+
+            if (cmd === 'bold' || cmd === 'italic' || cmd === 'underline') {
+                document.execCommand(cmd, false, null);
+            } else if (cmd === 'highlight') {
+                const range = sel.getRangeAt(0);
+                const parentMark = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement)?.closest('mark');
+                if (parentMark) {
+                    parentMark.replaceWith(document.createTextNode(parentMark.textContent));
+                } else {
+                    const mark = document.createElement('mark');
+                    mark.className = 'ehg-highlight';
+                    mark.appendChild(range.extractContents());
+                    range.insertNode(mark);
+                }
+            } else if (cmd === 'clear') {
+                document.execCommand('removeFormat', false, null);
+                editable.querySelectorAll('mark').forEach(m => m.replaceWith(document.createTextNode(m.textContent)));
+            }
+
+            saveContent(editable.dataset.id, editable.innerHTML);
+            showToast('Format appliqué');
+        }
+
+        // ============================================================================
+        // ACTIONS & CONVERSION UNIVERSELLE
+        // ============================================================================
+        function convertBlock(id, newType) {
+            const b = fiches[currentFicheId].blocks.find(x => x.id === id);
+            if (!b || b.type === newType) return;
+            const oldType = b.type;
+            const plain = stripHtml(b.content).trim();
+
+            if (newType === 'list' && oldType !== 'list') {
+                const parts = plain.split(/\.\s+|\n+/).filter(Boolean);
+                b.content = parts.join('\n');
+            } else if (oldType === 'list' && newType !== 'list') {
+                const lines = plain.split('\n').filter(Boolean);
+                b.content = lines.join('. ') + '.';
+            }
+
+            if (newType === 'secret' && !b.keyLabel) {
+                b.keyLabel = 'Code / Clé / Wi-Fi';
+            }
+
+            b.type = newType;
+            renderCanvas();
+            showToast(`Converti en ${SEMANTICS[newType].label}`);
+        }
+
+        function saveContent(id, val) {
+            const b = fiches[currentFicheId].blocks.find(x => x.id === id);
+            if (b) b.content = val.trim();
+        }
+
+        function saveSecretLabel(id, val) {
+            const b = fiches[currentFicheId].blocks.find(x => x.id === id);
+            if (b) b.keyLabel = val.trim();
+        }
+
+        function moveBlock(idx, dir) {
+            const blocks = fiches[currentFicheId].blocks;
+            const target = idx + dir;
+            if (target < 0 || target >= blocks.length) return;
+            const temp = blocks[idx];
+            blocks[idx] = blocks[target];
+            blocks[target] = temp;
+            renderCanvas();
+        }
+
+        // Drag & Drop
+        function onDragStart(e, idx) { draggedIndex = idx; e.currentTarget.classList.add('dragging'); }
+        function onDragOver(e, idx) { e.preventDefault(); }
+        function onDragLeave(e) {}
+        function onDrop(e, targetIdx) {
+            e.preventDefault();
+            if (draggedIndex === null || draggedIndex === targetIdx) return;
+            const blocks = fiches[currentFicheId].blocks;
+            const [moved] = blocks.splice(draggedIndex, 1);
+            blocks.splice(targetIdx, 0, moved);
+            renderCanvas();
+            showToast('Ordre mis à jour');
+        }
+        function onDragEnd(e) { draggedIndex = null; }
+
+        // ============================================================================
+        // MODALES
+        // ============================================================================
+        function renderModalGrids() {
+            const textGrid = document.getElementById('modal-textual-grid');
+            const mediaGrid = document.getElementById('modal-media-grid');
+
+            textGrid.innerHTML = CONVERTIBLES.map(k => `
+                <button onclick="insertBlock('${k}')" class="p-3 rounded-2xl border text-left flex items-center justify-between ${SEMANTICS[k].card}">
+                    <span class="font-bold text-xs">${SEMANTICS[k].label}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full border ${SEMANTICS[k].select}">+</span>
+                </button>
+            `).join('');
+
+            ['photo', 'audio', 'video'].forEach(k => {
+                mediaGrid.innerHTML += `
+                    <button onclick="insertBlock('${k}')" class="p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 ${SEMANTICS[k].card}">
+                        <span class="font-bold text-xs">${SEMANTICS[k].label}</span>
+                    </button>
+                `;
+            });
+        }
+
+        function openAddBlockModal(idx) {
+            pendingInsertIndex = idx;
+            document.getElementById('modal-add-block').classList.remove('hidden');
+        }
+        function closeAddBlockModal() {
+            document.getElementById('modal-add-block').classList.add('hidden');
+        }
+
+        function insertBlock(type) {
+            const defaults = {
+                title: 'Nouvelle section',
+                text: 'Explication simple du fonctionnement.',
+                tip: 'Astuce pour faciliter le séjour.',
+                advice: 'Notre recommandation locale.',
+                warning: 'Consigne importante à respecter.',
+                list: 'Première étape\nDeuxième étape',
+                secret: '1234 A',
+                photo: 'Légende photo',
+                audio: 'Mémo vocal (15s)',
+                video: 'Mini vidéo (10s)'
+            };
+            const newB = { id: 'b_' + Date.now().toString(36), type: type, content: defaults[type] };
+            const blocks = fiches[currentFicheId].blocks;
+            if (pendingInsertIndex === null) blocks.push(newB);
+            else blocks.splice(pendingInsertIndex, 0, newB);
+            closeAddBlockModal();
+            renderCanvas();
+            showToast('Bloc ajouté');
+        }
+
+        // Assistant Magique IA
+        function openAiMagicModal() {
+            const f = fiches[currentFicheId];
+            const target = f.blocks.find(b => b.id === activeBlockId) || f.blocks[0];
+            const activeSection = document.getElementById('ai-active-block-section');
+
+            if (target) {
+                activeBlockId = target.id;
+                activeSection.classList.remove('hidden');
+                document.getElementById('ai-active-block-badge').textContent = SEMANTICS[target.type].label;
+                document.getElementById('ai-active-block-preview').textContent = `"${stripHtml(target.content)}"`;
+            } else {
+                activeSection.classList.add('hidden');
+            }
+            document.getElementById('modal-ai-magic').classList.remove('hidden');
+        }
+        function closeAiMagicModal() {
+            document.getElementById('modal-ai-magic').classList.add('hidden');
+        }
+
+        function applyAiToBlock(action) {
+            const b = fiches[currentFicheId].blocks.find(x => x.id === activeBlockId);
+            if (!b) return;
+            const plain = stripHtml(b.content);
+            if (action === 'clarify') b.content = `✨ ${plain} — <mark class="ehg-highlight">clair et immédiat</mark>.`;
+            if (action === 'shorten') b.content = `<b>En bref :</b> ${plain.split('.')[0]}.`;
+            if (action === 'steps') {
+                b.type = 'list';
+                b.content = plain.split('.').filter(Boolean).map(s => s.trim()).join('\n');
+            }
+            closeAiMagicModal();
+            renderCanvas();
+            showToast('Bloc optimisé par l’IA');
+        }
+
+        function runAiGeneration() {
+            const raw = document.getElementById('ai-raw-input').value.trim();
+            if (!raw) return closeAiMagicModal();
+
+            const sentences = raw.split(/(?<=[.!?])\s+|\n+/).filter(Boolean);
+            sentences.forEach(s => {
+                let type = 'text';
+                const lower = s.toLowerCase();
+                if (lower.includes('attention') || lower.includes('jamais')) type = 'warning';
+                else if (lower.includes('astuce')) type = 'tip';
+                else if (lower.includes('code')) type = 'secret';
+                fiches[currentFicheId].blocks.push({ id: 'b_' + Math.random().toString(36).substr(2, 5), type: type, content: s });
+            });
+            closeAiMagicModal();
+            renderCanvas();
+            showToast('Blocs Bento générés par l’IA');
+        }
+
+        // Suppression sécurisée
+        function askDelete(id) {
+            pendingDeleteBlockId = id;
+            const b = fiches[currentFicheId].blocks.find(x => x.id === id);
+            document.getElementById('delete-block-badge').textContent = SEMANTICS[b.type].label;
+            document.getElementById('delete-block-preview').textContent = stripHtml(b.content);
+            document.getElementById('modal-delete').classList.remove('hidden');
+        }
+        function closeDeleteModal() { document.getElementById('modal-delete').classList.add('hidden'); }
+        function confirmDeleteBlock() {
+            fiches[currentFicheId].blocks = fiches[currentFicheId].blocks.filter(x => x.id !== pendingDeleteBlockId);
+            closeDeleteModal();
+            renderCanvas();
+            showToast('Bloc supprimé');
+        }
+
+        // Navigation
+        function selectFiche(id) { currentFicheId = id; renderHeader(); renderCanvas(); }
+        function updateFicheTitle(t) { fiches[currentFicheId].title = t.trim(); renderFicheSelect(); }
+        function setViewMode(preview) {
+            isGuestMode = preview;
+            document.getElementById('tab-btn-edit').className = !preview ? 'flex-1 py-1.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all bg-white text-stone-900 shadow-xs' : 'flex-1 py-1.5 px-3 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-all text-stone-600 hover:text-stone-900';
+            document.getElementById('tab-btn-preview').className = preview ? 'flex-1 py-1.5 px-3 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all bg-brand-600 text-white shadow-xs' : 'flex-1 py-1.5 px-3 rounded-lg text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-all text-stone-600 hover:text-stone-900';
+            renderCanvas();
+        }
+        function openRubriqueModal() { document.getElementById('modal-rubrique').classList.remove('hidden'); }
+        function closeRubriqueModal() { document.getElementById('modal-rubrique').classList.add('hidden'); }
+        function setFicheIcon(ico) { fiches[currentFicheId].icon = ico; renderHeader(); renderFicheSelect(); closeRubriqueModal(); }
+
+        // Utilitaires
+        function stripHtml(h) { return (h || '').replace(/<[^>]*>?/gm, ''); }
+        function escapeHtml(t) { return (t || '').replace(/"/g, '&quot;'); }
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-text').textContent = msg;
+            t.classList.remove('opacity-0');
+            setTimeout(() => t.classList.add('opacity-0'), 1800);
+        }
+    </script>
+</body>
+</html>
