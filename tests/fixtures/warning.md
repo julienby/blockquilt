@@ -1,0 +1,2 @@
+> [!warning] 🚭
+> Ne pas fumer.

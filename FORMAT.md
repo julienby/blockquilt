@@ -1,0 +1,79 @@
+# Format blockquilt
+
+Un document blockquilt est un fichier texte en Markdown. Il commence par un frontmatter facultatif, puis une suite de blocs séparés par une ligne vide. Tout ce qui suit est lu par l'éditeur sans perte. Ce qui sort de ces règles n'est pas perdu : l'éditeur le garde tel quel, dans un bloc « texte source ».
+
+## Exemple complet
+
+````markdown
+---
+title: Arrivée à la maison
+icon: 🏡
+---
+
+## Se garer
+
+Le portail s'ouvre avec le **bip gris**. Garez-vous *à gauche*, devant le ++garage++.
+Le code est ==1515==, voir [le plan](https://exemple.fr/plan).
+
+- porte bleue
+- boîte aux lettres à droite
+
+> [!tip] 🔑 La clé
+> Elle est dans la boîte aux lettres.
+
+> [!warning]
+> Ne pas fumer dans la maison.
+
+### Pour aller plus loin
+
+1. Ouvrir le portail
+2. Allumer la lumière
+
+> Une maison est une machine à habiter.
+
+![Le portail vu de la rue](media/abc123def456)
+
+https://youtu.be/dQw4w9WgXcQ
+
+---
+
+```sh
+ssh maison.local
+```
+````
+
+## Règles
+
+**Frontmatter.** Facultatif, seulement en tête. Une ligne `---`, puis des lignes `clé: valeur` à plat (pas de listes, pas d'imbrication, une clé une seule fois), puis `---`. L'éditeur lit `title` (titre du document) et `icon` (un emoji). Les autres clés sont gardées telles quelles, dans le même ordre.
+
+**Blocs.** Un bloc par paragraphe, séparés par une ligne vide. Ne jamais mettre deux blocs sans ligne vide entre eux.
+
+| Bloc | Écriture |
+|---|---|
+| Titre H2 | `## Titre` sur une seule ligne |
+| Titre H3 | `### Titre` sur une seule ligne |
+| Texte | Lignes de texte. Un retour à la ligne simple reste dans le même paragraphe. |
+| Liste | Lignes `- élément` ou `1. élément`, dans un bloc texte |
+| Citation | Chaque ligne commence par `> ` |
+| Encadré | Première ligne `> [!type]`, puis facultatifs un emoji et un titre : `> [!tip] 🔑 La clé`. Le texte suit, chaque ligne commençant par `> `. |
+| Photo | `![légende](media/<id>)` ou `![légende](https://…)`, seule sur sa ligne |
+| Vidéo | Adresse YouTube ou Vimeo, seule sur sa ligne |
+| Ligne horizontale | `---` seul, entre deux lignes vides |
+| Code | Trois accents graves suivis du langage (` ```js `), le code, puis trois accents graves |
+
+**Types d'encadré** (en minuscules) : `info`, `tip` (astuce), `success`, `warning` (attention), `danger`.
+
+**Mise en forme dans le texte** : `**gras**`, `*italique*`, `++souligné++`, `==surligné==`, `` `code` ``, `[lien](https://…)`. Liens acceptés : `https://`, `http://`, `mailto:`, `tel:`.
+
+**Pour écrire un caractère qui a un sens** (`*`, `[`, `` ` ``, `#` en début de ligne…), le précéder de `\`.
+
+## Ce qu'il ne faut pas écrire
+
+- `#` (titre de niveau 1) dans le corps : le titre du document est dans le frontmatter.
+- Un encadré dans un autre, ou une liste à plusieurs niveaux.
+- Du HTML brut, des tableaux : gardés tels quels, mais affichés comme du texte source.
+- Un bloc `:::` dans un autre bloc `:::`.
+
+## Contrôle
+
+`Blocks.lint(texte)` renvoie la liste des problèmes `{ line, message }` : frontmatter mal formé, bloc `:::` ou de code non fermé, type d'encadré inconnu, bloc non reconnu. Une liste vide veut dire que l'éditeur relit tout le texte sans perte.

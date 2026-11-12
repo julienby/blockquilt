@@ -5,20 +5,35 @@
 Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable="true" role="textbox" aria-multiline="true" spellcheck="false" data-placeholder="${Blocks.esc(ph).replace(/"/g, '&quot;')}" class="bq-edit ${cls}">${html}</div>`;
 {
   const rich = { edit: (b, ui) => ui.editable('min-h-10 text-sm leading-relaxed', b.html, 'Insérez votre texte…', 'data-body data-rich'), read: (card, b) => { b.html = card.querySelector('[data-body]').innerHTML; } };
-  for (const k of ['text', 'tip', 'advice', 'warning']) Object.assign(Blocks.types[k], rich);
-  Object.assign(Blocks.types.title, {
-    edit: (b, ui) => ui.editable('font-news text-base sm:text-lg font-semibold leading-tight tracking-tight text-stone-900', b.html, 'Saisissez un titre de section…', 'data-body data-plain'),
-    read: rich.read,
-  });
+  Object.assign(Blocks.types.text, rich);
+  Object.assign(Blocks.types.quote, { ...rich, edit: (b, ui) => ui.editable('min-h-10 text-sm italic leading-relaxed', b.html, 'Une citation…', 'data-body data-rich') });
+  // Encadrés : icône (emoji) et titre facultatifs, puis le texte.
+  for (const k of Blocks.CALLOUTS) {
+    Object.assign(Blocks.types[k], {
+      edit: (b, ui) => `<div class="mb-1.5 flex items-center gap-2"><span data-callout-icon class="text-lg leading-none" title="Icône">${ui.esc(b.icon || '')}</span>
+          <input data-callout-title value="${ui.attr(b.title || '')}" placeholder="Titre (facultatif)" aria-label="Titre de l’encadré" class="min-w-0 flex-1 bg-transparent text-sm font-bold placeholder:font-normal placeholder:opacity-50 focus:outline-none"></div>
+          ${rich.edit(b, ui)}`,
+      read: (card, b) => { rich.read(card, b); b.title = card.querySelector('[data-callout-title]').value; },
+    });
+  }
+  for (const [k, cls, ph] of [['h2', 'text-lg sm:text-xl', 'Titre de section…'], ['h3', 'text-base sm:text-lg', 'Sous-titre…']]) {
+    Object.assign(Blocks.types[k], { edit: (b, ui) => ui.editable(`font-news ${cls} font-semibold leading-tight tracking-tight text-stone-900`, b.html, ph, 'data-body data-plain'), read: rich.read });
+  }
   Object.assign(Blocks.types.photo, {
-    edit: (b, ui) => `<div class="space-y-2">${b.file ? `<div class="overflow-hidden rounded-xl border border-stone-200 bg-stone-100"><img src="${ui.attr(ui.media + b.file)}" alt="" class="h-36 w-full object-cover"></div>` : ''}
+    edit: (b, ui) => `<div class="space-y-2">${b.src ? `<div class="overflow-hidden rounded-xl border border-stone-200 bg-stone-100"><img src="${ui.attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="h-36 w-full object-cover"></div>` : ''}
           ${ui.editable('text-xs italic text-stone-600', ui.esc(b.alt), 'Légende de la photo (lue aux personnes malvoyantes)…', 'data-body data-plain')}</div>`,
     read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
   });
   Object.assign(Blocks.types.video, {
-    edit: (b, ui) => `<div class="space-y-2"><div class="flex h-24 flex-col items-center justify-center gap-1 rounded-xl bg-stone-900 text-white"><span class="flex size-9 items-center justify-center rounded-full bg-white/20">${ui.ic('video', 'size-4')}</span><span class="text-[11px] text-stone-300">Lecteur affiché à l’invité</span></div>
+    edit: (b, ui) => `<div class="space-y-2"><div class="flex h-24 flex-col items-center justify-center gap-1 rounded-xl bg-stone-900 text-white"><span class="flex size-9 items-center justify-center rounded-full bg-white/20">${ui.ic('video', 'size-4')}</span><span class="text-[11px] text-stone-300">Lecteur affiché au lecteur</span></div>
           <input data-url type="url" value="${ui.attr(b.url)}" class="w-full rounded-lg border border-rose-200 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo"></div>`,
     read: (card, b) => { b.url = card.querySelector('[data-url]').value; },
+  });
+  Object.assign(Blocks.types.hr, { edit: () => '<hr class="my-2 border-t-2 border-stone-300">', read: () => {} });
+  Object.assign(Blocks.types.code, {
+    edit: (b, ui) => `<input data-lang value="${ui.attr(b.lang)}" placeholder="langage (js, html, sh…)" aria-label="Langage du code" class="mb-1.5 w-full bg-transparent font-mono text-xs focus:outline-none">
+          <textarea data-code rows="${Math.min(16, Math.max(3, b.code.split('\n').length))}" spellcheck="false" aria-label="Code" class="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-xs leading-5">${ui.esc(b.code)}</textarea>`,
+    read: (card, b) => { b.lang = card.querySelector('[data-lang]').value.trim().replace(/[^\w+#.-]/g, ''); b.code = card.querySelector('[data-code]').value; },
   });
   // Repli : le texte du bloc, tel quel. Sert aussi à tout type enregistré sans carte d'édition propre.
   const source = {
@@ -55,6 +70,7 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
 
   let slug = root.dataset.slug;
   let icon = '';
+  let meta = {};
   let blocks = [];
   let dirty = false;
   let guestMode = false;
@@ -87,8 +103,14 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
   addEventListener('beforeunload', (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
 
   // ---- Titre et icône de la rubrique : « ## 🔑 Arrivée » ----
-  const splitHeading = Blocks.splitHeading;
-  const heading = () => '## ' + [icon, titleEl.textContent.trim()].filter(Boolean).join(' ');
+  // Titre et icône vivent dans le frontmatter ; les autres clés sont gardées dans leur ordre.
+  const docMeta = () => {
+    const m = { ...meta };
+    const title = titleEl.textContent.trim();
+    if (title) m.title = title; else delete m.title;
+    if (icon) m.icon = icon; else delete m.icon;
+    return m;
+  };
   const showIcon = () => { iconEl.textContent = icon || '📄'; };
 
   // ---- Lecture de l'écran vers le modèle (avant tout nouveau dessin) ----
@@ -101,7 +123,7 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
   };
   const markdown = () => {
     syncFromDom();
-    return Blocks.serialize(heading(), blocks.map((b) => ({ text: Blocks.toMarkdown(b) })));
+    return Blocks.serialize(docMeta(), blocks);
   };
 
   // ---- Dessin : bouton + Insérer au milieu SANS trait horizontal ----
@@ -165,7 +187,7 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
   const renderGuest = async () => {
     pill.hidden = true;
     canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
-    const text = markdown().split('\n').slice(1).join('\n');
+    const text = markdown();
     const data = new FormData();
     data.set('_csrf', csrf);
     data.set('text', text);
@@ -173,8 +195,8 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
       // Sans data-preview, le rendu se fait ici (Blocks.toHtml) ; avec, le serveur hôte peut compléter le texte (variables, etc.).
       const html = previewUrl
         ? await (await fetch(previewUrl, { method: 'POST', body: data, headers: { 'HX-Request': 'true' } })).text()
-        : Blocks.toHtml(text, media);
-      canvas.innerHTML = `<div class="rounded-2xl bg-white p-4"><h2 class="font-news text-2xl font-bold text-stone-900">${esc((icon + ' ' + titleEl.textContent).trim())}</h2>${html}</div>`;
+        : Blocks.toHtml(text, { media });
+      canvas.innerHTML = `<div class="rounded-2xl bg-white p-4">${html}</div>`;
     } catch {
       canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
     }
@@ -405,7 +427,7 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'Envoi impossible');
       syncFromDom();
-      const b = { id: 'b' + nextId++, ...Blocks.blank('photo'), file: j.id };
+      const b = { id: 'b' + nextId++, ...Blocks.blank('photo'), src: 'media/' + j.id };
       blocks.splice(insertAt === null || insertAt > blocks.length ? blocks.length : insertAt, 0, b);
       setDirty(true);
       render();
@@ -616,7 +638,7 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
       if (range.collapsed) return;
       const inside = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement).closest('mark');
       if (inside) unwrapMarks(range);
-      else { const m = document.createElement('mark'); m.className = 'bq-highlight'; m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
+      else { const m = document.createElement('mark'); m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
     } else if (what === 'clear') {
       document.execCommand('removeFormat');
       unwrapMarks(sel.getRangeAt(0));
@@ -626,12 +648,12 @@ Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable=
 
   // ---- Chargement ----
   const load = (md) => {
-    const { title, blocks: parsed } = Blocks.parse(md);
-    const h = splitHeading(title);
-    icon = h.icon;
-    titleEl.textContent = h.title;
+    const { meta: parsedMeta, blocks: parsed } = Blocks.parse(md);
+    meta = parsedMeta;
+    icon = meta.icon || '';
+    titleEl.textContent = meta.title || '';
     showIcon();
-    blocks = parsed.map((p) => ({ id: 'b' + nextId++, ...Blocks.fromMarkdown(p.text) }));
+    blocks = parsed.map((p) => ({ id: 'b' + nextId++, ...p }));
     if (blocks.length === 0) {
       blocks = [{ id: 'b' + nextId++, type: 'text', html: '' }];
     }

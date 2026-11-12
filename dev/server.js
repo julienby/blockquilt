@@ -44,7 +44,7 @@ const routes = {
   // Aperçu : un fragment HTML, rendu par Blocks.toHtml (le même rendu que l'éditeur fait seul sans data-preview).
   'POST /api/preview': async (req, res) => {
     const data = await form(req);
-    send(res, 200, 'text/html; charset=utf-8', Blocks.toHtml(String(data.get('text') ?? '').replace(/\r\n/g, '\n'), 'media/'));
+    send(res, 200, 'text/html; charset=utf-8', Blocks.toHtml(String(data.get('text') ?? '').replace(/\r\n/g, '\n'), { media: 'media/' }));
   },
   // Photo : le fichier est gardé tel quel, réponse JSON { id }.
   'POST /api/upload': async (req, res) => {

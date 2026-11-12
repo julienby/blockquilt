@@ -1,0 +1,52 @@
+/* blockquilt — rendu publié (Blocks.toHtml). Feuille écrite à la main, sans Tailwind.
+   Tout est sous .bq-content ; les couleurs sont des variables à redéfinir chez l'hôte. */
+.bq-content {
+  --bq-text: #1c1917;
+  --bq-muted: #57534e;
+  --bq-line: #e7e5e4;
+  --bq-link: #0369a1;
+  --bq-mark: #fde68a;
+  --bq-code-bg: #f1f5f9;
+  --bq-radius: 0.9rem;
+  --bq-info-bg: #f0f9ff;  --bq-info-line: #7dd3fc;  --bq-info-text: #0c4a6e;
+  --bq-tip-bg: #eef6f0;   --bq-tip-line: #6ee7b7;   --bq-tip-text: #064e3b;
+  --bq-success-bg: #f7fee7; --bq-success-line: #a3e635; --bq-success-text: #365314;
+  --bq-warning-bg: #fdf6e9; --bq-warning-line: #fcd34d; --bq-warning-text: #78350f;
+  --bq-danger-bg: #fff1f2;  --bq-danger-line: #fda4af;  --bq-danger-text: #881337;
+  color: var(--bq-text);
+  line-height: 1.7;
+  overflow-wrap: break-word;
+}
+.bq-content > :first-child { margin-top: 0; }
+.bq-content > :last-child { margin-bottom: 0; }
+.bq-content h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 1rem; font-weight: 800; }
+.bq-content h2 { font-size: 1.35rem; line-height: 1.25; margin: 2rem 0 0.75rem; font-weight: 700; scroll-margin-top: 4rem; }
+.bq-content h3 { font-size: 1.1rem; line-height: 1.3; margin: 1.5rem 0 0.5rem; font-weight: 700; scroll-margin-top: 4rem; }
+.bq-content p, .bq-content ul, .bq-content ol { margin: 0.75rem 0; }
+.bq-content ul { list-style: disc; padding-left: 1.5rem; }
+.bq-content ol { list-style: decimal; padding-left: 1.5rem; }
+.bq-content a { color: var(--bq-link); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.bq-content mark { background: var(--bq-mark); color: inherit; padding: 0.05em 0.25em; border-radius: 0.3em; }
+.bq-content code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: var(--bq-code-bg); padding: 0.1em 0.35em; border-radius: 0.35em; }
+.bq-content pre { margin: 1rem 0; padding: 0.9rem 1rem; overflow-x: auto; background: var(--bq-code-bg); border-radius: var(--bq-radius); font-size: 0.85rem; line-height: 1.55; }
+.bq-content pre code { background: none; padding: 0; font-size: inherit; }
+.bq-content pre.bq-raw { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px dashed var(--bq-line); background: none; }
+.bq-content hr { border: 0; border-top: 1px solid var(--bq-line); margin: 2rem 0; }
+.bq-content blockquote { margin: 1rem 0; padding: 0.1rem 0 0.1rem 1rem; border-left: 3px solid var(--bq-line); color: var(--bq-muted); font-style: italic; }
+.bq-content figure { margin: 1.25rem 0; }
+.bq-content figure img { display: block; width: 100%; height: auto; border-radius: var(--bq-radius); }
+.bq-content figcaption { margin-top: 0.4rem; font-size: 0.85rem; color: var(--bq-muted); text-align: center; }
+.bq-content .bq-video { aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--bq-radius); background: #e7e5e4; }
+.bq-content .bq-video iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+/* Encadrés : <aside class="bq-callout bq-callout-tip" role="note"> */
+.bq-content .bq-callout { margin: 1rem 0; padding: 0.85rem 1rem; border: 1px solid var(--bq-line); border-radius: var(--bq-radius); }
+.bq-content .bq-callout > :first-child { margin-top: 0; }
+.bq-content .bq-callout > :last-child { margin-bottom: 0; }
+.bq-content .bq-callout-title { font-weight: 700; }
+.bq-content .bq-callout p, .bq-content .bq-callout ul, .bq-content .bq-callout ol { margin: 0.35rem 0; }
+.bq-content .bq-callout-info { background: var(--bq-info-bg); border-color: var(--bq-info-line); color: var(--bq-info-text); }
+.bq-content .bq-callout-tip { background: var(--bq-tip-bg); border-color: var(--bq-tip-line); color: var(--bq-tip-text); }
+.bq-content .bq-callout-success { background: var(--bq-success-bg); border-color: var(--bq-success-line); color: var(--bq-success-text); }
+.bq-content .bq-callout-warning { background: var(--bq-warning-bg); border-color: var(--bq-warning-line); color: var(--bq-warning-text); }
+.bq-content .bq-callout-danger { background: var(--bq-danger-bg); border-color: var(--bq-danger-line); color: var(--bq-danger-text); }

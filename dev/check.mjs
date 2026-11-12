@@ -92,8 +92,9 @@ try {
   const doc = path.join(data, 'document.md');
   await waitFor(() => ev(`document.querySelector('[data-toast-text]').textContent === 'Sauvegardé'`), 'enregistrement');
   const md = fs.readFileSync(doc, 'utf8');
-  ok(md.startsWith('## 🏡 Arrivée'), 'enregistrement : titre de la rubrique');
-  ok(md.includes('> 💡 Garez-vous à gauche du portail.\n> - porte bleue\n> - code **1515**'), 'enregistrement : astuce fusionnée en Markdown');
+  ok(md.startsWith('---\ntitle: Arrivée\nicon: 🏡\n---\n'), 'enregistrement : titre et icône dans le frontmatter');
+  ok(md.includes('> [!tip]\n> Garez-vous à gauche du portail.\n> - porte bleue\n> - code **1515**'), 'enregistrement : astuce fusionnée en Markdown');
+  ok(md.includes('> [!info] 🥖 Boulangerie\n'), 'enregistrement : icône et titre de l’encadré gardés');
   ok(md.includes('La clé est dans la boîte aux lettres.\n\nRéseau : maison-wifi'), 'enregistrement : deux blocs après la scission');
   if (failed) console.log('--- document.md ---\n' + md + '\n---');
   const media = /\]\(media\/([a-f0-9]{12})\)/.exec(md);
@@ -107,7 +108,8 @@ try {
   await ev(`document.querySelector('[data-mode="guest"]').click()`);
   await waitFor(() => ev(`document.querySelector('[data-canvas]').textContent.includes('Garez-vous')`), 'aperçu');
   ok(true, 'aperçu : le fragment du serveur s’affiche');
-  ok(await ev(`!!document.querySelector('[data-canvas] aside[data-type="tip"]')`), 'aperçu : l’astuce s’affiche dans son encadré');
+  ok(await ev(`!!document.querySelector('[data-canvas] article.bq-content aside.bq-callout-tip')`), 'aperçu : l’astuce s’affiche dans son encadré');
+  ok(await ev(`getComputedStyle(document.querySelector('aside.bq-callout-tip')).backgroundColor !== 'rgba(0, 0, 0, 0)'`), 'aperçu : feuille blockquilt-content.css chargée');
   await waitFor(() => ev(`(() => { const i = document.querySelector('[data-canvas] img[src*="media/"]'); return !!i && i.complete && i.naturalWidth > 0; })()`), 'photo dans l’aperçu');
   ok(true, 'aperçu : la photo envoyée s’affiche');
 
