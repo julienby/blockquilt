@@ -6,16 +6,15 @@ const Blocks = {
   TYPES: {
     title: { label: 'Titre de section', short: 'Titre', desc: 'Sous-titre structurant pour découper la fiche', icon: 'heading', card: 'bg-white border-stone-300/90 text-stone-900', badge: 'bg-stone-100 text-stone-700 border-stone-200/90' },
     text: { label: 'Texte / Explication', short: 'Texte', desc: 'Paragraphe fluide ou liste sur fond ivoire doux', icon: 'align_left', card: 'bg-[#FAF8F5] border-stone-200/90 text-stone-800', badge: 'bg-stone-200/80 text-stone-800 border-stone-300/80' },
-    tip: { label: 'Astuce pratique', short: 'Astuce', desc: 'Vert sauge apaisant pour faciliter le séjour', icon: 'sparkles', mark: '💡', card: 'bg-[#EEF6F0] border-emerald-200/90 text-emerald-950', badge: 'bg-emerald-100 text-emerald-900 border-emerald-300/80' },
+    tip: { label: 'Astuce pratique', short: 'Astuce', desc: 'Vert sauge pour une astuce pratique', icon: 'sparkles', mark: '💡', card: 'bg-[#EEF6F0] border-emerald-200/90 text-emerald-950', badge: 'bg-emerald-100 text-emerald-900 border-emerald-300/80' },
     advice: { label: 'Conseil local / Recommandation', short: 'Conseil', desc: 'Lavande pastel pour vos bonnes adresses et coups de cœur', icon: 'compass', mark: '🧭', card: 'bg-[#F3F1FA] border-indigo-200/80 text-indigo-950', badge: 'bg-indigo-100 text-indigo-900 border-indigo-300/80' },
     warning: { label: 'Consigne / Vigilance', short: 'Consigne', desc: 'Ambre sable doux pour ce qu’il faut faire ou éviter', icon: 'triangle_alert', mark: '⚠️', card: 'bg-[#FDF6E9] border-amber-200/90 text-amber-950', badge: 'bg-amber-100 text-amber-900 border-amber-300/80' },
     photo: { label: 'Photo explicative', short: 'Photo', desc: 'Montrer un bouton, un compteur ou l’emplacement exact', icon: 'image', card: 'bg-white border-stone-200/90 text-stone-800', badge: 'bg-stone-100 text-stone-700 border-stone-200' },
-    audio: { label: 'Mémo Vocal', short: 'Vocal', desc: 'Bientôt disponible', icon: 'mic', soon: true, card: 'bg-purple-50/60 border-purple-200/80 text-purple-950', badge: 'bg-purple-100 text-purple-900 border-purple-200' },
     video: { label: 'Vidéo (YouTube, Vimeo)', short: 'Vidéo', desc: 'Une courte démonstration, par exemple allumer le poêle', icon: 'video', card: 'bg-rose-50/50 border-rose-200/80 text-rose-950', badge: 'bg-rose-100 text-rose-900 border-rose-200' },
     raw: { label: 'Mise en forme avancée', short: 'Avancé', desc: '', icon: 'sliders', card: 'bg-white border-dashed border-stone-300 text-stone-800', badge: 'bg-stone-100 text-stone-700 border-stone-200' },
   },
   TEXT_KEYS: ['title', 'text', 'tip', 'advice', 'warning'],
-  MEDIA_KEYS: ['photo', 'audio', 'video'],
+  MEDIA_KEYS: ['photo', 'video'],
   ENTITIES: { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" },
   VIDEO: /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+$/i,
 
@@ -69,7 +68,7 @@ const Blocks = {
       else if (m[2] !== undefined) out += '<b>' + Blocks.inlineHtml(m[2]) + '</b>';
       else if (m[3] !== undefined) out += '<i>' + Blocks.inlineHtml(m[3]) + '</i>';
       else if (m[4] !== undefined) out += '<u>' + Blocks.inlineHtml(m[4]) + '</u>';
-      else if (m[5] !== undefined) out += '<mark class="ehg-highlight">' + Blocks.inlineHtml(m[5]) + '</mark>';
+      else if (m[5] !== undefined) out += '<mark class="bq-highlight">' + Blocks.inlineHtml(m[5]) + '</mark>';
       else out += '<a href="' + Blocks.esc(m[7]).replace(/"/g, '&quot;') + '">' + Blocks.inlineHtml(m[6]) + '</a>';
     }
     return out + Blocks.esc(md.slice(at));
@@ -329,14 +328,14 @@ const Blocks = {
   toHtml(markdown, media = 'media/') {
     // « ## » factice : parse() lit toujours la première ligne « ## » comme titre de rubrique, jamais comme bloc.
     const { blocks } = Blocks.parse('##\n' + markdown);
-    return `<div class="ehg-view">${blocks.map((b) => Blocks.blockHtml(Blocks.fromMarkdown(b.text), media)).join('')}</div>`;
+    return `<div class="bq-view">${blocks.map((b) => Blocks.blockHtml(Blocks.fromMarkdown(b.text), media)).join('')}</div>`;
   },
 };
 if (typeof module !== 'undefined') module.exports = Blocks;
 
-// ---- Écran : actif seulement si la page contient #ehg ----
+// ---- Écran : actif seulement si la page contient #bq ----
 (function () {
-  const root = typeof document !== 'undefined' ? document.getElementById('ehg') : null;
+  const root = typeof document !== 'undefined' ? document.getElementById('bq') : null;
   if (!root) return;
   const $ = (s, r = root) => r.querySelector(s);
   const media = root.dataset.media;
@@ -418,7 +417,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
     </div>`;
   };
 
-  const editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable="true" role="textbox" aria-multiline="true" spellcheck="false" data-placeholder="${attr(ph)}" class="ehg-edit ${cls}">${html}</div>`;
+  const editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable="true" role="textbox" aria-multiline="true" spellcheck="false" data-placeholder="${attr(ph)}" class="bq-edit ${cls}">${html}</div>`;
 
   const body = (b) => {
     switch (b.type) {
@@ -451,7 +450,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
       ? `<button type="button" data-fullscreen aria-label="${isFull ? 'Quitter le plein écran' : 'Plein écran'}" title="${isFull ? 'Quitter le plein écran' : 'Plein écran'}" class="-mr-1.5 -mt-1 flex size-8 items-center justify-center rounded-xl text-stone-500 hover:bg-black/5 hover:text-stone-900">${ic(isFull ? 'minimize' : 'maximize', 'size-3.5')}</button>`
       : '<span></span>';
     const rail = (name, act, label, disabled) => `<button type="button" data-move="${act}" ${disabled ? 'disabled' : ''} aria-label="${label}" class="flex ${isTitle ? 'size-7' : 'size-8'} items-center justify-center rounded-lg text-stone-500 active:bg-white/80 disabled:pointer-events-none disabled:opacity-20">${ic(name, 'size-3.5')}</button>`;
-    return `<article data-id="${b.id}" class="ehg-card flex items-stretch overflow-hidden rounded-2xl border ${t.card} ${isFull ? 'ehg-fullscreen' : ''}">
+    return `<article data-id="${b.id}" class="bq-card flex items-stretch overflow-hidden rounded-2xl border ${t.card} ${isFull ? 'bq-fullscreen' : ''}">
         <div class="flex min-w-0 flex-1 flex-col ${isTitle ? 'px-3.5 py-2.5' : 'p-3.5'}">
           <div class="${isTitle ? 'mb-1' : 'mb-2'} flex items-center justify-between gap-2">${head}${fsBtn}</div>
           <div class="flex-1">${body(b)}</div>
@@ -473,7 +472,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
           <span class="flex size-5 items-center justify-center rounded-full bg-stone-100 text-stone-500">${ic('plus', 'size-3.5')}</span><span>Insérer un bloc</span></button>
       </div>`;
     pill.hidden = true;
-    canvas.querySelectorAll('.ehg-edit').forEach(clean);
+    canvas.querySelectorAll('.bq-edit').forEach(clean);
   };
   const clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };
 
@@ -546,7 +545,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
     setDirty(true);
     render();
     const el = canvas.querySelector(`[data-id="${b.id}"]`);
-    el.classList.add('ehg-new');
+    el.classList.add('bq-new');
     scrollAboveKeyboard(el);
   };
   const move = (id, delta) => {
@@ -590,7 +589,21 @@ if (typeof module !== 'undefined') module.exports = Blocks;
     showToast('Bloc scindé');
   };
 
-  const dialog = (name) => document.getElementById('ehg-' + name);
+  const dialog = (name) => document.getElementById('bq-' + name);
+  // Feuilles <dialog> : [data-close] ferme celle qui le contient ; un toucher qui commence ET finit sur le fond la ferme.
+  const outside = (d, event) => {
+    const box = d.getBoundingClientRect();
+    return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+  };
+  let pressedBackdrop = false;
+  document.querySelectorAll('dialog[id^="bq-"]').forEach((d) => {
+    d.addEventListener('pointerdown', (event) => { pressedBackdrop = event.target === d && outside(d, event); });
+    d.addEventListener('click', (event) => {
+      if (event.target.closest('[data-close]')) d.close();
+      else if (pressedBackdrop && event.target === d && outside(d, event)) d.close();
+      pressedBackdrop = false;
+    });
+  });
   const openAdd = (at) => {
     insertAt = at;
     const n = blocks.length;
@@ -645,10 +658,10 @@ if (typeof module !== 'undefined') module.exports = Blocks;
     setDirty(true);
   });
   canvas.addEventListener('focusout', (event) => {
-    if (event.target.classList?.contains('ehg-edit')) clean(event.target);
+    if (event.target.classList?.contains('bq-edit')) clean(event.target);
   });
   canvas.addEventListener('paste', (event) => {
-    if (!event.target.closest?.('.ehg-edit')) return;
+    if (!event.target.closest?.('.bq-edit')) return;
     event.preventDefault();
     document.execCommand('insertText', false, event.clipboardData.getData('text/plain'));
   });
@@ -660,7 +673,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
       render();
       return;
     }
-    if (event.key !== 'Enter' || event.shiftKey || !el.matches?.('.ehg-edit[data-plain]')) return;
+    if (event.key !== 'Enter' || event.shiftKey || !el.matches?.('.bq-edit[data-plain]')) return;
     event.preventDefault();
     el.blur();
   });
@@ -679,15 +692,14 @@ if (typeof module !== 'undefined') module.exports = Blocks;
 
   // ---- Choix du type à ajouter ----
   const fileInput = $('[data-file]');
-  const tile = (key, flat) => `<button type="button" data-pick="${key}" class="rounded-2xl border p-3 text-left transition-transform active:scale-95 ${T[key].soon ? 'opacity-70' : ''} ${flat ? 'flex items-center justify-between gap-2' : 'flex flex-col items-center gap-1.5 text-center'} ${T[key].card}">
+  const tile = (key, flat) => `<button type="button" data-pick="${key}" class="rounded-2xl border p-3 text-left transition-transform active:scale-95 ${flat ? 'flex items-center justify-between gap-2' : 'flex flex-col items-center gap-1.5 text-center'} ${T[key].card}">
       <span class="flex size-8 shrink-0 items-center justify-center rounded-xl border ${T[key].badge}">${ic(T[key].icon)}</span>
-      <span class="min-w-0 flex-1"><span class="block text-xs font-bold text-stone-900">${T[key].label}</span>${flat ? `<span class="mt-0.5 block text-[11px] leading-snug opacity-75">${T[key].desc}</span>` : T[key].soon ? '<span class="mt-0.5 inline-block rounded-full bg-purple-200/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-900">Coming soon</span>' : ''}</span></button>`;
+      <span class="min-w-0 flex-1"><span class="block text-xs font-bold text-stone-900">${T[key].label}</span>${flat ? `<span class="mt-0.5 block text-[11px] leading-snug opacity-75">${T[key].desc}</span>` : ''}</span></button>`;
   $('[data-add-text]', dialog('add')).innerHTML = Blocks.TEXT_KEYS.map((k) => tile(k, true)).join('');
   $('[data-add-media]', dialog('add')).innerHTML = Blocks.MEDIA_KEYS.map((k) => tile(k, false)).join('');
   dialog('add').addEventListener('click', (event) => {
     const pick = event.target.closest('[data-pick]');
     if (!pick) return;
-    if (T[pick.dataset.pick]?.soon) { dialog('add').close(); showToast('Mémo vocal : bientôt disponible'); return; }
     if (pick.dataset.pick === 'photo') { fileInput.click(); dialog('add').close(); return; }
     dialog('add').close();
     add(pick.dataset.pick, insertAt);
@@ -801,7 +813,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
     if (!grip) return;
     syncFromDom();
     drag = grip.closest('[data-id]');
-    drag.classList.add('ehg-dragging');
+    drag.classList.add('bq-dragging');
     grip.setPointerCapture(event.pointerId);
     event.preventDefault();
   });
@@ -823,7 +835,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
   canvas.addEventListener('pointercancel', dropped);
 
   // ---- Pilule de mise en forme style Medium (z-50 : apparaît à la sélection de texte OU sur un appui long, et déplaçable) ----
-  const richOf = (node) => (node && (node.nodeType === 1 ? node : node.parentElement))?.closest('.ehg-edit[data-rich], .ehg-edit:not([data-plain]):not([data-body])');
+  const richOf = (node) => (node && (node.nodeType === 1 ? node : node.parentElement))?.closest('.bq-edit[data-rich], .bq-edit:not([data-plain]):not([data-body])');
   let pillDismissed = false;
   let pillForced = false;
   let pillDrag = null;
@@ -869,7 +881,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
   canvas.addEventListener('pointerup', () => clearTimeout(longPressTimer));
   canvas.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
   canvas.addEventListener('contextmenu', (event) => {
-    if (event.target.closest?.('.ehg-edit')) {
+    if (event.target.closest?.('.bq-edit')) {
       event.preventDefault();
       clearTimeout(longPressTimer);
       pressPt = { x: event.clientX || innerWidth / 2, y: event.clientY || 160 };
@@ -899,7 +911,7 @@ if (typeof module !== 'undefined') module.exports = Blocks;
   pill.addEventListener('pointercancel', endPillDrag);
   const unwrapMarks = (range) => {
     const scope = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
-    scope.closest('.ehg-edit')?.querySelectorAll('mark').forEach((m) => {
+    scope.closest('.bq-edit')?.querySelectorAll('mark').forEach((m) => {
       if (range.intersectsNode(m)) m.replaceWith(...m.childNodes);
     });
   };
@@ -916,108 +928,12 @@ if (typeof module !== 'undefined') module.exports = Blocks;
       if (range.collapsed) return;
       const inside = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement).closest('mark');
       if (inside) unwrapMarks(range);
-      else { const m = document.createElement('mark'); m.className = 'ehg-highlight'; m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
+      else { const m = document.createElement('mark'); m.className = 'bq-highlight'; m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
     } else if (what === 'clear') {
       document.execCommand('removeFormat');
       unwrapMarks(sel.getRangeAt(0));
     } else document.execCommand(what);
     setDirty(true);
-  });
-
-  // ---- Assistant IA : actions sur bloc actif, découpe de notes en vrac, ou révision de la rubrique ----
-  const ai = document.querySelector('form[data-ai]');
-  const aiDialog = document.getElementById('ai');
-  const out = document.getElementById('ai-result');
-  const refreshAiModal = () => {
-    syncFromDom();
-    const target = blocks.find((b) => b.id === activeBlockId && Blocks.TEXT_KEYS.includes(b.type)) || blocks.find((b) => Blocks.TEXT_KEYS.includes(b.type));
-    const sec = aiDialog?.querySelector('[data-ai-active-section]');
-    if (!sec) return;
-    if (target) {
-      activeBlockId = target.id;
-      sec.hidden = false;
-      aiDialog.querySelector('[data-ai-active-badge]').textContent = T[target.type].label;
-      const preview = Blocks.stripTags(Blocks.toMarkdown(target)).replace(/\n/g, ' • ').replace(/^[#>:*\s]+/, '').trim();
-      aiDialog.querySelector('[data-ai-active-preview]').textContent = preview ? `« ${preview} »` : '(Bloc vide)';
-    } else {
-      sec.hidden = true;
-    }
-  };
-  root.querySelectorAll('[data-dialog="ai"]').forEach((b) => b.addEventListener('click', refreshAiModal));
-  aiDialog?.addEventListener('click', (event) => {
-    const actBtn = event.target.closest('[data-ai-block]');
-    if (actBtn) {
-      syncFromDom();
-      const idx = blocks.findIndex((b) => b.id === activeBlockId);
-      if (idx < 0) return;
-      const b = blocks[idx];
-      const act = actBtn.dataset.aiBlock;
-      if (act === 'steps') {
-        const sentences = Blocks.stripTags(Blocks.lines(b).join(' ')).split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
-        blocks[idx] = { ...b, html: `<ul>${sentences.map((s) => `<li>${Blocks.esc(s)}</li>`).join('')}</ul>` };
-      } else if (act === 'shorten') {
-        const plain = Blocks.stripTags(Blocks.lines(b).join(' ')).trim();
-        const first = plain.split(/(?<=[.!?])\s+/)[0] || plain;
-        blocks[idx] = { ...b, html: '<b>En bref :</b> ' + Blocks.esc(first) };
-      } else if (act === 'clarify') {
-        if (b.html !== undefined) b.html = b.html.replace(/\b(\d[\d\s:hH/.-]*\d|\d+)\b/g, '<b>$1</b>');
-      }
-      aiDialog.close();
-      setDirty(true);
-      render();
-      showToast('Bloc mis en forme');
-      return;
-    }
-    if (event.target.closest('[data-ai-generate]')) {
-      const rawInput = aiDialog.querySelector('[data-ai-raw]');
-      const raw = rawInput.value.trim();
-      if (!raw) { aiDialog.close(); return; }
-      syncFromDom();
-      raw.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter(Boolean).forEach((s) => {
-        const lower = s.toLowerCase();
-        let type = 'text';
-        let body = s;
-        if (lower.includes('attention') || lower.includes('jamais') || lower.includes('interdit') || lower.includes('consigne')) {
-          type = 'warning';
-          body = s.replace(/^(?:attention|consigne)\s*:\s*/i, '');
-        } else if (lower.includes('astuce')) {
-          type = 'tip';
-          body = s.replace(/^astuce\s*:\s*/i, '');
-        } else if (lower.includes('conseil') || lower.includes('adresse') || lower.includes('restaurant')) {
-          type = 'advice';
-          body = s.replace(/^conseil\s*:\s*/i, '');
-        }
-        const nb = { id: 'b' + nextId++, ...Blocks.blank(type) };
-        nb.html = Blocks.esc(body);
-        blocks.push(nb);
-      });
-      rawInput.value = '';
-      aiDialog.close();
-      setDirty(true);
-      render();
-      showToast('Blocs Bento générés');
-    }
-  });
-  ai?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = new FormData(ai);
-    data.set('text', markdown());
-    ai.reset();
-    ai.closest('dialog').close();
-    out.innerHTML = '<p class="rounded-xl bg-stone-100 p-3 text-stone-700">✨ L’assistant travaille, jusqu’à une minute…</p>';
-    try {
-      out.innerHTML = await (await fetch(ai.action, { method: 'POST', body: data, headers: { 'HX-Request': 'true' } })).text();
-    } catch {
-      out.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Pas de réponse. Réessayez.</p>';
-    }
-  });
-  out?.addEventListener('click', (event) => {
-    if (event.target.closest('[data-ai-apply]')) {
-      load(out.querySelector('[data-ai-markdown]').value);
-      setDirty(true);
-      out.replaceChildren();
-      scrollTo({ top: 0 });
-    } else if (event.target.closest('[data-ai-dismiss]')) out.replaceChildren();
   });
 
   // ---- Chargement ----

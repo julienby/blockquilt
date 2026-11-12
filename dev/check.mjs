@@ -45,10 +45,10 @@ try {
   };
   const open = async () => {
     await send('Page.navigate', { url: BASE + '/' });
-    await waitFor(() => ev(`document.readyState === 'complete' && document.querySelectorAll('#ehg [data-id]').length > 0`), 'chargement de la démo');
+    await waitFor(() => ev(`document.readyState === 'complete' && document.querySelectorAll('#bq [data-id]').length > 0`), 'chargement de la démo');
   };
   // Type et texte de chaque bloc, dans l'ordre.
-  const cards = () => ev(`[...document.querySelectorAll('#ehg [data-id]')].map((a) => (a.querySelector('[data-convert]')?.value ?? 'media') + ':' + (a.querySelector('[data-body]')?.textContent ?? ''))`);
+  const cards = () => ev(`[...document.querySelectorAll('#bq [data-id]')].map((a) => (a.querySelector('[data-convert]')?.value ?? 'media') + ':' + (a.querySelector('[data-body]')?.textContent ?? ''))`);
   const mergeButtons = () => ev(`[...document.querySelectorAll('[data-merge]')].map((b) => b.dataset.merge)`);
 
   await send('Page.enable');
@@ -66,7 +66,7 @@ try {
   ok(c.length === 5 && c[0].startsWith('tip:') && c[0].includes('porte bleue'), 'fusion : l’astuce garde son type et reçoit la liste');
 
   await ev(`(() => {
-    const body = [...document.querySelectorAll('#ehg [data-body]')].find((b) => b.textContent.includes('Réseau'));
+    const body = [...document.querySelectorAll('#bq [data-body]')].find((b) => b.textContent.includes('Réseau'));
     body.focus();
     const r = document.createRange(); r.setStartAfter(body.querySelector('br')); r.collapse(true);
     getSelection().removeAllRanges(); getSelection().addRange(r);

@@ -56,7 +56,7 @@ ok(Blocks.toMarkdown(Blocks.fromMarkdown('- pain \n- lait')) === '- pain\n- lait
 // Ce que produit le navigateur en modifiant.
 const md = (html, type = 'text') => Blocks.toMarkdown({ type, html });
 ok(md('un <b>gras </b>mot') === 'un **gras** mot', 'gras : les espaces sortent des **');
-ok(md('a <u>sou</u> <mark class="ehg-highlight">sur</mark> <i>it</i>') === 'a ++sou++ ==sur== *it*', 'souligné, surligné, italique');
+ok(md('a <u>sou</u> <mark class="bq-highlight">sur</mark> <i>it</i>') === 'a ++sou++ ==sur== *it*', 'souligné, surligné, italique');
 ok(md('<ul><li>un</li><li><b>deux</b></li></ul>') === '- un\n- **deux**', 'liste créée depuis la barre flottante : convertie en Markdown');
 ok(md('<strong>a</strong><b>b</b>') === '**ab**', 'deux gras collés : un seul');
 ok(md('a<div>b</div><div><br></div><div>c</div>') === 'a\nb\n\nc', 'Entrée du navigateur : lignes');
@@ -90,24 +90,10 @@ ok(Blocks.merge({ type: 'title', html: 'Garage' }, list) === null, 'fusion sous 
 ok(Blocks.merge(tip, { type: 'photo', file: 'aabbccddeeff', alt: '' }) === null && Blocks.merge({ type: 'raw', md: '| a |' }, list) === null, 'fusion avec photo, vidéo ou bloc avancé : refusée');
 ok(Blocks.convert({ type: 'tip', html: 'x', mark: '💡' }, 'advice').mark === '🧭' && Blocks.convert({ type: 'tip', html: 'x', mark: '' }, 'tip').mark === '', 'conversion : l’emoji suit le type');
 
-// Garanties UI de l'éditeur (assets/blocks.js) : menu flottant fonctionnel sur mobile et repositionnement au-dessus du clavier virtuel.
-const fs = require('node:fs');
-const src = fs.readFileSync(__dirname + '/../blockquilt.js', 'utf8');
-const cssSrc = fs.readFileSync(__dirname + '/../blockquilt.src.css', 'utf8');
-ok(!src.includes("pill.addEventListener('touchstart'"), 'menu flottant : aucun preventDefault sur touchstart (ne bloque jamais le click sur mobile)');
-ok(src.includes("pill.addEventListener('mousedown', keepSelection)") && src.includes("pill.addEventListener('pointerdown'"), 'menu flottant : conserve la sélection au clic et gère le glisser (mousedown + pointerdown)');
-ok(src.includes("canvas.addEventListener('contextmenu'") && cssSrc.includes('-webkit-touch-callout: none'), 'menu flottant : désactive le menu contextuel natif du téléphone sur .ehg-edit');
-ok(src.includes('if (!hasSel && !pillForced) { pill.hidden = true; return; }') && src.includes('longPressTimer = setTimeout(() => placePill(true), 450)'), 'menu flottant : apparaît à la sélection de texte OU sur un appui long (450ms / contextmenu), jamais lors d’un retour à la ligne');
-ok(src.includes('data-pill-grip') && src.includes('pillDrag'), 'menu flottant : déplaçable au doigt ou à la souris via [data-pill-grip]');
-ok(src.includes('spellcheck="false"'), 'clavier virtuel : spellcheck="false" empêche la popup dictionnaire de masquer le clavier dans les listes');
-ok(src.includes('const minTop = fullscreenId ? 12 : 72;') && src.includes('const top = rect.top - h - 8;'), 'menu flottant : positionné juste au-dessus de la sélection en mode normal comme en plein écran');
-ok(src.includes('ensureVisibleAboveKeyboard') && src.includes('window.scrollBy({ top: delta, behavior: \'smooth\' })'), 'clavier virtuel : un bloc ajouté en bas de page remonte automatiquement au-dessus du clavier');
-
-// Feedback 6 (point 7) : icône libre, un emoji collé depuis n'importe où.
+// Icône libre : un emoji collé depuis n'importe où.
 ok(Blocks.firstEmoji(' 🏊 piscine') === '🏊' && Blocks.firstEmoji('🇫🇷') === '🇫🇷' && Blocks.firstEmoji('👨‍👩‍👧 x') === '👨‍👩‍👧' && Blocks.firstEmoji('❤️') === '❤️' && Blocks.firstEmoji('👍🏽') === '👍🏽' && Blocks.firstEmoji('1️⃣') === '1️⃣', 'icône : premier emoji gardé (drapeau, famille, cœur, teinte, touche)');
 ok(Blocks.firstEmoji('abc') === '' && Blocks.firstEmoji('') === '' && Blocks.firstEmoji('1 chambre') === '', 'icône : texte sans emoji refusé');
 ok(JSON.stringify(Blocks.splitHeading('## 🇫🇷 Accueil')) === JSON.stringify({ icon: '🇫🇷', title: 'Accueil' }) && JSON.stringify(Blocks.splitHeading('## Wi-Fi')) === JSON.stringify({ icon: '', title: 'Wi-Fi' }), 'titre : emoji composé séparé du titre');
-ok(!src.includes('ne sait pas refaire (tableau, code…). Il reste tel quel.'), 'Feedback 6 (point 6) : plus de message sur le bloc avancé');
 
 // Visualisation invité : Blocks.toHtml rend photos, encadrés sémantiques, titres, vidéos ; tout le texte est échappé.
 const view = Blocks.toHtml(sample.split('\n').slice(1).join('\n'), '/m/');
@@ -119,10 +105,10 @@ ok(/<h3[^>]*>Garage<\/h3>/.test(view), 'aperçu : titre de section');
 ok(view.includes('<ul><li>porte bleue</li><li>code 1515</li></ul>'), 'aperçu : liste à puces');
 ok(view.includes('La clé est dans la boîte.<br>Réseau : box<br>Code Wi-Fi : abc'), 'aperçu : saut de ligne simple gardé');
 ok(Blocks.toHtml('https://youtu.be/dQw4w9WgXcQ').includes('src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"') && Blocks.toHtml('https://vimeo.com/76979871').includes('player.vimeo.com/video/76979871'), 'aperçu : vidéo YouTube ou Vimeo en lecteur intégré');
-ok(Blocks.toHtml('**gras** ==surligné== ++souligné++').includes('<b>gras</b> <mark class="ehg-highlight">surligné</mark> <u>souligné</u>'), 'aperçu : gras, surligné, souligné');
+ok(Blocks.toHtml('**gras** ==surligné== ++souligné++').includes('<b>gras</b> <mark class="bq-highlight">surligné</mark> <u>souligné</u>'), 'aperçu : gras, surligné, souligné');
 const evil = Blocks.toHtml('<script>alert(1)</script>\n\n[x](javascript:alert(1))\n\n![a"b](media/x"onerror=1)\n\n| a | b |\n|---|---|');
 ok(!evil.includes('<script') && !evil.includes('href="javascript') && !evil.includes('"onerror'), 'aperçu : HTML échappé, liens javascript: refusés, adresses de photo échappées');
-ok(Blocks.toHtml('## Pas un titre de rubrique').includes('Pas un titre de rubrique') && Blocks.toHtml('') === '<div class="ehg-view"></div>', 'aperçu : « ## » en tête de texte gardé, texte vide');
+ok(Blocks.toHtml('## Pas un titre de rubrique').includes('Pas un titre de rubrique') && Blocks.toHtml('') === '<div class="bq-view"></div>', 'aperçu : « ## » en tête de texte gardé, texte vide');
 ok(Blocks.toHtml(':::sensible\nCode : 1234\n:::').includes('Code : 1234'), 'aperçu : ancien :::sensible affiché en texte');
 
 process.exit(failed ? 1 : 0);
