@@ -19,7 +19,7 @@ Sans Docker : `node dev/server.js` (Node 22), puis `node tests/blocks_test.cjs`.
 
 | Fichier | Rôle |
 |---|---|
-| `blockquilt.js` | Le noyau `Blocks` (fonctions pures : Markdown ⇄ blocs, conversion, fusion), puis l'écran (actif si la page contient `#ehg`). |
+| `blockquilt.js` | Le noyau `Blocks` (fonctions pures : Markdown ⇄ blocs, conversion, fusion, rendu invité `Blocks.toHtml`), puis l'écran (actif si la page contient `#ehg`). |
 | `app.js` | Le JS commun d'easyHomeGuide, copié entier. Ici, il sert à ouvrir les feuilles (`data-dialog`) et à les fermer d'un toucher à l'extérieur. Il contient aussi du code de l'app, inutile ici. |
 | `index.html` | Démo : la vue de l'éditeur rendue par le serveur d'easyHomeGuide, avec une rubrique d'exemple. |
 | `blockquilt.css` | CSS généré par Tailwind 3.4.17. Ne pas le modifier à la main. |
@@ -38,7 +38,7 @@ Les adresses sont lues sur `#ehg` (`data-save`, `data-preview`, `data-upload`, `
 | Action | Requête | Champs envoyés | Réponse attendue |
 |---|---|---|---|
 | Enregistrer | `POST` `data-save`, en-tête `Accept: application/json` | `_csrf`, `slug`, `text` (Markdown complet, première ligne `## icône Titre`) | JSON `{"slug": "…"}`, ou `{"error": "…"}` avec un code 422. Si le slug change, l'adresse devient `data-save/<slug>`. |
-| Aperçu invité | `POST` `data-preview`, en-tête `HX-Request: true` | `_csrf`, `text` (sans la ligne de titre) | Fragment HTML du rendu. |
+| Aperçu invité (facultatif) | `POST` `data-preview`, en-tête `HX-Request: true` | `_csrf`, `text` (sans la ligne de titre) | Fragment HTML du rendu. Sans `data-preview`, l'éditeur rend lui-même avec `Blocks.toHtml` (photos, encadrés 💡 🧭 ⚠️, titres, vidéos) ; le serveur de démo répond avec ce même rendu. |
 | Photo | `POST` `data-upload`, en-tête `Accept: application/json` | `_csrf`, `photo` (fichier) | JSON `{"id": "…"}`. L'image est lue à `data-media` + `id`. |
 | Assistant IA | `POST` sur l'`action` de `form[data-ai]` | les champs du formulaire + `text` | Fragment HTML placé dans `#ai-result`. Absent de la démo. |
 

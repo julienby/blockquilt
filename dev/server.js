@@ -6,6 +6,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const Blocks = require('../blockquilt.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -40,10 +41,10 @@ const routes = {
     fs.writeFileSync(DOC, text);
     json(res, 200, { slug: String(data.get('slug') ?? '') });
   },
-  // Aperçu : un fragment HTML. Le vrai rendu Markdown appartient au projet hôte ; ici, le texte brut suffit.
+  // Aperçu : un fragment HTML, rendu par Blocks.toHtml (le même rendu que l'éditeur fait seul sans data-preview).
   'POST /api/preview': async (req, res) => {
     const data = await form(req);
-    send(res, 200, 'text/html; charset=utf-8', `<pre class="whitespace-pre-wrap text-sm">${esc(String(data.get('text') ?? ''))}</pre>`);
+    send(res, 200, 'text/html; charset=utf-8', Blocks.toHtml(String(data.get('text') ?? '').replace(/\r\n/g, '\n'), 'media/'));
   },
   // Photo : le fichier est gardé tel quel, réponse JSON { id }.
   'POST /api/upload': async (req, res) => {

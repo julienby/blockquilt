@@ -107,6 +107,9 @@ try {
   await ev(`document.querySelector('[data-mode="guest"]').click()`);
   await waitFor(() => ev(`document.querySelector('[data-canvas]').textContent.includes('Garez-vous')`), 'aperçu');
   ok(true, 'aperçu : le fragment du serveur s’affiche');
+  ok(await ev(`!!document.querySelector('[data-canvas] aside[data-type="tip"]')`), 'aperçu : l’astuce s’affiche dans son encadré');
+  await waitFor(() => ev(`(() => { const i = document.querySelector('[data-canvas] img[src*="media/"]'); return !!i && i.complete && i.naturalWidth > 0; })()`), 'photo dans l’aperçu');
+  ok(true, 'aperçu : la photo envoyée s’affiche');
 
   ws.close();
 } catch (error) {

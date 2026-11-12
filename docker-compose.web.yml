@@ -1,0 +1,24 @@
+# Démo publique derrière Caddy : https://web.byjulien.com/blockquilt/
+#   docker compose -f docker-compose.web.yml up -d
+# Caddy (réseau caddy-net) retire le préfixe /blockquilt et envoie vers blockquilt:8080.
+# Données à part de la démo locale : dev/data-web/.
+name: blockquilt-web
+services:
+  web:
+    image: node:22-alpine
+    container_name: blockquilt
+    restart: unless-stopped
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /app
+    command: node dev/server.js
+    environment:
+      DATA_DIR: /data
+    volumes:
+      - .:/app:ro
+      - ./dev/data-web:/data
+    networks:
+      - caddy-net
+
+networks:
+  caddy-net:
+    external: true

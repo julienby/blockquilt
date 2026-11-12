@@ -109,4 +109,20 @@ ok(Blocks.firstEmoji('abc') === '' && Blocks.firstEmoji('') === '' && Blocks.fir
 ok(JSON.stringify(Blocks.splitHeading('## 🇫🇷 Accueil')) === JSON.stringify({ icon: '🇫🇷', title: 'Accueil' }) && JSON.stringify(Blocks.splitHeading('## Wi-Fi')) === JSON.stringify({ icon: '', title: 'Wi-Fi' }), 'titre : emoji composé séparé du titre');
 ok(!src.includes('ne sait pas refaire (tableau, code…). Il reste tel quel.'), 'Feedback 6 (point 6) : plus de message sur le bloc avancé');
 
+// Visualisation invité : Blocks.toHtml rend photos, encadrés sémantiques, titres, vidéos ; tout le texte est échappé.
+const view = Blocks.toHtml(sample.split('\n').slice(1).join('\n'), '/m/');
+ok(view.includes('<img src="/m/abcdef123456" alt="Piscine"'), 'aperçu : photo affichée avec l’adresse des médias et sa légende');
+ok(view.includes(`data-type="tip" class="my-4 rounded-2xl border p-4 leading-7 ${Blocks.TYPES.tip.card}"`) && view.includes('Garez-vous à gauche.'), 'aperçu : astuce dans un encadré vert, teinte de l’éditeur');
+ok(view.includes('data-type="warning"') && view.includes('Ne pas fumer.'), 'aperçu : consigne dans un encadré ambre');
+ok(Blocks.toHtml('> 🧭 Le Fournil, à 150 m.').includes('data-type="advice"'), 'aperçu : conseil local dans un encadré lavande');
+ok(/<h3[^>]*>Garage<\/h3>/.test(view), 'aperçu : titre de section');
+ok(view.includes('<ul><li>porte bleue</li><li>code 1515</li></ul>'), 'aperçu : liste à puces');
+ok(view.includes('La clé est dans la boîte.<br>Réseau : box<br>Code Wi-Fi : abc'), 'aperçu : saut de ligne simple gardé');
+ok(Blocks.toHtml('https://youtu.be/dQw4w9WgXcQ').includes('src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"') && Blocks.toHtml('https://vimeo.com/76979871').includes('player.vimeo.com/video/76979871'), 'aperçu : vidéo YouTube ou Vimeo en lecteur intégré');
+ok(Blocks.toHtml('**gras** ==surligné== ++souligné++').includes('<b>gras</b> <mark class="ehg-highlight">surligné</mark> <u>souligné</u>'), 'aperçu : gras, surligné, souligné');
+const evil = Blocks.toHtml('<script>alert(1)</script>\n\n[x](javascript:alert(1))\n\n![a"b](media/x"onerror=1)\n\n| a | b |\n|---|---|');
+ok(!evil.includes('<script') && !evil.includes('href="javascript') && !evil.includes('"onerror'), 'aperçu : HTML échappé, liens javascript: refusés, adresses de photo échappées');
+ok(Blocks.toHtml('## Pas un titre de rubrique').includes('Pas un titre de rubrique') && Blocks.toHtml('') === '<div class="ehg-view"></div>', 'aperçu : « ## » en tête de texte gardé, texte vide');
+ok(Blocks.toHtml(':::sensible\nCode : 1234\n:::').includes('Code : 1234'), 'aperçu : ancien :::sensible affiché en texte');
+
 process.exit(failed ? 1 : 0);

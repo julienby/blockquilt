@@ -278,6 +278,59 @@ const Blocks = {
       photo: { type, file: '', alt: '' }, video: { type, url: '' },
     }[type];
   },
+
+  // ---- Visualisation invité : Markdown d'une rubrique (sans la ligne « ## ») → HTML ----
+  // Même lecture que l'éditeur, mêmes teintes que les cartes (Blocks.TYPES). Tout le texte est échappé ; liens limités à http(s), mailto, tel.
+
+  /** Adresse de lecteur intégré pour un lien YouTube ou Vimeo (vide si l'adresse n'est pas reconnue). */
+  embedUrl(url) {
+    let m;
+    if ((m = /^https?:\/\/(?:www\.)?youtube\.com\/watch\?(?:[^#]*&)?v=([\w-]{11})/i.exec(url)) || (m = /^https?:\/\/youtu\.be\/([\w-]{11})/i.exec(url))) return 'https://www.youtube-nocookie.com/embed/' + m[1];
+    if ((m = /^https?:\/\/(?:www\.)?vimeo\.com\/(\d+)/i.exec(url))) return 'https://player.vimeo.com/video/' + m[1];
+    return '';
+  },
+
+  /** Un bloc → HTML invité. `media` : adresse des photos (« media/<id> » du texte y est réécrit). */
+  blockHtml(b, media) {
+    const attr = (s) => Blocks.esc(s).replace(/"/g, '&quot;');
+    switch (b.type) {
+      case 'title': return `<h3 class="mb-2 mt-6 font-news text-xl font-semibold leading-tight tracking-tight text-stone-900">${b.html}</h3>`;
+      case 'text': return `<p class="my-3 leading-7">${b.html}</p>`;
+      case 'tip': case 'advice': case 'warning': {
+        const mark = b.mark ?? Blocks.TYPES[b.type].mark;
+        return `<aside data-type="${b.type}" class="my-4 rounded-2xl border p-4 leading-7 ${Blocks.TYPES[b.type].card}">${mark ? `<span aria-hidden="true">${mark}</span> ` : ''}${b.html}</aside>`;
+      }
+      case 'photo': return `<img src="${attr(media + b.file)}" alt="${attr(b.alt)}" loading="lazy" class="my-4 h-auto w-full rounded-xl">`;
+      case 'video': {
+        const src = Blocks.embedUrl(b.url);
+        return src
+          ? `<div class="my-4 aspect-video overflow-hidden rounded-xl bg-stone-100"><iframe class="h-full w-full" src="${attr(src)}" title="Vidéo" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+          : `<p class="my-3"><a href="${attr(b.url)}">${Blocks.esc(b.url)}</a></p>`;
+      }
+      default: {
+        // Bloc « avancé » : titres et photos ligne à ligne, le reste en texte (tableaux et code restent lisibles, jamais interprétés).
+        const out = [];
+        let para = [];
+        const flush = () => { if (para.length) out.push(`<p class="my-3 leading-7">${Blocks.linesToHtml(para)}</p>`); para = []; };
+        for (const line of (b.md ?? '').split('\n')) {
+          let m;
+          if ((m = /^(#{1,6}) +(.*)$/.exec(line))) { flush(); out.push(`<h4 class="mb-2 mt-5 font-semibold tracking-tight text-stone-900">${Blocks.inlineHtml(m[2])}</h4>`); }
+          else if ((m = /^!\[((?:\\.|[^\]\\])*)\]\(media\/([^)\s]+)\)$/.exec(line.trim()))) { flush(); out.push(Blocks.blockHtml({ type: 'photo', file: m[2], alt: Blocks.plain(m[1]) }, media)); }
+          else if (/^:::\w*\s*$/.test(line)) continue;
+          else para.push(line.replace(/^> ?/, ''));
+        }
+        flush();
+        return out.join('');
+      }
+    }
+  },
+
+  /** Texte d'une rubrique, sans sa ligne « ## titre » → HTML invité, bloc par bloc. */
+  toHtml(markdown, media = 'media/') {
+    // « ## » factice : parse() lit toujours la première ligne « ## » comme titre de rubrique, jamais comme bloc.
+    const { blocks } = Blocks.parse('##\n' + markdown);
+    return `<div class="ehg-view">${blocks.map((b) => Blocks.blockHtml(Blocks.fromMarkdown(b.text), media)).join('')}</div>`;
+  },
 };
 if (typeof module !== 'undefined') module.exports = Blocks;
 
@@ -427,11 +480,15 @@ if (typeof module !== 'undefined') module.exports = Blocks;
   const renderGuest = async () => {
     pill.hidden = true;
     canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
+    const text = markdown().split('\n').slice(1).join('\n');
     const data = new FormData();
     data.set('_csrf', csrf);
-    data.set('text', markdown().split('\n').slice(1).join('\n'));
+    data.set('text', text);
     try {
-      const html = await (await fetch(previewUrl, { method: 'POST', body: data, headers: { 'HX-Request': 'true' } })).text();
+      // Sans data-preview, le rendu se fait ici (Blocks.toHtml) ; avec, le serveur hôte peut compléter le texte (variables, etc.).
+      const html = previewUrl
+        ? await (await fetch(previewUrl, { method: 'POST', body: data, headers: { 'HX-Request': 'true' } })).text()
+        : Blocks.toHtml(text, media);
       canvas.innerHTML = `<div class="rounded-2xl bg-white p-4"><h2 class="font-news text-2xl font-bold text-stone-900">${esc((icon + ' ' + titleEl.textContent).trim())}</h2>${html}</div>`;
     } catch {
       canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
