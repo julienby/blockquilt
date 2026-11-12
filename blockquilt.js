@@ -267,6 +267,73 @@ const Blocks = {
     return lines.join('\n').replace(/^\n+|\n+$/g, '').replace(/\*\*\*\*/g, '');
   },
 
+  // ---- Filtre HTML (bloc :::html) : sans DOM, liste blanche courte et figée. L'allonger demande une ligne dans DECISIONS.md. ----
+  SAFE_TAGS: ['div', 'span', 'p', 'br', 'hr', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'strong', 'em', 'u', 'mark', 'small', 'a', 'img', 'figure', 'figcaption', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+  // Balises retirées avec tout leur contenu.
+  DROP_TAGS: ['script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'svg', 'math', 'template', 'noscript', 'noembed', 'noframes', 'textarea', 'title', 'select', 'option', 'xmp', 'plaintext', 'head', 'canvas', 'audio', 'video', 'button', 'form'],
+  VOID_TAGS: ['br', 'hr', 'img'],
+
+  /** HTML quelconque → HTML sûr : balises de SAFE_TAGS, attributs permis seulement, adresses vérifiées. `media` réécrit « media/… ». */
+  sanitize(html, media = 'media/') {
+    const decode = (v) => v.replace(/&#x([0-9a-f]+);?/gi, (_, h) => String.fromCodePoint(parseInt(h, 16) || 0xfffd))
+      .replace(/&#(\d+);?/g, (_, d) => String.fromCodePoint(Number(d) || 0xfffd))
+      .replace(/&(amp|lt|gt|quot|apos|colon|tab|newline|nbsp);?/gi, (_, n) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", colon: ':', tab: '\t', newline: '\n', nbsp: ' ' })[n.toLowerCase()]);
+    const url = (v, allowed) => { const u = decode(v).replace(/[\u0000-\u0020\u007f-\u009f\u00ad\u200b-\u200f\u2028\u2029\ufeff]/g, ''); return allowed.test(u) ? u : null; };
+    const allow = (tag, name, value) => {
+      if (name === 'class') return value;
+      if (tag === 'a' && name === 'href') return url(value, /^(https?:\/\/|mailto:|tel:)/i);
+      if (tag === 'img' && name === 'src') { const u = url(value, /^(https:\/\/|media\/[\w.-]+$)/i); return u && Blocks.mediaUrl(u, media); }
+      if (tag === 'img' && name === 'alt') return value;
+      if ((tag === 'img' && (name === 'width' || name === 'height')) || ((tag === 'th' || tag === 'td') && (name === 'colspan' || name === 'rowspan'))) return /^\d{1,4}$/.test(value.trim()) ? value.trim() : null;
+      return null;
+    };
+    const out = [];
+    const open = [];
+    const re = /<!--[\s\S]*?(?:-->|$)|<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[^\s"'>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*\/?>/g;
+    let at = 0;
+    let m;
+    const text = (t) => out.push(t.replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    while ((m = re.exec(html))) {
+      text(html.slice(at, m.index));
+      at = re.lastIndex;
+      if (m[0].startsWith('<!--')) continue;
+      const tag = m[2].toLowerCase();
+      if (Blocks.DROP_TAGS.includes(tag)) {
+        if (!m[1]) {
+          const end = new RegExp('</' + tag + '\\s*>', 'ig');
+          end.lastIndex = at;
+          const e = end.exec(html);
+          at = e ? end.lastIndex : html.length;
+          re.lastIndex = at;
+        }
+        continue;
+      }
+      if (!Blocks.SAFE_TAGS.includes(tag)) continue; // balise inconnue : retirée, son texte reste
+      if (m[1]) {
+        const i = open.lastIndexOf(tag);
+        if (i >= 0) while (open.length > i) out.push(`</${open.pop()}>`);
+        continue;
+      }
+      const attrs = [];
+      const are = /([^\s"'>\/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+      let a;
+      while ((a = are.exec(m[3]))) {
+        const name = a[1].toLowerCase();
+        const raw = a[2] ?? a[3] ?? a[4] ?? '';
+        const value = name === 'class' || name === 'alt' ? decode(raw) : raw;
+        const ok = allow(tag, name, value);
+        if (ok !== null && ok !== undefined && !attrs.some((x) => x.startsWith(name + '='))) attrs.push(`${name}="${Blocks.attr(ok)}"`);
+      }
+      if (tag === 'img' && !attrs.some((x) => x.startsWith('src='))) continue;
+      if (tag === 'img' && !attrs.some((x) => x.startsWith('alt='))) attrs.push('alt=""');
+      out.push(`<${tag}${attrs.length ? ' ' + attrs.join(' ') : ''}>`);
+      if (!Blocks.VOID_TAGS.includes(tag)) open.push(tag);
+    }
+    text(html.slice(at));
+    while (open.length) out.push(`</${open.pop()}>`);
+    return out.join('');
+  },
+
   // ---- Bloc Markdown ⇄ modèle ----
   // Modèle : { type, ...champs du type }. Un bloc est lu par le premier type dont l'écriture redonne le même texte ; sinon il reste « raw ».
 
@@ -482,6 +549,17 @@ const Blocks = {
         : `<p><a href="${Blocks.attr(b.url)}">${Blocks.esc(b.url)}</a></p>`;
     },
     blank: () => ({ url: '' }),
+  });
+
+  // Bloc HTML : le source est gardé tel quel ; le rendu passe toujours par Blocks.sanitize.
+  // Classes Tailwind : seules celles déjà présentes dans le CSS de l'hôte ont un effet.
+  Blocks.register('html', {
+    label: 'HTML', short: 'HTML', icon: 'html', group: 'structure',
+    tone: tone('bg-white border-indigo-200/90 text-stone-900', 'bg-indigo-100 text-indigo-900 border-indigo-200'),
+    match: (t) => { const m = /^:::html\n([\s\S]*)\n:::$/.exec(t); return m && !/^:::/m.test(m[1]) ? { html: m[1] } : null; },
+    toMarkdown: (b) => (b.html.trim() ? `:::html\n${b.html.replace(/^(:::)/gm, ' $1')}\n:::` : ''),
+    toHtml: (b, ctx) => `<div class="bq-html">${Blocks.sanitize(b.html, ctx.media)}</div>`,
+    blank: () => ({ html: '' }),
   });
 
   Blocks.register('hr', {

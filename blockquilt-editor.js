@@ -93,6 +93,14 @@
       edit: (b) => `<input data-url type="url" value="${attr(b.url)}" class="h-11 w-full rounded-xl border border-rose-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo YouTube ou Vimeo">`,
       read: (card, b) => { b.url = card.querySelector('[data-url]').value.trim(); },
     });
+    // Bloc HTML : source à gauche (au-dessus sur téléphone), aperçu filtré en direct.
+    Object.assign(Blocks.types.html, {
+      edit: (b, ui) => `<div class="grid gap-2 sm:grid-cols-2">
+          <textarea data-html rows="${Math.min(16, Math.max(4, b.html.split('\n').length))}" spellcheck="false" aria-label="Code HTML" placeholder="<div class=&quot;…&quot;>…</div>" class="w-full rounded-xl border border-indigo-200 bg-white p-3 font-mono text-[13px] leading-5">${esc(b.html)}</textarea>
+          <div data-html-preview aria-label="Aperçu filtré" class="bq-content min-h-16 overflow-auto rounded-xl border border-dashed border-indigo-200 bg-white p-3 text-sm">${Blocks.sanitize(b.html, ui.media)}</div></div>`,
+      read: (card, b) => { b.html = card.querySelector('[data-html]').value; },
+      onInput: (card, ui) => { card.querySelector('[data-html-preview]').innerHTML = Blocks.sanitize(card.querySelector('[data-html]').value, ui.media); },
+    });
     Object.assign(Blocks.types.hr, { edit: () => '<hr class="my-3 border-t-2 border-stone-300">', read: () => {} });
     Object.assign(Blocks.types.code, {
       edit: (b) => `<input data-lang value="${attr(b.lang)}" placeholder="langage (js, html, sh…)" aria-label="Langage du code" class="mb-1 h-9 w-full bg-transparent font-mono text-xs focus:outline-none">
@@ -265,7 +273,7 @@
       if (preview) return;
       cardsIn().forEach((card) => {
         const b = blocks.find((x) => x.id === card.dataset.id);
-        if (b) (def(b).read || Blocks.fallbackEditor.read)(card, b);
+        if (b) editorOf(b).read(card, b);
       });
     };
     const markdown = () => { syncFromDom(); return Blocks.serialize(docMeta(), blocks); };
@@ -291,8 +299,10 @@
         <div class="-mr-2 flex h-11 items-center gap-0.5">${badge(b)}<span class="flex-1"></span>
           <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-btn cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
           <button type="button" data-menu aria-label="Actions du bloc" aria-haspopup="dialog" class="bq-btn text-stone-500">${ic('more')}</button></div>
-        <div data-card-body>${(def(b).edit || Blocks.fallbackEditor.edit)(b, ui)}</div></article>`;
+        <div data-card-body>${editorOf(b).edit(b, ui)}</div></article>`;
 
+    // Bloc HTML désactivé (option `html` absente) : édité comme texte source, sans aperçu.
+    const editorOf = (b) => (def(b).edit && (b.type !== 'html' || o.html) ? def(b) : Blocks.fallbackEditor);
     const render = () => (preview ? renderPreview() : renderEdit());
     const renderEdit = () => {
       canvas.innerHTML = `<div class="relative mx-auto max-w-3xl">${blocks.map((b, i) => (i ? gap(i) : '') + card(b)).join('')}
@@ -452,7 +462,7 @@
       const groups = {};
       for (const k of Blocks.order) {
         const t = Blocks.types[k];
-        if (t.group === 'none' || t.hidden) continue;
+        if (t.group === 'none' || t.hidden || (k === 'html' && !o.html)) continue;
         (groups[t.group] = groups[t.group] || []).push(k);
       }
       $('[data-add-list]', sheets.add).innerHTML = Object.entries(groups).map(([g, keys]) => `<p class="mb-1 mt-3 px-1 text-[11px] font-bold uppercase tracking-wider text-stone-400 first:mt-0">${esc(GROUPS[g] || g)}</p>
@@ -832,7 +842,14 @@
     on(app, 'change', (e) => { if (e.target.matches('[data-convert]') && canvas.contains(e.target)) convert(e.target.closest('[data-id]').dataset.id, e.target.value); });
     // Écouteurs posés sur toute l'application : un bloc en plein écran est hors de la zone des blocs. Les feuilles sont exclues.
     const inSheet = (t) => !!t.closest?.('[data-sheet]');
-    on(app, 'input', (e) => { if (!inSheet(e.target)) { setDirty(true); typed(); } });
+    on(app, 'input', (e) => {
+      if (inSheet(e.target)) return;
+      setDirty(true);
+      typed();
+      const c = e.target.closest?.('[data-id]');
+      const b = c && blocks.find((x) => x.id === c.dataset.id);
+      if (b) def(b).onInput?.(c, ui);
+    });
     on(app, 'focusin', (e) => { const c = e.target.closest?.('[data-id]'); if (c) activeId = c.dataset.id; });
     on(titleEl, 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
     on(app, 'focusout', (e) => { if (e.target.classList?.contains('bq-edit')) clean(e.target); });

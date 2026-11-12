@@ -11,7 +11,7 @@ const FIX = path.join(__dirname, 'fixtures');
 const expected = {
   'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
-  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
+  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
 };
 for (const file of fs.readdirSync(FIX).sort()) {
   const x = fs.readFileSync(path.join(FIX, file), 'utf8');
@@ -28,6 +28,34 @@ const carHtml = Blocks.toHtml(':::carousel\n![a](media/x1)\n![b](media/x2)\n![c]
 ok((carHtml.match(/<figure>/g) || []).length === 3 && carHtml.includes('<div class="bq-carousel-track">') && carHtml.includes('<figcaption>b</figcaption>') && carHtml.includes('src="/m/x3"'), 'carrousel : 3 <figure> avec <figcaption> dans le rendu');
 ok(Blocks.toMarkdown({ type: 'carousel', items: [{ src: 'media/b', alt: 'B' }, { src: 'media/a', alt: 'A' }] }) === ':::carousel\n![B](media/b)\n![A](media/a)\n:::' && Blocks.toMarkdown({ type: 'carousel', items: [] }) === '', 'carrousel : écrit dans l’ordre, vide il disparaît');
 ok(['::: carousel\n![a](media/x)\n:::', ':::carousel\ntexte\n:::', ':::carousel\n:::', ':::columns\n![a](media/x)\n:::'].every((x) => Blocks.fromMarkdown(x).type === 'raw' && Blocks.toMarkdown(Blocks.fromMarkdown(x)) === x), 'carrousel mal écrit ou :::columns : bloc source, texte intact');
+
+// ---- Bloc HTML : filtre par liste blanche ----
+const PAYLOADS = [
+  '<script>alert(1)</script>', '<img src=x onerror=alert(1)>', '<a href="javascript:alert(1)">x</a>', '<a href="JaVaScRiPt:alert(1)">x</a>',
+  '<a href="&#106;avascript:alert(1)">x</a>', '<a href="java&#x09;script:alert(1)">x</a>', '<a href="jav&#97;script&colon;alert(1)">x</a>', '<a href="&#0000106&#0000097vascript:alert(1)">x</a>',
+  '<a href=" javascript:alert(1)">x</a>', '<svg onload=alert(1)><circle/></svg>', '<iframe src="https://evil.example"></iframe>', '<style>body{display:none}</style>',
+  '<a href="data:text/html;base64,PHNjcmlwdD4=">x</a>', '<div onclick="alert(1)">x</div>', '<img src="javascript:alert(1)">', '<div style="background:url(javascript:alert(1))">s</div>',
+  '<object data="x"></object><embed src="x">', '<math><mi xlink:href="javascript:alert(1)">m</mi></math>', '<scr<script>ipt>alert(1)</script>', '<<script>script>alert(1)<</script>/script>',
+  '<img/src="x"/onerror="alert(1)">', '<!--<script>alert(1)</script>-->', '<form action="javascript:x"><button formaction="javascript:x">b</button></form>', '<input onfocus=alert(1) autofocus>',
+  '<SCRIPT SRC=//evil.example></SCRIPT>', '<img src="https://x.example/a.png" onerror  =  "alert(1)">', '<a href="https://x.example" target="_blank" style="color:red" id="y" onmouseover=x>s</a>', '<div><b>non fermé', '<a href="https://ok.example"',
+];
+ok(PAYLOADS.length >= 20, `filtre : ${PAYLOADS.length} charges connues`);
+for (const p of PAYLOADS) {
+  const out = Blocks.sanitize(p);
+  const tags = [...out.matchAll(/<[a-z][^>]*>/gi)].map((m) => m[0]);
+  const bad = /<(script|style|iframe|svg|math|object|embed|form|input|button)/i.test(out)
+    || tags.some((t) => /\s(on\w+|style|id|target|xlink:href|formaction|action)=/i.test(t) || /(href|src)="(?!https?:\/\/|mailto:|tel:|media\/)/i.test(t));
+  ok(!bad, 'filtre : rien ne survit à ' + JSON.stringify(p));
+}
+const table = '<table class="w-full"><thead><tr><th colspan="2">Tarifs</th></tr></thead><tbody><tr><td>Nuit</td><td rowspan="1">80 €</td></tr></tbody></table>';
+ok(Blocks.sanitize(table) === table, 'filtre : un tableau passe intact');
+const grid = '<div class="grid grid-cols-2 gap-4 md:grid-cols-[1fr_2fr]"><div class="p-4"><h3>A</h3><p>Texte <strong>gras</strong> <a href="https://exemple.fr">lien</a></p></div><figure><img src="https://exemple.fr/a.png" alt="A" width="40" height="40"><figcaption>B</figcaption></figure></div>';
+ok(Blocks.sanitize(grid) === grid, 'filtre : une grille de div passe intacte (classes Tailwind gardées)');
+ok(Blocks.sanitize('<img src="media/abc" alt="x">', '/m/') === '<img src="/m/abc" alt="x">' && Blocks.sanitize('<div><p>a') === '<div><p>a</p></div>', 'filtre : photo du document, balises fermées');
+const htmlFix = fs.readFileSync(path.join(FIX, 'html.md'), 'utf8');
+ok(Blocks.toMarkdown(Blocks.fromMarkdown(htmlFix)) + '\n' === htmlFix && Blocks.fromMarkdown(htmlFix).html.includes('\n\n'), 'bloc HTML : texte source gardé à l’identique (ligne vide comprise)');
+ok(Blocks.toHtml(':::html\n<p onclick="x">a</p><script>b</script>\n:::').includes('<div class="bq-html"><p>a</p></div>'), 'bloc HTML : rendu filtré dans <div class="bq-html">');
+ok(Blocks.toMarkdown({ type: 'html', html: 'a\n:::\nb' }) === ':::html\na\n :::\nb\n:::', 'bloc HTML : une ligne « ::: » tapée ne ferme pas le bloc');
 
 // ---- Frontmatter ----
 const fm = Blocks.parse(fs.readFileSync(path.join(FIX, 'frontmatter.md'), 'utf8'));

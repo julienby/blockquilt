@@ -58,3 +58,8 @@
 .bq-content .bq-carousel-track img { aspect-ratio: 4 / 3; object-fit: cover; }
 .bq-content .bq-carousel-dots { display: flex; justify-content: center; gap: 0.4rem; margin: 0.5rem 0 0; }
 .bq-content .bq-carousel-dots span { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--bq-line); }
+
+/* Bloc HTML filtré : le contenu garde ses classes ; seules celles présentes dans le CSS de l'hôte ont un effet. */
+.bq-content .bq-html { margin: 1rem 0; }
+.bq-content .bq-html table { width: 100%; border-collapse: collapse; }
+.bq-content .bq-html th, .bq-content .bq-html td { border: 1px solid var(--bq-line); padding: 0.4rem 0.6rem; text-align: left; }

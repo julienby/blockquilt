@@ -376,6 +376,22 @@ try {
   await ev(`document.querySelector('[data-preview]').click()`);
   ok(await ev(`(() => { const t = ':::columns\\nGauche\\n\\nDroite\\n:::'; editor.setMarkdown(t); return !!document.querySelector('[data-bq] [data-raw]') && editor.getMarkdown() === t + '\\n'; })()`), ':::columns écrit à la main : bloc source, texte intact');
 
+  // ---- Phase 8 : bloc HTML ----
+  await open();
+  await ev(`document.querySelector('[data-insert="end"]').click()`);
+  await ev(`document.querySelector('[data-sheet="add"] [data-pick="html"]').click()`);
+  await ev(`(() => { const t = document.querySelector('[data-bq] [data-html]'); t.value = '<div class="p-4" onclick="alert(1)"><strong>Gras</strong><script>window.pwned = 1</script><img src=x onerror="window.pwned = 2"></div>'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+  const live = await ev(`document.querySelector('[data-html-preview]').innerHTML`);
+  ok(live === '<div class="p-4"><strong>Gras</strong></div>', 'bloc HTML : aperçu filtré en direct (' + live + ')');
+  await ev(`document.querySelector('[data-save]').click()`);
+  md = await saved((x) => x.includes(':::html'), 'enregistrement du bloc HTML');
+  ok(md.includes(':::html\n<div class="p-4" onclick="alert(1)"><strong>Gras</strong><script>window.pwned = 1</script><img src=x onerror="window.pwned = 2"></div>\n:::'), 'bloc HTML : texte source enregistré tel quel');
+  await ev(`document.querySelector('[data-preview]').click()`);
+  await waitFor(() => ev(`!!document.querySelector('[data-canvas] .bq-html')`), 'aperçu du bloc HTML');
+  await sleep(200);
+  ok(await ev(`!window.pwned && !document.querySelector('[data-canvas] script, [data-canvas] [onclick], [data-canvas] [onerror]') && document.querySelector('[data-canvas] .bq-html strong')?.textContent === 'Gras'`), 'bloc HTML : rendu filtré, aucun script exécuté');
+  ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: ':::html\\n<b>x</b>\\n:::' }); el.querySelector('[data-insert="end"]').click(); const has = !!el.querySelector('[data-pick="html"]'); const raw = !!el.querySelector('[data-id] [data-raw]') && !el.querySelector('[data-html-preview]'); e.destroy(); el.remove(); return !has && raw; })()`), 'bloc HTML désactivé par défaut : absent du menu, édité comme texte source');
+
   ws.close();
 } catch (error) {
   ok(false, error.message);

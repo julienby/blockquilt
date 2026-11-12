@@ -1,0 +1,7 @@
+:::html
+<div class="grid grid-cols-2 gap-4">
+  <div class="rounded-xl bg-sky-50 p-4"><strong>Gauche</strong></div>
+
+  <div class="rounded-xl bg-amber-50 p-4">Droite <a href="https://exemple.fr">lien</a></div>
+</div>
+:::
