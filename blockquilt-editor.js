@@ -1,665 +1,623 @@
-// Écran de blockquilt : cartes d'édition des blocs. Nécessite blockquilt.js (le noyau `Blocks`), chargé avant.
-// Chaque type reçoit ici edit(b, ui) → HTML de la carte, et read(card, b) → met à jour le modèle depuis l'écran.
-
-/** Champ riche ou simple (contenteditable). */
-Blocks.editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable="true" role="textbox" aria-multiline="true" spellcheck="false" data-placeholder="${Blocks.esc(ph).replace(/"/g, '&quot;')}" class="bq-edit ${cls}">${html}</div>`;
-{
-  const rich = { edit: (b, ui) => ui.editable('min-h-10 text-sm leading-relaxed', b.html, 'Insérez votre texte…', 'data-body data-rich'), read: (card, b) => { b.html = card.querySelector('[data-body]').innerHTML; } };
-  Object.assign(Blocks.types.text, rich);
-  Object.assign(Blocks.types.quote, { ...rich, edit: (b, ui) => ui.editable('min-h-10 text-sm italic leading-relaxed', b.html, 'Une citation…', 'data-body data-rich') });
-  // Encadrés : icône (emoji) et titre facultatifs, puis le texte.
-  for (const k of Blocks.CALLOUTS) {
-    Object.assign(Blocks.types[k], {
-      edit: (b, ui) => `<div class="mb-1.5 flex items-center gap-2"><span data-callout-icon class="text-lg leading-none" title="Icône">${ui.esc(b.icon || '')}</span>
-          <input data-callout-title value="${ui.attr(b.title || '')}" placeholder="Titre (facultatif)" aria-label="Titre de l’encadré" class="min-w-0 flex-1 bg-transparent text-sm font-bold placeholder:font-normal placeholder:opacity-50 focus:outline-none"></div>
-          ${rich.edit(b, ui)}`,
-      read: (card, b) => { rich.read(card, b); b.title = card.querySelector('[data-callout-title]').value; },
-    });
-  }
-  for (const [k, cls, ph] of [['h2', 'text-lg sm:text-xl', 'Titre de section…'], ['h3', 'text-base sm:text-lg', 'Sous-titre…']]) {
-    Object.assign(Blocks.types[k], { edit: (b, ui) => ui.editable(`font-news ${cls} font-semibold leading-tight tracking-tight text-stone-900`, b.html, ph, 'data-body data-plain'), read: rich.read });
-  }
-  Object.assign(Blocks.types.photo, {
-    edit: (b, ui) => `<div class="space-y-2">${b.src ? `<div class="overflow-hidden rounded-xl border border-stone-200 bg-stone-100"><img src="${ui.attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="h-36 w-full object-cover"></div>` : ''}
-          ${ui.editable('text-xs italic text-stone-600', ui.esc(b.alt), 'Légende de la photo (lue aux personnes malvoyantes)…', 'data-body data-plain')}</div>`,
-    read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
-  });
-  Object.assign(Blocks.types.video, {
-    edit: (b, ui) => `<div class="space-y-2"><div class="flex h-24 flex-col items-center justify-center gap-1 rounded-xl bg-stone-900 text-white"><span class="flex size-9 items-center justify-center rounded-full bg-white/20">${ui.ic('video', 'size-4')}</span><span class="text-[11px] text-stone-300">Lecteur affiché au lecteur</span></div>
-          <input data-url type="url" value="${ui.attr(b.url)}" class="w-full rounded-lg border border-rose-200 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo"></div>`,
-    read: (card, b) => { b.url = card.querySelector('[data-url]').value; },
-  });
-  Object.assign(Blocks.types.hr, { edit: () => '<hr class="my-2 border-t-2 border-stone-300">', read: () => {} });
-  Object.assign(Blocks.types.code, {
-    edit: (b, ui) => `<input data-lang value="${ui.attr(b.lang)}" placeholder="langage (js, html, sh…)" aria-label="Langage du code" class="mb-1.5 w-full bg-transparent font-mono text-xs focus:outline-none">
-          <textarea data-code rows="${Math.min(16, Math.max(3, b.code.split('\n').length))}" spellcheck="false" aria-label="Code" class="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-xs leading-5">${ui.esc(b.code)}</textarea>`,
-    read: (card, b) => { b.lang = card.querySelector('[data-lang]').value.trim().replace(/[^\w+#.-]/g, ''); b.code = card.querySelector('[data-code]').value; },
-  });
-  // Repli : le texte du bloc, tel quel. Sert aussi à tout type enregistré sans carte d'édition propre.
-  const source = {
-    edit: (b, ui) => `<div class="space-y-1"><textarea data-raw rows="3" class="w-full rounded-xl border border-stone-300 bg-white p-3 font-mono text-xs leading-5" aria-label="Contenu du bloc">${ui.esc(Blocks.toMarkdown(b))}</textarea></div>`,
-  };
-  Object.assign(Blocks.types.raw, source, { read: (card, b) => { b.md = card.querySelector('[data-raw]').value; } });
-  Blocks.fallbackEditor = {
-    edit: source.edit,
-    read: (card, b) => {
-      const next = Blocks.fromMarkdown(card.querySelector('[data-raw]').value);
-      for (const k of Object.keys(b)) if (k !== 'id') delete b[k];
-      Object.assign(b, next);
-    },
-  };
-}
-
-// ---- Écran : actif seulement si la page contient #bq ----
+// blockquilt — écran d'édition. Nécessite blockquilt.js (le noyau `Blocks`), chargé avant, et la feuille blockquilt.css.
+// Intégration : Blockquilt.mount(element, { source, media, saveUrl | onSave, uploadUrl, previewUrl, aiUrl, backUrl, fields }).
+// Chaque type de bloc reçoit ici edit(b, ui) → HTML de la carte, et read(card, b) → met à jour le modèle depuis l'écran.
 (function () {
-  const root = typeof document !== 'undefined' ? document.getElementById('bq') : null;
-  if (!root) return;
-  const $ = (s, r = root) => r.querySelector(s);
-  const media = root.dataset.media;
-  const csrf = root.dataset.csrf;
-  const saveUrl = root.dataset.save;
-  const previewUrl = root.dataset.preview;
-  const uploadUrl = root.dataset.upload;
-  const canvas = $('[data-canvas]');
-  const pill = $('[data-pill]');
-  const status = $('[data-status]');
-  const titleEl = $('[data-title]');
-  const iconEl = $('[data-icon]');
-  const toast = $('[data-toast]');
-  const T = Blocks.types;
-
-  let slug = root.dataset.slug;
-  let icon = '';
-  let meta = {};
-  let blocks = [];
-  let dirty = false;
-  let guestMode = false;
-  let insertAt = null; // null = en bas
-  let deleteId = null;
-  let activeBlockId = null;
-  let fullscreenId = null;
-  let nextId = 1;
-
-  const ic = (name, cls = 'size-4') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#ic-${name}"/></svg>`;
+  // ---- Icônes (tracés Lucide, licence ISC), en ligne : aucun identifiant dans la page ----
+  const ICONS = {
+    heading: '<path d="M6 12h12"/><path d="M6 20V4"/><path d="M18 20V4"/>',
+    align_left: '<path d="M15 12H3"/><path d="M17 18H3"/><path d="M21 6H3"/>',
+    sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z"/>',
+    triangle_alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    octagon_alert: '<path d="M12 16h.01"/><path d="M12 8v4"/><path d="M15.312 2a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586l-4.688-4.688A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2z"/>',
+    info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+    quote: '<path d="M10 11H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2-1 4-4 5"/><path d="M19 11h-4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v6c0 2-1 4-4 5"/>',
+    image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+    images: '<path d="M18 22H4a2 2 0 0 1-2-2V6"/><path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"/><circle cx="12" cy="8" r="2"/><rect width="16" height="16" x="6" y="2" rx="2"/>',
+    video: '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+    minus: '<path d="M5 12h14"/>',
+    code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+    html: '<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>',
+    sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
+    chevron_left: '<path d="m15 6-6 6 6 6"/>',
+    chevron_down: '<path d="m6 9 6 6 6-6"/>',
+    arrow_up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+    arrow_down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+    grip: '<circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>',
+    more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    save: '<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+    maximize: '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
+    minimize: '<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/>',
+    merge: '<path d="M12 22v-6"/><path d="M12 8V2"/><path d="m15 19-3-3-3 3"/><path d="m15 5-3 3-3-3"/>',
+    eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+    pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+    redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
+    copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+    duplicate: '<path d="M15 12h-6M12 9v6"/><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+    cut: '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>',
+    paste: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
+    split: '<path d="M3 12h4M17 12h4M10 12h4"/><path d="m8 5 4 4 4-4"/><path d="m8 19 4-4 4 4"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
+    eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+    smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+    wand: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>',
+  };
+  const ic = (name, cls = 'size-5') => `<svg class="${cls} shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.sliders}</svg>`;
   const esc = Blocks.esc;
-  const attr = (s) => esc(s).replace(/"/g, '&quot;');
-  const showToast = (text) => {
-    $('[data-toast-text]').textContent = text;
-    toast.classList.remove('opacity-0');
-    clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => toast.classList.add('opacity-0'), 1800);
-  };
+  const attr = Blocks.attr;
 
-  // ---- État enregistré (grisé) / à enregistrer (vert avec icône disquette) ----
-  const setDirty = (value) => {
-    if (dirty === value && status.innerHTML !== '') return;
-    dirty = value;
-    status.innerHTML = `${ic('save', 'size-3.5')} <span>${value ? 'Enregistrer' : 'Enregistré'}</span>`;
-    status.disabled = !value;
-    status.className = value
-      ? 'inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-brand-700 active:scale-95 transition-all'
-      : 'inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-400 transition-all';
-  };
-  addEventListener('beforeunload', (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
-
-  // ---- Titre et icône de la rubrique : « ## 🔑 Arrivée » ----
-  // Titre et icône vivent dans le frontmatter ; les autres clés sont gardées dans leur ordre.
-  const docMeta = () => {
-    const m = { ...meta };
-    const title = titleEl.textContent.trim();
-    if (title) m.title = title; else delete m.title;
-    if (icon) m.icon = icon; else delete m.icon;
-    return m;
-  };
-  const showIcon = () => { iconEl.textContent = icon || '📄'; };
-
-  // ---- Lecture de l'écran vers le modèle (avant tout nouveau dessin) ----
-  const syncFromDom = () => {
-    if (guestMode) return;
-    canvas.querySelectorAll('[data-id]').forEach((card) => {
-      const b = blocks.find((x) => x.id === card.dataset.id);
-      if (b) (Blocks.def(b.type).read || Blocks.fallbackEditor.read)(card, b);
+  // ---- Cartes d'édition des types de base ----
+  /** Champ modifiable (contenteditable). `rich` : mise en forme permise (barre), sinon texte simple. */
+  const editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable="true" role="textbox" aria-multiline="true" spellcheck="false" data-placeholder="${attr(ph)}" class="bq-edit ${cls}">${html}</div>`;
+  Blocks.editable = editable;
+  {
+    const richEdit = (cls, ph) => (b) => editable(`min-h-7 ${cls}`, b.html, ph, 'data-body data-rich aria-label="Texte du bloc"');
+    const readHtml = (card, b) => { b.html = card.querySelector('[data-body]').innerHTML; };
+    Object.assign(Blocks.types.text, { edit: richEdit('text-[15px] leading-relaxed', 'Écrivez ici…'), read: readHtml });
+    Object.assign(Blocks.types.quote, { edit: richEdit('text-[15px] italic leading-relaxed', 'Une citation…'), read: readHtml });
+    for (const k of Blocks.CALLOUTS) {
+      const t = Blocks.types[k];
+      Object.assign(t, {
+        edit: (b) => `<div class="-ml-2 flex items-center">
+            <button type="button" data-callout-icon aria-label="Icône de l’encadré" class="bq-btn text-xl ${b.icon ? '' : 'opacity-40 grayscale'}">${esc(b.icon || t.emoji)}</button>
+            <input data-callout-title value="${attr(b.title || '')}" placeholder="Titre (facultatif)" aria-label="Titre de l’encadré" class="h-11 min-w-0 flex-1 bg-transparent text-[15px] font-bold placeholder:font-medium placeholder:opacity-50 focus:outline-none"></div>
+          ${richEdit('text-[15px] leading-relaxed', 'Écrivez ici…')(b)}`,
+        read: (card, b) => { readHtml(card, b); b.title = card.querySelector('[data-callout-title]').value; },
+      });
+    }
+    for (const [k, cls, ph] of [['h2', 'text-xl font-bold', 'Titre de section'], ['h3', 'text-[17px] font-bold', 'Sous-titre']]) {
+      Object.assign(Blocks.types[k], { edit: (b) => editable(`${cls} leading-snug tracking-tight text-stone-900`, b.html, ph, 'data-body data-plain aria-label="Titre"'), read: readHtml });
+    }
+    Object.assign(Blocks.types.photo, {
+      edit: (b, ui) => `<figure class="space-y-2">${b.src ? `<img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="max-h-72 w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">` : ''}
+          ${editable('text-sm italic text-stone-600', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}</figure>`,
+      read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
     });
-  };
-  const markdown = () => {
-    syncFromDom();
-    return Blocks.serialize(docMeta(), blocks);
-  };
+    Object.assign(Blocks.types.video, {
+      edit: (b) => `<input data-url type="url" value="${attr(b.url)}" class="h-11 w-full rounded-xl border border-rose-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo YouTube ou Vimeo">`,
+      read: (card, b) => { b.url = card.querySelector('[data-url]').value.trim(); },
+    });
+    Object.assign(Blocks.types.hr, { edit: () => '<hr class="my-3 border-t-2 border-stone-300">', read: () => {} });
+    Object.assign(Blocks.types.code, {
+      edit: (b) => `<input data-lang value="${attr(b.lang)}" placeholder="langage (js, html, sh…)" aria-label="Langage du code" class="mb-1 h-9 w-full bg-transparent font-mono text-xs focus:outline-none">
+          <textarea data-code rows="${Math.min(16, Math.max(3, b.code.split('\n').length))}" spellcheck="false" aria-label="Code" class="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-[13px] leading-5">${esc(b.code)}</textarea>`,
+      read: (card, b) => { b.lang = card.querySelector('[data-lang]').value.trim().replace(/[^\w+#.-]/g, ''); b.code = card.querySelector('[data-code]').value; },
+    });
+    // Repli : le texte du bloc, tel quel. Sert aussi à tout type enregistré sans carte d'édition propre.
+    const sourceEdit = (b) => `<textarea data-raw rows="${Math.min(14, Math.max(3, Blocks.toMarkdown(b).split('\n').length))}" spellcheck="false" class="w-full rounded-xl border border-stone-300 bg-white p-3 font-mono text-[13px] leading-5" aria-label="Texte source du bloc">${esc(Blocks.toMarkdown(b))}</textarea>`;
+    Object.assign(Blocks.types.raw, { edit: sourceEdit, read: (card, b) => { b.md = card.querySelector('[data-raw]').value; } });
+    Blocks.fallbackEditor = {
+      edit: sourceEdit,
+      read: (card, b) => {
+        const next = Blocks.fromMarkdown(card.querySelector('[data-raw]').value);
+        for (const k of Object.keys(b)) if (k !== 'id') delete b[k];
+        Object.assign(b, next);
+      },
+    };
+  }
 
-  // ---- Dessin : bouton + Insérer au milieu SANS trait horizontal ----
-  const gapBtn = 'inline-flex h-7 items-center justify-center gap-1 rounded-full border border-stone-200/90 bg-white px-3 text-[11px] font-bold text-stone-600 shadow-sm transition-all hover:border-stone-400 hover:bg-stone-50 active:scale-95';
-  const gap = (index, label) => {
-    const canMerge = index > 0 && index < blocks.length && Blocks.merge(blocks[index - 1], blocks[index]) !== null;
-    return `<div class="flex items-center justify-center gap-2 py-2.5">
-      <button type="button" data-insert="${index}" aria-label="${label}" class="${gapBtn}">${ic('plus', 'size-3.5')}<span>Insérer</span></button>
-      ${canMerge ? `<button type="button" data-merge="${index}" aria-label="Fusionner le bloc n°${index + 1} dans le bloc n°${index}" class="${gapBtn}">${ic('fold_vertical', 'size-3.5')}<span>Fusionner</span></button>` : ''}
+  const GROUPS = { text: 'Texte', media: 'Médias', structure: 'Structure' };
+  const sheetCls = 'bq-sheet m-0 mt-auto max-h-[88dvh] w-full max-w-full overflow-auto rounded-t-3xl bg-white p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-stone-900 shadow-xl backdrop:bg-black/40 sm:m-auto sm:max-w-lg sm:rounded-3xl';
+  const sheet = (name, label, inner) => `<dialog data-sheet="${name}" aria-label="${attr(label)}" class="${sheetCls}">
+      <div class="-mx-1 -mt-1 mb-2 flex items-center gap-2"><h2 class="min-w-0 flex-1 truncate px-1 text-base font-bold">${esc(label)}</h2>
+        <button type="button" data-close aria-label="Fermer" class="bq-btn text-stone-500">${ic('x')}</button></div>${inner}</dialog>`;
+  const item = (data, icon, label, cls = '') => `<button type="button" ${data} class="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium hover:bg-stone-100 active:bg-stone-200 ${cls}">${ic(icon)}<span class="min-w-0 flex-1 truncate">${label}</span></button>`;
+
+  /** Monte un éditeur dans `element`. Renvoie { getMarkdown(), setMarkdown(md), destroy() }. */
+  function mount(element, options = {}) {
+    const o = { media: 'media/', fields: {}, source: '', ...options };
+    const ac = new AbortController();
+    const on = (target, type, fn, opts = {}) => target?.addEventListener(type, fn, { ...opts, signal: ac.signal });
+    const timers = new Set();
+    const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); return t; };
+
+    element.innerHTML = `<div data-bq class="bq-app flex min-h-full w-full flex-col bg-white font-jakarta text-stone-800">
+      <header data-head class="sticky top-0 z-20 flex min-h-14 items-center gap-0.5 border-b border-stone-200/80 bg-white/95 px-1.5 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-3">
+        ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn text-stone-500">${ic('chevron_left')}</a>` : ''}
+        <button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
+        <div data-title contenteditable="true" role="textbox" aria-label="Titre du document" data-placeholder="Sans titre" spellcheck="false" class="bq-edit min-w-0 flex-1 truncate px-1 text-base font-extrabold leading-snug text-stone-900 sm:text-lg"></div>
+        <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn text-stone-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
+        <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative text-stone-400">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
+      </header>
+      <div data-canvas class="flex-1 bg-stone-50/60 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
+      <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 px-1 text-white shadow-2xl">
+        <button type="button" data-fmt="bold" aria-label="Gras" class="bq-btn font-extrabold">B</button>
+        <button type="button" data-fmt="italic" aria-label="Italique" class="bq-btn font-news italic">I</button>
+        <button type="button" data-fmt="underline" aria-label="Souligner" class="bq-btn underline">U</button>
+        <button type="button" data-fmt="highlight" aria-label="Surligner" class="bq-btn"><span class="size-4 rounded bg-amber-300"></span></button>
+        <button type="button" data-fmt="insertUnorderedList" aria-label="Liste à puces" class="bq-btn">${ic('list')}</button>
+        <button type="button" data-fmt="clear" aria-label="Effacer la mise en forme" class="bq-btn text-stone-300">${ic('eraser')}</button>
+        <button type="button" data-split aria-label="Scinder le bloc au curseur" class="bq-btn text-stone-300">${ic('split')}</button>
+      </div>
+      <div class="pointer-events-none fixed inset-x-0 top-16 z-[60] flex justify-center">
+        <div data-toast role="status" class="rounded-full bg-stone-900/95 px-3.5 py-2 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-300"></div>
+      </div>
+      <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" hidden aria-label="Choisir une photo">
+      ${sheet('add', 'Ajouter un bloc', '<div data-add-list></div>')}
+      ${sheet('menu', 'Bloc', '<div data-menu-list class="grid gap-0.5"></div>')}
+      ${sheet('delete', 'Supprimer ce bloc ?', `<p data-del-preview class="line-clamp-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm italic text-stone-700"></p>
+        <button type="button" data-del-confirm class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 font-semibold text-white hover:bg-red-700">${ic('trash')}Supprimer</button>`)}
+      ${sheet('leave', 'Modifications non enregistrées', `<div class="grid gap-2"><button type="button" data-leave-save class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Enregistrer et quitter</button>
+        <button type="button" data-leave-discard class="min-h-11 rounded-xl bg-red-600 px-4 font-semibold text-white">Quitter sans enregistrer</button></div>`)}
+      ${sheet('icon', 'Icône', `<ul data-icon-grid class="grid grid-cols-6 gap-1.5">${['🏡', '🔑', '📶', '🗑️', '🍽️', '🚗', '📞', '🛏️', '☕', '🔥', '❄️', '📍', '💡', 'ℹ️', '✅', '⚠️', '🚨', '🚭', '📝', '📌', '⭐', '❤️', '🎉', '📷'].map((e) => `<li><button type="button" data-icon-pick="${e}" class="flex aspect-square w-full items-center justify-center rounded-xl bg-stone-100 text-2xl hover:bg-stone-200">${e}</button></li>`).join('')}</ul>
+        <div class="mt-3 flex gap-2"><input data-icon-input aria-label="Votre emoji" placeholder="Collez un emoji" class="h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-xl"><button type="button" data-icon-use class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Utiliser</button></div>
+        <button type="button" data-icon-pick="" class="mt-2 min-h-11 rounded-xl px-3 font-medium text-brand-700 hover:bg-brand-50">Aucune icône</button>`)}
     </div>`;
-  };
 
-  const ui = { ic, esc, attr, media, editable: Blocks.editable };
-  const body = (b) => (Blocks.def(b.type).edit || Blocks.fallbackEditor.edit)(b, ui);
+    const app = element.firstElementChild;
+    const $ = (s, r = app) => r.querySelector(s);
+    const canvas = $('[data-canvas]');
+    const bar = $('[data-bar]');
+    const head = $('[data-head]');
+    const titleEl = $('[data-title]');
+    const iconBtn = $('[data-doc-icon]');
+    const saveBtn = $('[data-save]');
+    const fileInput = $('[data-file]');
+    const toastEl = $('[data-toast]');
+    const sheets = {};
+    app.querySelectorAll('[data-sheet]').forEach((d) => { sheets[d.dataset.sheet] = d; });
+    const ui = { ic, esc, attr, media: o.media, editable };
 
-  // Structure de bloc :
-  // (type contenu)   []fullscreen   | haut
-  // contenu                         | drag
-  //                  []poubelle     | bas
-  const card = (b, i) => {
-    const t = T[b.type];
-    const isTitle = !!t.single;
-    const isFull = fullscreenId === b.id;
-    const canFullscreen = t.convertible && !t.single || b.type === 'raw';
-    const head = Blocks.TEXT_KEYS.includes(b.type)
-      ? `<div class="relative inline-flex items-center">${ic(t.icon, 'pointer-events-none absolute left-2.5 size-3.5 opacity-80')}
-          <select data-convert aria-label="Type du bloc" class="cursor-pointer appearance-none rounded-full border py-0.5 pl-7 pr-6 text-[11px] font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${t.tone.badge}">
-            ${Blocks.TEXT_KEYS.map((k) => `<option value="${k}" ${k === b.type ? 'selected' : ''}>${T[k].label}</option>`).join('')}</select>
-          ${ic('chevron_down', 'pointer-events-none absolute right-2 size-3 opacity-70')}</div>`
-      : `<span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${t.tone.badge}">${ic(t.icon, 'size-3.5')}<span>${t.label}</span></span>`;
-    const fsBtn = canFullscreen
-      ? `<button type="button" data-fullscreen aria-label="${isFull ? 'Quitter le plein écran' : 'Plein écran'}" title="${isFull ? 'Quitter le plein écran' : 'Plein écran'}" class="-mr-1.5 -mt-1 flex size-8 items-center justify-center rounded-xl text-stone-500 hover:bg-black/5 hover:text-stone-900">${ic(isFull ? 'minimize' : 'maximize', 'size-3.5')}</button>`
-      : '<span></span>';
-    const rail = (name, act, label, disabled) => `<button type="button" data-move="${act}" ${disabled ? 'disabled' : ''} aria-label="${label}" class="flex ${isTitle ? 'size-7' : 'size-8'} items-center justify-center rounded-lg text-stone-500 active:bg-white/80 disabled:pointer-events-none disabled:opacity-20">${ic(name, 'size-3.5')}</button>`;
-    return `<article data-id="${b.id}" class="bq-card flex items-stretch overflow-hidden rounded-2xl border ${t.tone.card} ${isFull ? 'bq-fullscreen' : ''}">
-        <div class="flex min-w-0 flex-1 flex-col ${isTitle ? 'px-3.5 py-2.5' : 'p-3.5'}">
-          <div class="${isTitle ? 'mb-1' : 'mb-2'} flex items-center justify-between gap-2">${head}${fsBtn}</div>
-          <div class="flex-1">${body(b)}</div>
-          <div class="mt-2 flex justify-end">
-            <button type="button" data-delete aria-label="Supprimer ce bloc" class="-mb-1 -mr-1.5 flex size-8 items-center justify-center rounded-xl text-red-600 hover:bg-red-50 active:bg-red-100">${ic('trash2', 'size-3.5')}</button>
-          </div>
-        </div>
-        <div class="flex w-10 shrink-0 select-none flex-col items-center justify-between border-l border-black/5 bg-black/[0.02] py-1">
-          ${rail('chevron_up', '-1', 'Monter ce bloc', i === 0)}
-          <div data-grip role="button" aria-label="Glisser pour déplacer" class="flex ${isTitle ? 'size-7' : 'size-8'} cursor-grab touch-none items-center justify-center rounded-lg text-stone-400 active:cursor-grabbing">${ic('grip', 'size-3.5')}</div>
-          ${rail('chevron_down', '1', 'Descendre ce bloc', i === blocks.length - 1)}</div></article>`;
-  };
+    let meta = {};
+    let icon = '';
+    let blocks = [];
+    let dirty = false;
+    let preview = false;
+    let insertAt = null; // null = en bas
+    let menuId = null;
+    let iconTarget = null; // null = document, sinon id du bloc (encadré)
+    let nextId = 1;
+    const newId = () => 'b' + nextId++;
+    const def = (b) => Blocks.def(b.type);
 
-  const render = () => (guestMode ? renderGuest() : renderEdit());
-  const renderEdit = () => {
-    canvas.innerHTML = `${blocks.length ? gap(0, 'Insérer un bloc au début') : ''}${blocks.map((b, i) => card(b, i) + (i < blocks.length - 1 ? gap(i + 1, 'Insérer un bloc ici') : '')).join('')}
-      <div class="${blocks.length ? 'pt-3' : ''} flex items-center gap-2.5">
-        <button type="button" data-insert="end" class="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl border border-stone-200/90 bg-white px-4 py-2.5 text-xs font-bold text-stone-600 shadow-sm transition-all hover:border-stone-300 hover:bg-stone-50 active:scale-[0.99] sm:text-sm">
-          <span class="flex size-5 items-center justify-center rounded-full bg-stone-100 text-stone-500">${ic('plus', 'size-3.5')}</span><span>Insérer un bloc</span></button>
-      </div>`;
-    pill.hidden = true;
-    canvas.querySelectorAll('.bq-edit').forEach(clean);
-  };
-  const clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };
+    const toast = (text) => {
+      toastEl.textContent = text;
+      toastEl.classList.remove('opacity-0');
+      clearTimeout(toast.timer);
+      toast.timer = later(() => toastEl.classList.add('opacity-0'), 1800);
+    };
 
-  const renderGuest = async () => {
-    pill.hidden = true;
-    canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
-    const text = markdown();
-    const data = new FormData();
-    data.set('_csrf', csrf);
-    data.set('text', text);
-    try {
-      // Sans data-preview, le rendu se fait ici (Blocks.toHtml) ; avec, le serveur hôte peut compléter le texte (variables, etc.).
-      const html = previewUrl
-        ? await (await fetch(previewUrl, { method: 'POST', body: data, headers: { 'HX-Request': 'true' } })).text()
-        : Blocks.toHtml(text, { media });
-      canvas.innerHTML = `<div class="rounded-2xl bg-white p-4">${html}</div>`;
-    } catch {
-      canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
-    }
-  };
-
-  // ---- Modes ----
-  const setMode = async (guest) => {
-    if (guest === guestMode) return;
-    syncFromDom();
-    guestMode = guest;
-    fullscreenId = null;
-    root.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.mode === 'guest') === guest)));
-    titleEl.contentEditable = String(!guest);
-    render();
-    showToast(guest ? 'Visualisation invité' : 'Mode édition');
-  };
-
-  // ---- Positionnement fluide au-dessus du clavier virtuel mobile lors de l'ajout d'un bloc ----
-  // Règle UX : uniquement déclenché à l'ajout d'un bloc neuf (jamais pendant la frappe ni au focusin sur une liste existante).
-  let addedCard = null;
-  let addedAt = 0;
-  const ensureVisibleAboveKeyboard = (cardEl) => {
-    if (!cardEl || fullscreenId) return;
-    const vh = window.visualViewport ? window.visualViewport.height : innerHeight;
-    const rect = cardEl.getBoundingClientRect();
-    const targetTop = Math.max(96, Math.round(vh * 0.26));
-    if (rect.bottom > vh - 20 || rect.top > vh * 0.5) {
-      const delta = rect.top - targetTop;
-      if (Math.abs(delta) > 16) window.scrollBy({ top: delta, behavior: 'smooth' });
-    }
-  };
-  const scrollAboveKeyboard = (cardEl) => {
-    if (!cardEl) return;
-    addedCard = cardEl;
-    addedAt = Date.now();
-    const field = cardEl.querySelector('[contenteditable], input, textarea');
-    field?.focus({ preventScroll: true });
-    requestAnimationFrame(() => ensureVisibleAboveKeyboard(cardEl));
-    setTimeout(() => ensureVisibleAboveKeyboard(cardEl), 180);
-    setTimeout(() => ensureVisibleAboveKeyboard(cardEl), 360);
-  };
-  window.visualViewport?.addEventListener('resize', () => {
-    if (addedCard && Date.now() - addedAt < 800) {
-      ensureVisibleAboveKeyboard(addedCard);
-    }
-  });
-
-  // ---- Ajout, déplacement, suppression ----
-  const add = (type, at) => {
-    syncFromDom();
-    const b = { id: 'b' + nextId++, ...Blocks.blank(type) };
-    const index = at === null || at > blocks.length ? blocks.length : at;
-    blocks.splice(index, 0, b);
-    setDirty(true);
-    render();
-    const el = canvas.querySelector(`[data-id="${b.id}"]`);
-    el.classList.add('bq-new');
-    scrollAboveKeyboard(el);
-  };
-  const move = (id, delta) => {
-    syncFromDom();
-    const i = blocks.findIndex((b) => b.id === id);
-    const j = i + delta;
-    if (j < 0 || j >= blocks.length) return;
-    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
-    setDirty(true);
-    render();
-    canvas.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  };
-
-  // Le bloc n°index rejoint celui du dessus, qui garde son type.
-  const merge = (index) => {
-    syncFromDom();
-    const fused = Blocks.merge(blocks[index - 1], blocks[index]);
-    if (!fused) return;
-    blocks.splice(index - 1, 2, fused);
-    setDirty(true);
-    render();
-    showToast('Blocs fusionnés');
-  };
-  // Coupe le bloc au curseur : ce qui suit part dans un nouveau bloc du même type, juste en dessous.
-  const split = (range) => {
-    const field = richOf(range.startContainer);
-    const id = field?.closest('[data-id]')?.dataset.id;
-    if (!id) return;
-    const tail = document.createRange();
-    tail.setStart(range.startContainer, range.startOffset);
-    tail.setEnd(field, field.childNodes.length);
-    const box = document.createElement('div');
-    box.append(tail.extractContents());
-    syncFromDom();
-    const i = blocks.findIndex((b) => b.id === id);
-    const nb = { ...blocks[i], id: 'b' + nextId++, html: box.innerHTML };
-    blocks.splice(i + 1, 0, nb);
-    setDirty(true);
-    render();
-    canvas.querySelector(`[data-id="${nb.id}"] [data-body]`)?.focus();
-    showToast('Bloc scindé');
-  };
-
-  const dialog = (name) => document.getElementById('bq-' + name);
-  // Feuilles <dialog> : [data-close] ferme celle qui le contient ; un toucher qui commence ET finit sur le fond la ferme.
-  const outside = (d, event) => {
-    const box = d.getBoundingClientRect();
-    return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
-  };
-  let pressedBackdrop = false;
-  document.querySelectorAll('dialog[id^="bq-"]').forEach((d) => {
-    d.addEventListener('pointerdown', (event) => { pressedBackdrop = event.target === d && outside(d, event); });
-    d.addEventListener('click', (event) => {
-      if (event.target.closest('[data-close]')) d.close();
-      else if (pressedBackdrop && event.target === d && outside(d, event)) d.close();
-      pressedBackdrop = false;
+    // ---- Feuilles <dialog> : [data-close] ferme ; un toucher qui commence ET finit sur le fond ferme ----
+    const outside = (d, e) => { const r = d.getBoundingClientRect(); return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom; };
+    let pressedBackdrop = false;
+    Object.values(sheets).forEach((d) => {
+      on(d, 'pointerdown', (e) => { pressedBackdrop = e.target === d && outside(d, e); });
+      on(d, 'click', (e) => {
+        if (e.target.closest('[data-close]')) d.close();
+        else if (pressedBackdrop && e.target === d && outside(d, e)) d.close();
+        pressedBackdrop = false;
+      });
     });
-  });
-  const openAdd = (at) => {
-    insertAt = at;
-    const n = blocks.length;
-    $('[data-add-where]', dialog('add')).textContent = at === null || at >= n ? `Ajout en bas de fiche (bloc n°${n + 1})` : at === 0 ? 'Insertion tout en haut de la fiche' : `Insertion entre le bloc n°${at} et n°${at + 1}`;
-    // Construit depuis le registre à chaque ouverture : un type enregistré après le chargement y figure aussi.
-    const ofGroup = (g) => Blocks.order.filter((k) => T[k].group === g);
-    $('[data-add-text]', dialog('add')).innerHTML = ofGroup('text').map((k) => tile(k, true)).join('');
-    $('[data-add-media]', dialog('add')).innerHTML = ofGroup('media').map((k) => tile(k, false)).join('');
-    dialog('add').showModal();
-  };
-
-  canvas.addEventListener('focusin', (event) => {
-    const cardEl = event.target.closest?.('[data-id]');
-    if (cardEl) activeBlockId = cardEl.dataset.id;
-  });
-  canvas.addEventListener('click', (event) => {
-    const el = event.target;
-    const cardEl = el.closest('[data-id]');
-    const id = cardEl?.dataset.id;
-    if (id) activeBlockId = id;
-    if (el.closest('[data-fullscreen]')) {
-      syncFromDom();
-      fullscreenId = fullscreenId === id ? null : id;
-      render();
-      canvas.querySelector(`[data-id="${id}"] [contenteditable], [data-id="${id}"] textarea`)?.focus();
-      return;
-    }
-    if (el.closest('[data-insert]')) { const v = el.closest('[data-insert]').dataset.insert; syncFromDom(); return openAdd(v === 'end' ? null : Number(v)); }
-    if (el.closest('[data-merge]')) return merge(Number(el.closest('[data-merge]').dataset.merge));
-    if (el.closest('[data-move]')) return move(id, Number(el.closest('[data-move]').dataset.move));
-    if (el.closest('[data-delete]')) {
-      syncFromDom();
-      const b = blocks.find((x) => x.id === id);
-      deleteId = id;
-      const badge = $('[data-del-type]', dialog('delete'));
-      badge.textContent = T[b.type].label;
-      badge.className = `inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${T[b.type].tone.badge}`;
-      const preview = Blocks.stripTags(Blocks.toMarkdown(b)).replace(/\n/g, ' • ').replace(/^[#>:*\s]+/, '').trim();
-      $('[data-del-preview]', dialog('delete')).textContent = preview ? `« ${preview.slice(0, 140)}${preview.length > 140 ? '…' : ''} »` : '(Bloc sans texte)';
-      $('[data-del-fiche]', dialog('delete')).textContent = titleEl.textContent.trim() || 'cette rubrique';
-      return dialog('delete').showModal();
-    }
-  });
-
-  canvas.addEventListener('change', (event) => {
-    if (!event.target.matches('[data-convert]')) return;
-    syncFromDom();
-    const i = blocks.findIndex((b) => b.id === event.target.closest('[data-id]').dataset.id);
-    blocks[i] = { id: blocks[i].id, ...Blocks.convert(blocks[i], event.target.value) };
-    setDirty(true);
-    render();
-    showToast('Converti en ' + T[blocks[i].type].label);
-  });
-
-  canvas.addEventListener('input', () => {
-    setDirty(true);
-  });
-  canvas.addEventListener('focusout', (event) => {
-    if (event.target.classList?.contains('bq-edit')) clean(event.target);
-  });
-  canvas.addEventListener('paste', (event) => {
-    if (!event.target.closest?.('.bq-edit')) return;
-    event.preventDefault();
-    document.execCommand('insertText', false, event.clipboardData.getData('text/plain'));
-  });
-  canvas.addEventListener('keydown', (event) => {
-    const el = event.target;
-    if (event.key === 'Escape' && fullscreenId) {
-      syncFromDom();
-      fullscreenId = null;
-      render();
-      return;
-    }
-    if (event.key !== 'Enter' || event.shiftKey || !el.matches?.('.bq-edit[data-plain]')) return;
-    event.preventDefault();
-    el.blur();
-  });
-
-  // ---- Suppression confirmée ----
-  dialog('delete').addEventListener('click', (event) => {
-    if (!event.target.closest('[data-del-confirm]')) return;
-    blocks = blocks.filter((b) => b.id !== deleteId);
-    if (fullscreenId === deleteId) fullscreenId = null;
-    deleteId = null;
-    dialog('delete').close();
-    setDirty(true);
-    render();
-    showToast('Bloc supprimé');
-  });
-
-  // ---- Choix du type à ajouter ----
-  const fileInput = $('[data-file]');
-  const tile = (key, flat) => `<button type="button" data-pick="${key}" class="rounded-2xl border p-3 text-left transition-transform active:scale-95 ${flat ? 'flex items-center justify-between gap-2' : 'flex flex-col items-center gap-1.5 text-center'} ${T[key].tone.card}">
-      <span class="flex size-8 shrink-0 items-center justify-center rounded-xl border ${T[key].tone.badge}">${ic(T[key].icon)}</span>
-      <span class="min-w-0 flex-1"><span class="block text-xs font-bold text-stone-900">${T[key].label}</span>${flat && T[key].desc ? `<span class="mt-0.5 block text-[11px] leading-snug opacity-75">${T[key].desc}</span>` : ''}</span></button>`;
-  dialog('add').addEventListener('click', (event) => {
-    const pick = event.target.closest('[data-pick]');
-    if (!pick) return;
-    if (pick.dataset.pick === 'photo') { fileInput.click(); dialog('add').close(); return; }
-    dialog('add').close();
-    add(pick.dataset.pick, insertAt);
-  });
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files[0];
-    fileInput.value = '';
-    if (!file) return;
-    showToast('Envoi de la photo…');
-    const data = new FormData();
-    data.set('_csrf', csrf);
-    data.set('photo', file);
-    try {
-      const r = await fetch(uploadUrl, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Envoi impossible');
-      syncFromDom();
-      const b = { id: 'b' + nextId++, ...Blocks.blank('photo'), src: 'media/' + j.id };
-      blocks.splice(insertAt === null || insertAt > blocks.length ? blocks.length : insertAt, 0, b);
-      setDirty(true);
-      render();
-      const el = canvas.querySelector(`[data-id="${b.id}"]`);
-      scrollAboveKeyboard(el);
-      showToast('Photo ajoutée');
-    } catch (error) {
-      showToast(error.message);
-    }
-  });
-
-  // ---- Icône de la rubrique ----
-  dialog('icon').addEventListener('click', (event) => {
-    const pick = event.target.closest('[data-icon-pick]');
-    if (!pick) return;
-    icon = pick.dataset.iconPick;
-    showIcon();
-    setDirty(true);
-    dialog('icon').close();
-    showToast(icon ? `Icône changée en ${icon}` : 'Icône retirée');
-  });
-  // Emoji libre : collé depuis un clavier ou un site ; seul le premier emoji est gardé.
-  dialog('icon').querySelector('[data-icon-use]').addEventListener('click', () => {
-    const input = dialog('icon').querySelector('[data-icon-input]');
-    const picked = Blocks.firstEmoji(input.value);
-    if (!picked) { showToast('Collez un emoji, par exemple 🏡'); return; }
-    icon = picked;
-    input.value = '';
-    showIcon();
-    setDirty(true);
-    dialog('icon').close();
-    showToast(`Icône changée en ${icon}`);
-  });
-  dialog('icon').querySelector('[data-icon-input]').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') { event.preventDefault(); dialog('icon').querySelector('[data-icon-use]').click(); }
-  });
-  iconEl.closest('button').addEventListener('click', () => dialog('icon').showModal());
-  $('[data-title]').addEventListener('input', () => setDirty(true));
-  titleEl.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); titleEl.blur(); } });
-
-  // ---- Modes, ajout, retour sécurisé, enregistrement ----
-  root.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode === 'guest')));
-  root.querySelectorAll('[data-open-add]').forEach((b) => b.addEventListener('click', () => { syncFromDom(); openAdd(null); }));
-
-  const save = async () => {
-    if (!dirty) return true;
-    const data = new FormData();
-    data.set('_csrf', csrf);
-    data.set('slug', slug);
-    data.set('text', markdown());
-    status.textContent = 'Enregistrement…';
-    try {
-      const r = await fetch(saveUrl, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Enregistrement impossible');
-      if (j.slug !== slug) {
-        slug = j.slug;
-        history.replaceState(null, '', saveUrl + '/' + encodeURIComponent(slug));
+    // Sur grand écran, un menu s'ouvre à côté du bouton qui l'appelle ; sur téléphone, en feuille du bas.
+    const openSheet = (name, from) => {
+      const d = sheets[name];
+      d.classList.remove('bq-pop');
+      d.style.removeProperty('top');
+      d.style.removeProperty('left');
+      d.showModal();
+      if (from && innerWidth >= 640) {
+        const r = from.getBoundingClientRect();
+        d.classList.add('bq-pop');
+        const h = d.offsetHeight;
+        const w = d.offsetWidth;
+        d.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
+        d.style.top = (r.bottom + h + 8 < innerHeight ? r.bottom + 4 : Math.max(8, r.top - h - 4)) + 'px';
       }
-      setDirty(false);
-      showToast('Sauvegardé');
-      return true;
-    } catch (error) {
-      setDirty(true);
-      showToast(error.message);
-      return false;
-    }
-  };
-  status.addEventListener('click', save);
+    };
 
-  // Retour vers les rubriques : modale de confirmation si des modifications ne sont pas enregistrées.
-  const backBtn = $('[data-back]');
-  backBtn?.addEventListener('click', (event) => {
-    if (!dirty) return;
-    event.preventDefault();
-    dialog('leave')?.showModal();
-  });
-  dialog('leave')?.addEventListener('click', async (event) => {
-    if (event.target.closest('[data-leave-discard]')) {
-      dirty = false;
-      return;
-    }
-    if (event.target.closest('[data-leave-save]')) {
-      dialog('leave').close();
-      if (await save()) location.href = backBtn.href;
-    }
-  });
+    // ---- État enregistré / à enregistrer ----
+    const setDirty = (value) => {
+      dirty = value;
+      $('[data-dot]', saveBtn).hidden = !value;
+      saveBtn.classList.toggle('text-brand-700', value);
+      saveBtn.classList.toggle('text-stone-400', !value);
+      saveBtn.setAttribute('aria-label', value ? 'Enregistrer' : 'Enregistré');
+    };
+    on(window, 'beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 
-  // ---- Glisser par la poignée (doigt ou souris) ----
-  let drag = null;
-  canvas.addEventListener('pointerdown', (event) => {
-    const grip = event.target.closest('[data-grip]');
-    if (!grip) return;
-    syncFromDom();
-    drag = grip.closest('[data-id]');
-    drag.classList.add('bq-dragging');
-    grip.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (!drag) return;
-    const others = [...canvas.querySelectorAll('[data-id]')].filter((c) => c !== drag);
-    const next = others.find((c) => event.clientY < c.getBoundingClientRect().top + c.offsetHeight / 2);
-    if (next) next.before(drag); else if (others.length) others[others.length - 1].after(drag);
-  });
-  const dropped = () => {
-    if (!drag) return;
-    const order = [...canvas.querySelectorAll('[data-id]')].map((c) => c.dataset.id);
-    drag = null;
-    const same = order.every((id, i) => blocks[i].id === id);
-    if (!same) { blocks.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); setDirty(true); }
-    render();
-  };
-  canvas.addEventListener('pointerup', dropped);
-  canvas.addEventListener('pointercancel', dropped);
+    // ---- Titre et icône : dans le frontmatter ; les autres clés sont gardées dans leur ordre ----
+    const showIcon = () => { iconBtn.textContent = icon || '📄'; iconBtn.classList.toggle('grayscale', !icon); };
+    const docMeta = () => {
+      const m = { ...meta };
+      const title = titleEl.textContent.replace(/\s+/g, ' ').trim();
+      if (title) m.title = title; else delete m.title;
+      if (icon) m.icon = icon; else delete m.icon;
+      return m;
+    };
 
-  // ---- Pilule de mise en forme style Medium (z-50 : apparaît à la sélection de texte OU sur un appui long, et déplaçable) ----
-  const richOf = (node) => (node && (node.nodeType === 1 ? node : node.parentElement))?.closest('.bq-edit[data-rich], .bq-edit:not([data-plain]):not([data-body])');
-  let pillDismissed = false;
-  let pillForced = false;
-  let pillDrag = null;
-  let longPressTimer = null;
-  let pressPt = null;
-  const placePill = (force = false) => {
-    if (pillDrag) return;
-    if (force) { pillForced = true; pillDismissed = false; }
-    if (guestMode || pillDismissed) { pill.hidden = true; return; }
-    const sel = getSelection();
-    const hasSel = sel && sel.rangeCount > 0 && !sel.isCollapsed;
-    if (!hasSel && !pillForced) { pill.hidden = true; return; }
-    const field = (sel && sel.rangeCount ? richOf(sel.anchorNode) : null) || richOf(document.activeElement);
-    if (!field || !canvas.contains(field) || field.hasAttribute('data-plain')) { pill.hidden = true; return; }
-    let rect = sel && sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : { width: 0, height: 0, top: 0, bottom: 0, left: 0 };
-    if (rect.width === 0 && rect.height === 0) {
-      const fRect = field.getBoundingClientRect();
-      rect = pressPt ? { left: pressPt.x, width: 0, top: pressPt.y - 10, bottom: pressPt.y + 10 } : fRect;
-    }
-    pill.hidden = false;
-    const w = pill.offsetWidth;
-    const h = pill.offsetHeight;
-    const minTop = fullscreenId ? 12 : 72;
-    const top = rect.top - h - 8;
-    pill.style.left = Math.max(8, Math.min(innerWidth - w - 8, rect.left + rect.width / 2 - w / 2)) + 'px';
-    pill.style.top = (top < minTop ? rect.bottom + 8 : top) + 'px';
-  };
-  document.addEventListener('selectionchange', () => { pillDismissed = false; placePill(); });
-  canvas.addEventListener('input', () => { pillForced = false; });
-  canvas.addEventListener('keydown', () => { pillForced = false; pill.hidden = true; });
-  canvas.addEventListener('pointerdown', (event) => {
-    clearTimeout(longPressTimer);
-    const field = richOf(event.target);
-    if (!field || field.hasAttribute('data-plain')) { pillForced = false; return; }
-    pressPt = { x: event.clientX, y: event.clientY };
-    longPressTimer = setTimeout(() => placePill(true), 450);
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (pressPt && (Math.abs(event.clientX - pressPt.x) > 10 || Math.abs(event.clientY - pressPt.y) > 10)) {
-      clearTimeout(longPressTimer);
-    }
-  });
-  canvas.addEventListener('pointerup', () => clearTimeout(longPressTimer));
-  canvas.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
-  canvas.addEventListener('contextmenu', (event) => {
-    if (event.target.closest?.('.bq-edit')) {
-      event.preventDefault();
-      clearTimeout(longPressTimer);
-      pressPt = { x: event.clientX || innerWidth / 2, y: event.clientY || 160 };
-      placePill(true);
-    }
-  });
-  document.addEventListener('pointerdown', (event) => {
-    if (!pill.hidden && !pill.contains(event.target) && !richOf(event.target)) { pillForced = false; pill.hidden = true; }
-  });
-  addEventListener('scroll', () => { if (!pill.hidden && !pillDrag) placePill(); }, { passive: true });
-  const keepSelection = (event) => event.preventDefault();
-  pill.addEventListener('mousedown', keepSelection);
-  pill.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    const grip = event.target.closest('[data-pill-grip]');
-    if (!grip) return;
-    pillDrag = { dx: event.clientX - pill.offsetLeft, dy: event.clientY - pill.offsetTop };
-    grip.setPointerCapture(event.pointerId);
-  });
-  pill.addEventListener('pointermove', (event) => {
-    if (!pillDrag) return;
-    pill.style.left = Math.max(8, Math.min(innerWidth - pill.offsetWidth - 8, event.clientX - pillDrag.dx)) + 'px';
-    pill.style.top = Math.max(8, Math.min(innerHeight - pill.offsetHeight - 8, event.clientY - pillDrag.dy)) + 'px';
-  });
-  const endPillDrag = () => { pillDrag = null; };
-  pill.addEventListener('pointerup', endPillDrag);
-  pill.addEventListener('pointercancel', endPillDrag);
-  const unwrapMarks = (range) => {
-    const scope = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
-    scope.closest('.bq-edit')?.querySelectorAll('mark').forEach((m) => {
-      if (range.intersectsNode(m)) m.replaceWith(...m.childNodes);
+    // ---- Écran → modèle (avant tout nouveau dessin) ----
+    const cardsIn = () => app.querySelectorAll('[data-id]');
+    const syncFromDom = () => {
+      if (preview) return;
+      cardsIn().forEach((card) => {
+        const b = blocks.find((x) => x.id === card.dataset.id);
+        if (b) (def(b).read || Blocks.fallbackEditor.read)(card, b);
+      });
+    };
+    const markdown = () => { syncFromDom(); return Blocks.serialize(docMeta(), blocks); };
+
+    // ---- Dessin ----
+    const pill = 'inline-flex h-7 items-center gap-1 rounded-full border border-stone-200/90 bg-white px-2.5 text-[11px] font-bold text-stone-500 shadow-sm group-hover:border-stone-400 group-hover:text-stone-800';
+    const gap = (index) => {
+      const canMerge = index > 0 && index < blocks.length && Blocks.merge(blocks[index - 1], blocks[index]) !== null;
+      return `<div class="bq-gap -my-1.5 flex justify-center gap-1">
+        <button type="button" data-insert="${index}" aria-label="Insérer un bloc ici" class="group flex h-11 items-center px-1"><span class="${pill}">${ic('plus', 'size-3.5')}Insérer</span></button>
+        ${canMerge ? `<button type="button" data-merge="${index}" aria-label="Fusionner avec le bloc du dessus" class="group flex h-11 items-center px-1"><span class="${pill}">${ic('merge', 'size-3.5')}Fusionner</span></button>` : ''}</div>`;
+    };
+    const badge = (b) => {
+      const t = def(b);
+      return t.convertible
+        ? `<label class="relative inline-flex items-center">${ic(t.icon, 'pointer-events-none absolute left-2 size-3.5 opacity-80')}
+            <select data-convert aria-label="Type du bloc" class="h-7 cursor-pointer appearance-none rounded-full border py-0 pl-7 pr-6 text-[11px] font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${t.tone.badge}">
+            ${Blocks.TEXT_KEYS.map((k) => `<option value="${k}" ${k === b.type ? 'selected' : ''}>${esc(Blocks.types[k].label)}</option>`).join('')}</select>
+            ${ic('chevron_down', 'pointer-events-none absolute right-2 size-3 opacity-70')}</label>`
+        : `<span class="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold ${t.tone.badge}">${ic(t.icon, 'size-3.5')}${esc(t.label)}</span>`;
+    };
+    const card = (b) => `<article data-id="${b.id}" aria-label="${attr(def(b).label)}" class="bq-card rounded-2xl border ${def(b).tone.card} px-3 pb-3">
+        <div class="-mr-2 flex h-11 items-center gap-0.5">${badge(b)}<span class="flex-1"></span>
+          <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-btn cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
+          <button type="button" data-menu aria-label="Actions du bloc" aria-haspopup="dialog" class="bq-btn text-stone-500">${ic('more')}</button></div>
+        <div data-card-body>${(def(b).edit || Blocks.fallbackEditor.edit)(b, ui)}</div></article>`;
+
+    const render = () => (preview ? renderPreview() : renderEdit());
+    const renderEdit = () => {
+      canvas.innerHTML = `<div class="mx-auto max-w-3xl">${blocks.map((b, i) => (i ? gap(i) : '') + card(b)).join('')}
+        <button type="button" data-insert="end" class="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
+      canvas.querySelectorAll('.bq-edit').forEach(clean);
+    };
+    const clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };
+    const renderPreview = async () => {
+      hideBar();
+      const text = markdown();
+      canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
+      try {
+        const html = o.previewUrl ? await (await fetch(o.previewUrl, { method: 'POST', body: form({ text }), signal: ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
+        if (preview) canvas.innerHTML = `<div class="mx-auto max-w-3xl rounded-2xl bg-white p-4 sm:p-8">${html}</div>`;
+      } catch {
+        if (preview) canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
+      }
+    };
+    const setPreview = (value) => {
+      if (value === preview) return;
+      syncFromDom();
+      preview = value;
+      $('[data-preview]').setAttribute('aria-pressed', String(value));
+      titleEl.contentEditable = String(!value);
+      render();
+    };
+    const focusCard = (id) => {
+      const el = canvas.querySelector(`[data-id="${id}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'nearest' });
+      const field = el.querySelector('[contenteditable], input, textarea');
+      if (field) field.focus({ preventScroll: true }); else el.querySelector('[data-menu]')?.focus({ preventScroll: true });
+    };
+
+    // ---- Envois au serveur hôte : champs fixes (`fields`, ex. jeton CSRF) + champs de l'échange ----
+    const form = (extra) => {
+      const data = new FormData();
+      for (const [k, v] of Object.entries({ ...o.fields, ...extra })) data.set(k, v);
+      return data;
+    };
+
+    // ---- Actions de structure ----
+    const change = (fn) => { syncFromDom(); fn(); setDirty(true); render(); };
+    const add = (type, at, extra = {}) => {
+      const b = { id: newId(), ...Blocks.blank(type), ...extra };
+      change(() => blocks.splice(at === null || at > blocks.length ? blocks.length : at, 0, b));
+      canvas.querySelector(`[data-id="${b.id}"]`)?.classList.add('bq-new');
+      focusCard(b.id);
+      return b;
+    };
+    const move = (id, to) => {
+      const i = blocks.findIndex((b) => b.id === id);
+      if (i < 0 || to < 0 || to >= blocks.length || to === i) return;
+      change(() => blocks.splice(to, 0, ...blocks.splice(i, 1)));
+      canvas.querySelector(`[data-id="${id}"] [data-grip]`)?.focus({ preventScroll: true });
+      canvas.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+    };
+    const merge = (index) => {
+      syncFromDom();
+      const fused = Blocks.merge(blocks[index - 1], blocks[index]);
+      if (!fused) return;
+      change(() => blocks.splice(index - 1, 2, fused));
+      toast('Blocs fusionnés');
+    };
+    const remove = (id) => { change(() => { blocks = blocks.filter((b) => b.id !== id); }); toast('Bloc supprimé'); };
+    const convert = (id, type) => {
+      const i = blocks.findIndex((b) => b.id === id);
+      change(() => { blocks[i] = { id, ...Blocks.convert(blocks[i], type) }; });
+      toast('Converti en ' + Blocks.def(type).label);
+    };
+    // Coupe le bloc au curseur : ce qui suit part dans un nouveau bloc du même type, juste en dessous.
+    const richOf = (node) => (node && (node.nodeType === 1 ? node : node.parentElement))?.closest('.bq-edit[data-rich]');
+    const split = (range) => {
+      const field = richOf(range.startContainer);
+      const id = field?.closest('[data-id]')?.dataset.id;
+      if (!id) return;
+      const tail = document.createRange();
+      tail.setStart(range.startContainer, range.startOffset);
+      tail.setEnd(field, field.childNodes.length);
+      const box = document.createElement('div');
+      box.append(tail.extractContents());
+      syncFromDom();
+      const i = blocks.findIndex((b) => b.id === id);
+      const nb = { ...blocks[i], id: newId(), html: box.innerHTML, ...('title' in blocks[i] ? { title: '', icon: '' } : {}) };
+      change(() => blocks.splice(i + 1, 0, nb));
+      hideBar();
+      focusCard(nb.id);
+      toast('Bloc scindé');
+    };
+
+    // ---- Menu d'ajout : construit depuis le registre à chaque ouverture ----
+    const openAdd = (at) => {
+      syncFromDom();
+      insertAt = at;
+      const groups = {};
+      for (const k of Blocks.order) {
+        const t = Blocks.types[k];
+        if (t.group === 'none' || t.hidden) continue;
+        (groups[t.group] = groups[t.group] || []).push(k);
+      }
+      $('[data-add-list]', sheets.add).innerHTML = Object.entries(groups).map(([g, keys]) => `<p class="mb-1 mt-3 px-1 text-[11px] font-bold uppercase tracking-wider text-stone-400 first:mt-0">${esc(GROUPS[g] || g)}</p>
+        <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-3">${keys.map((k) => `<button type="button" data-pick="${k}" class="flex min-h-11 items-center gap-2 rounded-xl border px-2.5 text-left text-sm font-semibold ${Blocks.types[k].tone.card}">
+          <span class="flex size-7 shrink-0 items-center justify-center rounded-lg border ${Blocks.types[k].tone.badge}">${ic(Blocks.types[k].icon, 'size-4')}</span><span class="min-w-0 truncate">${esc(Blocks.types[k].label)}</span></button>`).join('')}</div>`).join('');
+      openSheet('add');
+    };
+    on(sheets.add, 'click', (e) => {
+      const pick = e.target.closest('[data-pick]');
+      if (!pick) return;
+      sheets.add.close();
+      if (pick.dataset.pick === 'photo') return fileInput.click();
+      add(pick.dataset.pick, insertAt);
     });
-  };
-  pill.addEventListener('click', (event) => {
-    if (event.target.closest('[data-pill-close]')) { pillDismissed = true; pill.hidden = true; return; }
-    if (event.target.closest('[data-split]')) { const sel = getSelection(); if (sel.rangeCount) split(sel.getRangeAt(0)); return; }
-    const button = event.target.closest('[data-fmt]');
-    if (!button) return;
-    const sel = getSelection();
-    if (!sel.rangeCount) return;
-    const what = button.dataset.fmt;
-    const range = sel.getRangeAt(0);
-    if (what === 'highlight') {
-      if (range.collapsed) return;
-      const inside = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement).closest('mark');
-      if (inside) unwrapMarks(range);
-      else { const m = document.createElement('mark'); m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
-    } else if (what === 'clear') {
-      document.execCommand('removeFormat');
-      unwrapMarks(sel.getRangeAt(0));
-    } else document.execCommand(what);
-    setDirty(true);
-  });
+    const upload = async (file) => {
+      if (!o.uploadUrl) throw new Error('Envoi de photos non configuré');
+      const r = await fetch(o.uploadUrl, { method: 'POST', body: form({ photo: file }), headers: { Accept: 'application/json' }, signal: ac.signal });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !(j.id || j.src)) throw new Error(j.error || 'Envoi impossible');
+      return j.src || 'media/' + j.id;
+    };
+    on(fileInput, 'change', async () => {
+      const files = [...fileInput.files];
+      fileInput.value = '';
+      if (!files.length) return;
+      toast('Envoi de la photo…');
+      try {
+        add('photo', insertAt, { src: await upload(files[0]) });
+        toast('Photo ajoutée');
+      } catch (error) {
+        toast(error.message);
+      }
+    });
 
-  // ---- Chargement ----
-  const load = (md) => {
-    const { meta: parsedMeta, blocks: parsed } = Blocks.parse(md);
-    meta = parsedMeta;
-    icon = meta.icon || '';
-    titleEl.textContent = meta.title || '';
-    showIcon();
-    blocks = parsed.map((p) => ({ id: 'b' + nextId++, ...p }));
-    if (blocks.length === 0) {
-      blocks = [{ id: 'b' + nextId++, type: 'text', html: '' }];
-    }
-    render();
-  };
-  load($('[data-source]').value);
-  setDirty(false);
-  root.hidden = false;
+    // ---- Menu du bloc « ⋯ » ----
+    const openMenu = (id, from) => {
+      syncFromDom();
+      menuId = id;
+      const i = blocks.findIndex((b) => b.id === id);
+      const b = blocks[i];
+      const t = def(b);
+      sheets.menu.querySelector('h2').textContent = t.label;
+      $('[data-menu-list]', sheets.menu).innerHTML = (t.convertible ? `<p class="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">Changer de type</p>
+          <div class="mb-2 flex flex-wrap gap-1 px-2">${Blocks.TEXT_KEYS.filter((k) => k !== b.type).map((k) => `<button type="button" data-to="${k}" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold ${Blocks.types[k].tone.badge}">${ic(Blocks.types[k].icon, 'size-3.5')}${esc(Blocks.types[k].short)}</button>`).join('')}</div>` : '')
+        + (i > 0 ? item('data-act="up"', 'arrow_up', 'Monter') : '')
+        + (i < blocks.length - 1 ? item('data-act="down"', 'arrow_down', 'Descendre') : '')
+        + item('data-act="duplicate"', 'duplicate', 'Dupliquer')
+        + item('data-act="delete"', 'trash', 'Supprimer…', 'text-red-700 hover:bg-red-50');
+      openSheet('menu', from);
+    };
+    on(sheets.menu, 'click', (e) => {
+      const to = e.target.closest('[data-to]');
+      const act = e.target.closest('[data-act]')?.dataset.act;
+      if (!to && !act) return;
+      sheets.menu.close();
+      const id = menuId;
+      const i = blocks.findIndex((b) => b.id === id);
+      if (i < 0) return;
+      if (to) return convert(id, to.dataset.to);
+      if (act === 'up') move(id, i - 1);
+      else if (act === 'down') move(id, i + 1);
+      else if (act === 'duplicate') { const copy = { ...structuredClone(blocks[i]), id: newId() }; change(() => blocks.splice(i + 1, 0, copy)); toast('Bloc dupliqué'); }
+      else if (act === 'delete') {
+        const preview = Blocks.stripTags(Blocks.toMarkdown(blocks[i])).replace(/\n/g, ' • ').trim();
+        $('[data-del-preview]', sheets.delete).textContent = preview ? `« ${preview.slice(0, 160)}${preview.length > 160 ? '…' : ''} »` : '(Bloc vide)';
+        openSheet('delete');
+      }
+    });
+    on(sheets.delete, 'click', (e) => {
+      if (!e.target.closest('[data-del-confirm]')) return;
+      sheets.delete.close();
+      remove(menuId);
+    });
+
+    // ---- Icône du document ou d'un encadré ----
+    const setIcon = (value) => {
+      if (iconTarget === null) { icon = value; showIcon(); setDirty(true); return; }
+      syncFromDom();
+      const b = blocks.find((x) => x.id === iconTarget);
+      if (b) change(() => { b.icon = value; });
+    };
+    const openIcon = (target) => {
+      iconTarget = target;
+      sheets.icon.querySelector('h2').textContent = target === null ? 'Icône du document' : 'Icône de l’encadré';
+      openSheet('icon');
+    };
+    on(sheets.icon, 'click', (e) => {
+      const pick = e.target.closest('[data-icon-pick]');
+      if (pick) { sheets.icon.close(); setIcon(pick.dataset.iconPick); return; }
+      if (e.target.closest('[data-icon-use]')) {
+        const input = $('[data-icon-input]', sheets.icon);
+        const picked = Blocks.firstEmoji(input.value);
+        if (!picked) return toast('Collez un emoji, par exemple 🏡');
+        input.value = '';
+        sheets.icon.close();
+        setIcon(picked);
+      }
+    });
+    on($('[data-icon-input]', sheets.icon), 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('[data-icon-use]', sheets.icon).click(); } });
+
+    // ---- Enregistrer ----
+    let saving = null;
+    const save = async () => {
+      if (saving) return saving;
+      const text = markdown();
+      saving = (async () => {
+        try {
+          if (o.onSave) await o.onSave(text);
+          else if (o.saveUrl) {
+            const r = await fetch(o.saveUrl, { method: 'POST', body: form({ text }), headers: { Accept: 'application/json' }, signal: ac.signal });
+            const j = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(j.error || 'Enregistrement impossible');
+          } else throw new Error('Enregistrement non configuré');
+          if (markdown() === text) setDirty(false);
+          toast('Enregistré');
+          return true;
+        } catch (error) {
+          if (error.name !== 'AbortError') toast(error.message);
+          return false;
+        } finally { saving = null; }
+      })();
+      return saving;
+    };
+
+    // ---- Clics ----
+    on(app, 'click', async (e) => {
+      const el = e.target;
+      if (el.closest('dialog')) return;
+      const cardEl = el.closest('[data-id]');
+      const id = cardEl?.dataset.id;
+      if (el.closest('[data-insert]')) { const v = el.closest('[data-insert]').dataset.insert; return openAdd(v === 'end' ? null : Number(v)); }
+      if (el.closest('[data-merge]')) return merge(Number(el.closest('[data-merge]').dataset.merge));
+      if (el.closest('[data-menu]')) return openMenu(id, el.closest('[data-menu]'));
+      if (el.closest('[data-callout-icon]')) { syncFromDom(); return openIcon(id); }
+      if (el.closest('[data-save]')) return save();
+      if (el.closest('[data-preview]')) return setPreview(!preview);
+      if (el.closest('[data-doc-icon]')) return preview ? null : openIcon(null);
+      if (el.closest('[data-back]') && dirty) { e.preventDefault(); return openSheet('leave'); }
+    });
+    on(sheets.leave, 'click', async (e) => {
+      if (e.target.closest('[data-leave-discard]')) { setDirty(false); location.href = o.backUrl; }
+      if (e.target.closest('[data-leave-save]')) { sheets.leave.close(); if (await save()) location.href = o.backUrl; }
+    });
+    on(canvas, 'change', (e) => { if (e.target.matches('[data-convert]')) convert(e.target.closest('[data-id]').dataset.id, e.target.value); });
+    on(canvas, 'input', () => setDirty(true));
+    on(titleEl, 'input', () => setDirty(true));
+    on(titleEl, 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
+    on(canvas, 'focusout', (e) => { if (e.target.classList?.contains('bq-edit')) clean(e.target); });
+    on(canvas, 'paste', (e) => {
+      if (!e.target.closest?.('.bq-edit')) return;
+      e.preventDefault();
+      document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+    });
+    on(canvas, 'keydown', (e) => {
+      const el = e.target;
+      // Poignée au clavier : flèches haut et bas déplacent le bloc.
+      if (el.matches?.('[data-grip]') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        const id = el.closest('[data-id]').dataset.id;
+        move(id, blocks.findIndex((b) => b.id === id) + (e.key === 'ArrowUp' ? -1 : 1));
+        return;
+      }
+      if (e.key === 'Enter' && !e.shiftKey && el.matches?.('.bq-edit[data-plain], [data-callout-title]')) { e.preventDefault(); el.blur(); }
+    });
+
+    // ---- Barre de mise en forme : fixe et centrée, en bas de l'écran visible (téléphone) ou sous l'en-tête (ordinateur) ----
+    let barField = null;
+    const placeBar = () => {
+      if (bar.hidden) return;
+      const vv = window.visualViewport;
+      if (innerWidth >= 640) {
+        const top = Math.max(8, Math.min(innerHeight - bar.offsetHeight - 8, head.getBoundingClientRect().bottom + 8));
+        bar.style.top = top + 'px';
+        bar.style.left = '50%';
+      } else {
+        bar.style.top = ((vv ? vv.offsetTop + vv.height : innerHeight) - bar.offsetHeight - 8) + 'px';
+        bar.style.left = (vv ? vv.offsetLeft + vv.width / 2 : innerWidth / 2) + 'px';
+      }
+    };
+    const showBar = (field) => {
+      if (preview || !field || !app.contains(field)) return;
+      barField = field;
+      bar.hidden = false;
+      placeBar();
+    };
+    const hideBar = () => { bar.hidden = true; barField = null; };
+    on(document, 'selectionchange', () => {
+      const sel = getSelection();
+      if (!sel.rangeCount || sel.isCollapsed) return;
+      const field = richOf(sel.anchorNode);
+      if (field && app.contains(field)) showBar(field);
+    });
+    on(canvas, 'dblclick', (e) => showBar(richOf(e.target)));
+    on(canvas, 'contextmenu', (e) => { const f = richOf(e.target); if (f) { e.preventDefault(); showBar(f); } });
+    let press = null;
+    on(canvas, 'pointerdown', (e) => {
+      clearTimeout(press?.timer);
+      const f = richOf(e.target);
+      press = f ? { x: e.clientX, y: e.clientY, timer: later(() => showBar(f), 450) } : null;
+    });
+    on(canvas, 'pointermove', (e) => { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) clearTimeout(press.timer); });
+    on(canvas, 'pointerup', () => clearTimeout(press?.timer));
+    on(canvas, 'pointercancel', () => clearTimeout(press?.timer));
+    on(canvas, 'focusout', (e) => { if (barField && e.target === barField && !bar.contains(e.relatedTarget)) hideBar(); });
+    on(window.visualViewport, 'resize', placeBar);
+    on(window.visualViewport, 'scroll', placeBar);
+    on(window, 'resize', placeBar);
+    on(bar, 'mousedown', (e) => e.preventDefault());
+    const unwrapMarks = (range) => {
+      const scope = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+      scope.closest('.bq-edit')?.querySelectorAll('mark').forEach((m) => { if (range.intersectsNode(m)) m.replaceWith(...m.childNodes); });
+    };
+    on(bar, 'click', (e) => {
+      const sel = getSelection();
+      if (e.target.closest('[data-split]')) { if (sel.rangeCount) split(sel.getRangeAt(0)); return; }
+      const button = e.target.closest('[data-fmt]');
+      if (!button || !sel.rangeCount) return;
+      const what = button.dataset.fmt;
+      const range = sel.getRangeAt(0);
+      if (what === 'highlight') {
+        if (range.collapsed) return;
+        const inside = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement).closest('mark');
+        if (inside) unwrapMarks(range);
+        else { const m = document.createElement('mark'); m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
+      } else if (what === 'clear') {
+        document.execCommand('removeFormat');
+        unwrapMarks(sel.getRangeAt(0));
+      } else document.execCommand(what);
+      setDirty(true);
+    });
+
+    // ---- Chargement ----
+    const load = (md) => {
+      const parsed = Blocks.parse(md);
+      meta = parsed.meta;
+      icon = meta.icon || '';
+      titleEl.textContent = meta.title || '';
+      showIcon();
+      blocks = parsed.blocks.map((b) => ({ id: newId(), ...b }));
+      if (!blocks.length) blocks = [{ id: newId(), ...Blocks.blank('text') }];
+      render();
+    };
+    load(o.source);
+    setDirty(false);
+
+    return {
+      getMarkdown: markdown,
+      setMarkdown: (md) => { load(md); setDirty(false); },
+      save,
+      destroy: () => {
+        ac.abort();
+        timers.forEach(clearTimeout);
+        Object.values(sheets).forEach((d) => d.open && d.close());
+        element.replaceChildren();
+      },
+    };
+  }
+
+  window.Blockquilt = { mount, icons: ICONS };
 })();

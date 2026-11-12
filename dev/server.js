@@ -28,18 +28,18 @@ const form = (req) => new Request('http://local' + req.url, { method: 'POST', he
 const page = () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   if (!fs.existsSync(DOC)) return html;
-  return html.replace(/(<textarea data-source hidden>)[\s\S]*?(<\/textarea>)/, (_, open, close) => open + esc(fs.readFileSync(DOC, 'utf8')) + close);
+  return html.replace(/(<textarea id="source" hidden>)[\s\S]*?(<\/textarea>)/, (_, open, close) => open + esc(fs.readFileSync(DOC, 'utf8')) + close);
 };
 
 const routes = {
-  // Enregistrer : le Markdown complet, réponse JSON { slug }.
+  // Enregistrer : le Markdown complet (champ `text`), réponse JSON { ok: true }.
   'POST /api/save': async (req, res) => {
     const data = await form(req);
     // Un formulaire multipart envoie les fins de ligne en \r\n (règle HTML) : on les remet en \n.
     const text = String(data.get('text') ?? '').replace(/\r\n/g, '\n');
     if (text.trim() === '') return json(res, 422, { error: 'Texte vide' });
     fs.writeFileSync(DOC, text);
-    json(res, 200, { slug: String(data.get('slug') ?? '') });
+    json(res, 200, { ok: true });
   },
   // Aperçu : un fragment HTML, rendu par Blocks.toHtml (le même rendu que l'éditeur fait seul sans data-preview).
   'POST /api/preview': async (req, res) => {
