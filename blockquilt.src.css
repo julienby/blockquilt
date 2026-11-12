@@ -12,9 +12,12 @@
 [hidden] { display: none !important; }
 
 /* Bouton à icône : cible tactile de 44 px. */
-.bq-btn { @apply inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-30; }
+@layer components {
+  .bq-btn { @apply inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-30; }
+}
 .bq-app :focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
-.bq-bar .bq-btn { @apply hover:bg-white/10 active:bg-white/20; }
+.bq-bar .bq-btn:hover { background: rgb(255 255 255 / 0.1); }
+.bq-bar .bq-btn:active { background: rgb(255 255 255 / 0.2); }
 
 /* Champs modifiables */
 .bq-edit { -webkit-touch-callout: none; overflow-wrap: anywhere; }
@@ -36,3 +39,18 @@ dialog.bq-pop::backdrop { background: transparent; }
   .bq-new { animation: bq-pop 0.2s ease-out; }
   @keyframes bq-pop { from { opacity: 0; transform: translateY(-0.5rem) scale(0.97); } }
 }
+
+/* Glisser-déposer : carte d'origine estompée, copie qui suit le doigt, trait bleu à l'arrivée, boutons des intervalles masqués. */
+.bq-origin { opacity: 0.35; }
+.bq-ghost { position: fixed; z-index: 70; pointer-events: none; transform: scale(0.94); transform-origin: top center; opacity: 0.95; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.15); }
+.bq-drop { position: absolute; left: 0; right: 0; height: 3px; border-radius: 3px; background: #2563eb; pointer-events: none; z-index: 5; }
+.bq-dragging .bq-gap { visibility: hidden; }
+.bq-dragging, .bq-dragging * { cursor: grabbing !important; user-select: none; }
+
+/* Plein écran : un <dialog> modal qui couvre exactement la fenêtre. */
+dialog.bq-full { position: fixed; inset: 0; width: 100dvw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: auto; overscroll-behavior: contain; }
+dialog.bq-full::backdrop { background: #fff; }
+html:has(dialog.bq-full[open]) { overflow: hidden; }
+dialog.bq-full .bq-app { min-height: 100%; }
+[data-block-full] [data-grip], [data-block-full] [data-menu] { display: none; }
+[data-block-full] .bq-card { min-height: calc(100dvh - 6rem); }

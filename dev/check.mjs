@@ -54,6 +54,8 @@ try {
   const doc = path.join(data, 'document.md');
   const saved = async (test, label) => { await waitFor(async () => fs.existsSync(doc) && test(fs.readFileSync(doc, "utf8")), label); return fs.readFileSync(doc, 'utf8'); };
 
+  await send('Browser.grantPermissions', { origin: BASE, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await send('Page.enable');
   await send('Runtime.enable');
   await send('DOM.enable');
@@ -175,6 +177,135 @@ try {
     return gone && quiet;
   })()`), 'destroy() : éditeur retiré, plus aucun écouteur (un clic ne déclenche rien)');
   ok(await ev(`(() => { editor.setMarkdown('Nouveau'); return editor.getMarkdown() === 'Nouveau\\n' && document.querySelector('[data-save]').getAttribute('aria-label') === 'Enregistré'; })()`), 'setMarkdown() : remplace le document, état enregistré');
+
+  // ---- Phase 5 : interactions ----
+  const key = async (k, code, vk, modifiers = 0) => {
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: k, code, windowsVirtualKeyCode: vk, modifiers });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk, modifiers });
+    await sleep(60);
+  };
+  const CTRL = 2;
+  const SHIFT = 8;
+  const mdNow = () => ev(`editor.getMarkdown()`);
+  await viewport(375);
+  await open();
+
+  // Annuler / rétablir
+  const before = await mdNow();
+  const count0 = (await cards()).length;
+  await ev(`document.querySelectorAll('[data-bq] [data-id] [data-menu]')[1].click()`);
+  ok(await ev(`!!document.querySelector('[data-sheet="menu"][open]')`), 'menu du bloc : s’ouvre depuis « ⋯ »');
+  ok(await ev(`['copy', 'cut', 'paste', 'full', 'delete', 'up', 'down', 'duplicate'].every((a) => document.querySelector('[data-sheet="menu"] [data-act="' + a + '"]'))`), 'menu du bloc : monter, descendre, dupliquer, copier, couper, coller, plein écran, supprimer');
+  await ev(`document.querySelector('[data-sheet="menu"] [data-act="delete"]').click()`);
+  await ev(`document.querySelector('[data-del-confirm]').click()`);
+  const afterDel = await mdNow();
+  ok(afterDel !== before && (await cards()).length === count0 - 1, 'suppression : un bloc de moins');
+  await key('z', 'KeyZ', 90, CTRL);
+  ok((await mdNow()) === before, 'Ctrl+Z : texte identique à avant la suppression');
+  await key('y', 'KeyY', 89, CTRL);
+  ok((await mdNow()) === afterDel, 'Ctrl+Y : le bloc est de nouveau supprimé');
+  await key('z', 'KeyZ', 90, CTRL);
+  await key('z', 'KeyZ', 90, CTRL | SHIFT);
+  ok((await mdNow()) === afterDel, 'Ctrl+Maj+Z : rétablit aussi');
+  ok(await ev(`document.querySelector('[data-undo]').getBoundingClientRect().width >= 44 && !document.querySelector('[data-undo]').disabled`), 'bouton Annuler dans l’en-tête');
+  const hist = await ev(`(async () => {
+    for (let i = 0; i < 60; i++) { document.querySelector('[data-insert="end"]').click(); document.querySelector('[data-sheet="add"] [data-pick="hr"]').click(); }
+    const added = document.querySelectorAll('[data-bq] hr').length;
+    let undone = 0;
+    for (let i = 0; i < 60; i++) if (editor.undo()) undone++;
+    return { added, undone, left: document.querySelectorAll('[data-bq] hr').length };
+  })()`);
+  ok(hist.added === 60 && hist.undone === 50 && hist.left === 10, `60 actions puis 60 annulations : arrêt à la 50ᵉ (${JSON.stringify(hist)})`);
+  // Frappe en cours dans un champ : le navigateur garde la main sur Ctrl+Z.
+  ok(await ev(`(() => {
+    const f = document.querySelector('[data-bq] [data-rich]'); f.focus();
+    document.execCommand('insertText', false, 'abc');
+    const e = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true });
+    f.dispatchEvent(e);
+    return !e.defaultPrevented;
+  })()`), 'Ctrl+Z pendant la frappe : laissé au navigateur');
+
+  // Ctrl+S
+  await ev(`(() => { const t = document.querySelector('[data-title]'); t.textContent = 'Titre Ctrl S'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); document.activeElement.blur(); })()`);
+  await key('s', 'KeyS', 83, CTRL);
+  md = await saved((x) => x.includes('title: Titre Ctrl S'), 'Ctrl+S');
+  ok(true, 'Ctrl+S : document.md écrit sur le disque');
+
+  // Barre de mise en forme stable
+  await open();
+  const barAt = (n) => ev(`(async () => {
+    const f = [...document.querySelectorAll('[data-bq] [data-rich]')][${n}];
+    f.focus();
+    const node = document.createTreeWalker(f, NodeFilter.SHOW_TEXT).nextNode();
+    const r = document.createRange(); r.setStart(node, 0); r.setEnd(node, Math.min(4, node.length));
+    getSelection().removeAllRanges(); getSelection().addRange(r);
+    await new Promise((res) => setTimeout(res, 120));
+    const b = document.querySelector('[data-bar]');
+    return b.hidden ? null : JSON.stringify(b.getBoundingClientRect());
+  })()`);
+  const r1 = await barAt(0);
+  const r5 = await barAt(4);
+  ok(r1 !== null && r1 === r5, 'barre : même position pour un mot ligne 1 et un mot ligne 5');
+  ok(await ev(`(() => { const r = document.querySelector('[data-bar]').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; })()`), 'barre : tient dans 375 px');
+  ok(await ev(`(async () => { document.activeElement.blur(); await new Promise((r) => setTimeout(r, 50)); return document.querySelector('[data-bar]').hidden; })()`), 'barre : disparaît quand le champ perd le focus');
+  ok(await ev(`(() => { const f = [...document.querySelectorAll('[data-bq] [data-rich]')][1]; f.focus(); getSelection().collapse(f, 0); f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return !document.querySelector('[data-bar]').hidden; })()`), 'barre : visible au double clic');
+  ok(await ev(`(async () => { document.activeElement.blur(); const f = [...document.querySelectorAll('[data-bq] [data-rich]')][2]; f.focus(); f.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 50, clientY: 300 })); await new Promise((r) => setTimeout(r, 520)); return !document.querySelector('[data-bar]').hidden; })()`), 'barre : visible après un appui long (450 ms)');
+  await ev(`(() => { document.activeElement.blur(); document.querySelector('[data-bq]').dispatchEvent(new PointerEvent('pointerup', { bubbles: true })); })()`);
+
+  // Copier / coller
+  const n0 = (await cards()).length;
+  await ev(`document.querySelectorAll('[data-bq] [data-id] [data-menu]')[0].click()`);
+  await ev(`document.querySelector('[data-sheet="menu"] [data-act="copy"]').click()`);
+  await ev(`document.querySelectorAll('[data-bq] [data-id] [data-menu]')[0].click()`);
+  await ev(`document.querySelector('[data-sheet="menu"] [data-act="paste"]').click()`);
+  await waitFor(async () => (await cards()).length === n0 + 1, 'collage');
+  ok(await ev(`(() => { const p = Blocks.parse(editor.getMarkdown()).blocks; return Blocks.toMarkdown(p[0]) === Blocks.toMarkdown(p[1]); })()`), 'copier un bloc, coller dessous : deux blocs identiques');
+  await ev(`(async () => { const t = 'Un\\n\\nDeux\\n\\nTrois'; await navigator.clipboard?.writeText(t).catch(() => {}); Blockquilt.clipboard = t; })()`);
+  await ev(`document.querySelectorAll('[data-bq] [data-id] [data-menu]')[0].click()`);
+  await ev(`document.querySelector('[data-sheet="menu"] [data-act="paste"]').click()`);
+  await waitFor(async () => (await cards()).length === n0 + 4, 'collage de trois paragraphes');
+  ok(true, 'coller un texte de trois paragraphes : trois blocs');
+
+  // Glisser-déposer
+  await open();
+  const order = () => ev(`[...document.querySelectorAll('[data-bq] [data-id]')].map((c) => c.dataset.id).join()`);
+  const mouse = (type, x, y, buttons = 1) => send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons, clickCount: 1 });
+  const grip = await ev(`(() => { scrollTo(0, 0); const r = document.querySelectorAll('[data-bq] [data-grip]')[0].getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  const goal = await ev(`(() => { const r = document.querySelectorAll('[data-bq] [data-id]')[2].getBoundingClientRect(); return r.bottom - 8; })()`);
+  const o0 = await order();
+  await mouse('mouseMoved', grip.x, grip.y, 0);
+  await mouse('mousePressed', grip.x, grip.y);
+  for (let y = grip.y; y <= goal; y += 40) await mouse('mouseMoved', grip.x, y);
+  await mouse('mouseMoved', grip.x, goal);
+  const mid = await ev(`({ drops: document.querySelectorAll('.bq-drop').length, ghost: !!document.querySelector('.bq-ghost'), gaps: getComputedStyle(document.querySelector('.bq-gap')).visibility })`);
+  ok((await order()) === o0 && mid.drops === 1, 'glissement : ordre inchangé pendant le déplacement, un seul trait bleu');
+  ok(mid.ghost && mid.gaps === 'hidden', 'glissement : une copie suit le doigt, boutons Insérer et Fusionner masqués');
+  await mouse('mouseReleased', grip.x, goal, 0);
+  const o1 = await order();
+  ok(o1 !== o0 && o1.split(',')[2] === o0.split(',')[0] && !(await ev(`!!document.querySelector('.bq-drop, .bq-ghost')`)), 'glissement : au lâcher, le bloc arrive sous le trait');
+  await mouse('mousePressed', grip.x, grip.y);
+  for (let y = grip.y; y <= goal; y += 40) await mouse('mouseMoved', grip.x, y);
+  await key('Escape', 'Escape', 27);
+  await mouse('mouseReleased', grip.x, goal, 0);
+  ok((await order()) === o1 && !(await ev(`!!document.querySelector('.bq-drop')`)), 'glissement : Échap rend l’ordre d’origine');
+
+  // Plein écran
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    await open();
+    if (width < 640) { await ev(`document.querySelector('[data-more]').click()`); await ev(`document.querySelector('[data-more-act="full"]').click()`); }
+    else await ev(`document.querySelector('[data-full]').click()`);
+    const full = await ev(`(() => { const d = document.querySelector('[data-editor-full]'); const r = d.getBoundingClientRect(); return { open: d.open, w: r.width, h: r.height, W: innerWidth, H: innerHeight, inside: d.contains(document.querySelector('[data-bq]')) }; })()`);
+    ok(full.open && full.inside && full.w === full.W && full.h === full.H, `${width} px : éditeur en plein écran, exactement ${full.W} × ${full.H} (${full.w} × ${full.h})`);
+    await key('Escape', 'Escape', 27);
+    ok(await ev(`!document.querySelector('[data-editor-full]').open && document.getElementById('editor').firstElementChild.matches('[data-bq]')`), `${width} px : Échap quitte le plein écran, l’éditeur revient à sa place`);
+    await ev(`(() => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === 'text'); c.querySelector('[data-menu]').click(); document.querySelector('[data-sheet="menu"] [data-act="full"]').click(); })()`);
+    const bf = await ev(`(() => { const d = document.querySelector('[data-block-full]'); const r = d.getBoundingClientRect(); const f = d.querySelector('[data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, ' Plein${width}'); return { open: d.open, w: r.width, h: r.height, W: innerWidth, H: innerHeight }; })()`);
+    ok(bf.open && bf.w === bf.W && bf.h === bf.H, `${width} px : bloc en plein écran, exactement ${bf.W} × ${bf.H} (${bf.w} × ${bf.h})`);
+    await key('Escape', 'Escape', 27);
+    ok(await ev(`!document.querySelector('[data-block-full]').open && editor.getMarkdown().includes(' Plein${width}')`), `${width} px : Échap ferme, le texte tapé est dans le document`);
+  }
+  await viewport(375);
 
   ws.close();
 } catch (error) {

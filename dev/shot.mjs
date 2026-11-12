@@ -21,10 +21,11 @@ try {
   ws.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (m.id && pending[m.id]) { pending[m.id](m); delete pending[m.id]; } });
   const send = (method, params = {}) => new Promise((r) => { const id = ++n; pending[id] = r; ws.send(JSON.stringify({ id, method, params })); });
   await send('Emulation.setDeviceMetricsOverride', { width: Number(width), height: Number(width) < 640 ? 800 : 900, deviceScaleFactor: 1, mobile: Number(width) < 640 });
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await send('Page.enable');
   await send('Page.navigate', { url: 'http://127.0.0.1:8098/' });
   await sleep(1200);
-  if (script) { const r = await send('Runtime.evaluate', { expression: script, awaitPromise: true }); if (r.result.exceptionDetails) console.log(r.result.exceptionDetails.exception?.description); await sleep(600); }
+  if (script) { const r = await send('Runtime.evaluate', { expression: script, awaitPromise: true, returnByValue: true }); console.log(r.result.exceptionDetails ? r.result.exceptionDetails.exception?.description : JSON.stringify(r.result.result.value)); await sleep(600); }
   const shot = await send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(out, Buffer.from(shot.result.data, 'base64'));
   ws.close();

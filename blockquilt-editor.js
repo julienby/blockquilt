@@ -103,7 +103,7 @@
   const GROUPS = { text: 'Texte', media: 'Médias', structure: 'Structure' };
   const sheetCls = 'bq-sheet m-0 mt-auto max-h-[88dvh] w-full max-w-full overflow-auto rounded-t-3xl bg-white p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-stone-900 shadow-xl backdrop:bg-black/40 sm:m-auto sm:max-w-lg sm:rounded-3xl';
   const sheet = (name, label, inner) => `<dialog data-sheet="${name}" aria-label="${attr(label)}" class="${sheetCls}">
-      <div class="-mx-1 -mt-1 mb-2 flex items-center gap-2"><h2 class="min-w-0 flex-1 truncate px-1 text-base font-bold">${esc(label)}</h2>
+      <div class="-mx-1 -mt-1 mb-2 flex items-center gap-2"><h2 tabindex="-1" autofocus class="min-w-0 flex-1 truncate px-1 text-base font-bold outline-none">${esc(label)}</h2>
         <button type="button" data-close aria-label="Fermer" class="bq-btn text-stone-500">${ic('x')}</button></div>${inner}</dialog>`;
   const item = (data, icon, label, cls = '') => `<button type="button" ${data} class="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium hover:bg-stone-100 active:bg-stone-200 ${cls}">${ic(icon)}<span class="min-w-0 flex-1 truncate">${label}</span></button>`;
 
@@ -120,11 +120,15 @@
         ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn text-stone-500">${ic('chevron_left')}</a>` : ''}
         <button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
         <div data-title contenteditable="true" role="textbox" aria-label="Titre du document" data-placeholder="Sans titre" spellcheck="false" class="bq-edit min-w-0 flex-1 truncate px-1 text-base font-extrabold leading-snug text-stone-900 sm:text-lg"></div>
+        <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn text-stone-600">${ic('undo')}</button>
+        <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('redo')}</button>
         <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn text-stone-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
         <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative text-stone-400">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
+        <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('maximize')}</button>
+        <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn text-stone-600 sm:hidden">${ic('more')}</button>
       </header>
       <div data-canvas class="flex-1 bg-stone-50/60 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
-      <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 px-1 text-white shadow-2xl">
+      <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 px-1 text-white shadow-2xl">
         <button type="button" data-fmt="bold" aria-label="Gras" class="bq-btn font-extrabold">B</button>
         <button type="button" data-fmt="italic" aria-label="Italique" class="bq-btn font-news italic">I</button>
         <button type="button" data-fmt="underline" aria-label="Souligner" class="bq-btn underline">U</button>
@@ -138,6 +142,7 @@
       </div>
       <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" hidden aria-label="Choisir une photo">
       ${sheet('add', 'Ajouter un bloc', '<div data-add-list></div>')}
+      ${sheet('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}</div>`)}
       ${sheet('menu', 'Bloc', '<div data-menu-list class="grid gap-0.5"></div>')}
       ${sheet('delete', 'Supprimer ce bloc ?', `<p data-del-preview class="line-clamp-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm italic text-stone-700"></p>
         <button type="button" data-del-confirm class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 font-semibold text-white hover:bg-red-700">${ic('trash')}Supprimer</button>`)}
@@ -146,9 +151,18 @@
       ${sheet('icon', 'Icône', `<ul data-icon-grid class="grid grid-cols-6 gap-1.5">${['🏡', '🔑', '📶', '🗑️', '🍽️', '🚗', '📞', '🛏️', '☕', '🔥', '❄️', '📍', '💡', 'ℹ️', '✅', '⚠️', '🚨', '🚭', '📝', '📌', '⭐', '❤️', '🎉', '📷'].map((e) => `<li><button type="button" data-icon-pick="${e}" class="flex aspect-square w-full items-center justify-center rounded-xl bg-stone-100 text-2xl hover:bg-stone-200">${e}</button></li>`).join('')}</ul>
         <div class="mt-3 flex gap-2"><input data-icon-input aria-label="Votre emoji" placeholder="Collez un emoji" class="h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-xl"><button type="button" data-icon-use class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Utiliser</button></div>
         <button type="button" data-icon-pick="" class="mt-2 min-h-11 rounded-xl px-3 font-medium text-brand-700 hover:bg-brand-50">Aucune icône</button>`)}
-    </div>`;
+      <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full bg-stone-50">
+        <div class="sticky top-0 z-10 flex min-h-14 items-center gap-2 border-b border-stone-200/80 bg-white/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+          <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-600"></span>
+          <button type="button" data-block-full-close class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-brand-600 px-4 text-sm font-bold text-white">${ic('minimize', 'size-4')}Terminer</button></div>
+        <div data-block-full-body class="mx-auto w-full max-w-3xl p-3 sm:p-6"></div>
+      </dialog>
+    </div>
+    <dialog data-editor-full aria-label="Éditeur en plein écran" class="bq-full bg-white"></dialog>`;
 
     const app = element.firstElementChild;
+    const editorFull = element.lastElementChild;
+    const blockFull = app.querySelector('[data-block-full]');
     const $ = (s, r = app) => r.querySelector(s);
     const canvas = $('[data-canvas]');
     const bar = $('[data-bar]');
@@ -170,6 +184,7 @@
     let insertAt = null; // null = en bas
     let menuId = null;
     let iconTarget = null; // null = document, sinon id du bloc (encadré)
+    let activeId = null;
     let nextId = 1;
     const newId = () => 'b' + nextId++;
     const def = (b) => Blocks.def(b.type);
@@ -265,7 +280,7 @@
 
     const render = () => (preview ? renderPreview() : renderEdit());
     const renderEdit = () => {
-      canvas.innerHTML = `<div class="mx-auto max-w-3xl">${blocks.map((b, i) => (i ? gap(i) : '') + card(b)).join('')}
+      canvas.innerHTML = `<div class="relative mx-auto max-w-3xl">${blocks.map((b, i) => (i ? gap(i) : '') + card(b)).join('')}
         <button type="button" data-insert="end" class="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
       canvas.querySelectorAll('.bq-edit').forEach(clean);
     };
@@ -304,8 +319,70 @@
       return data;
     };
 
+    // ---- Annuler / rétablir : un instantané = le texte complet + la place du bloc actif ----
+    // Pris avant et après chaque action de structure, et après 1 s sans frappe. 50 instantanés au plus.
+    const LIMIT = 50;
+    let past = [];
+    let future = [];
+    let baseline = null;
+    let typing = false;
+    const snapshot = () => ({ md: markdown(), active: Math.max(0, blocks.findIndex((b) => b.id === activeId)) });
+    const updateHistoryButtons = () => {
+      app.querySelector('[data-undo]').disabled = !past.length && !typing;
+      app.querySelector('[data-redo]').disabled = !future.length;
+    };
+    const checkpoint = () => {
+      if (preview) return;
+      clearTimeout(checkpoint.timer);
+      typing = false;
+      const cur = snapshot();
+      if (baseline && cur.md !== baseline.md) {
+        past.push(baseline);
+        if (past.length > LIMIT) past.shift();
+        future = [];
+      }
+      baseline = cur;
+      updateHistoryButtons();
+    };
+    const typed = () => {
+      typing = true;
+      clearTimeout(checkpoint.timer);
+      checkpoint.timer = later(checkpoint, 1000);
+      updateHistoryButtons();
+    };
+    const restore = (state) => {
+      const { meta: m, blocks: parsed } = Blocks.parse(state.md);
+      meta = m;
+      icon = m.icon || '';
+      titleEl.textContent = m.title || '';
+      showIcon();
+      blocks = parsed.map((b) => ({ id: newId(), ...b }));
+      if (!blocks.length) blocks = [{ id: newId(), ...Blocks.blank('text') }];
+      activeId = blocks[Math.min(state.active, blocks.length - 1)].id;
+      setDirty(true);
+      render();
+      canvas.querySelector(`[data-id="${activeId}"]`)?.scrollIntoView({ block: 'nearest' });
+      updateHistoryButtons();
+    };
+    const undo = () => {
+      if (preview) return false;
+      checkpoint();
+      if (!past.length) return false;
+      future.push(baseline);
+      baseline = past.pop();
+      restore(baseline);
+      return true;
+    };
+    const redo = () => {
+      if (preview || !future.length) return false;
+      past.push(baseline);
+      baseline = future.pop();
+      restore(baseline);
+      return true;
+    };
+
     // ---- Actions de structure ----
-    const change = (fn) => { syncFromDom(); fn(); setDirty(true); render(); };
+    const change = (fn) => { checkpoint(); fn(); setDirty(true); render(); checkpoint(); };
     const add = (type, at, extra = {}) => {
       const b = { id: newId(), ...Blocks.blank(type), ...extra };
       change(() => blocks.splice(at === null || at > blocks.length ? blocks.length : at, 0, b));
@@ -408,6 +485,10 @@
         + (i > 0 ? item('data-act="up"', 'arrow_up', 'Monter') : '')
         + (i < blocks.length - 1 ? item('data-act="down"', 'arrow_down', 'Descendre') : '')
         + item('data-act="duplicate"', 'duplicate', 'Dupliquer')
+        + item('data-act="copy"', 'copy', 'Copier')
+        + item('data-act="cut"', 'cut', 'Couper')
+        + item('data-act="paste"', 'paste', 'Coller dessous')
+        + item('data-act="full"', 'maximize', 'Plein écran')
         + item('data-act="delete"', 'trash', 'Supprimer…', 'text-red-700 hover:bg-red-50');
       openSheet('menu', from);
     };
@@ -423,6 +504,12 @@
       if (act === 'up') move(id, i - 1);
       else if (act === 'down') move(id, i + 1);
       else if (act === 'duplicate') { const copy = { ...structuredClone(blocks[i]), id: newId() }; change(() => blocks.splice(i + 1, 0, copy)); toast('Bloc dupliqué'); }
+      else if (act === 'copy' || act === 'cut') {
+        copyText(Blocks.toMarkdown(blocks[i]));
+        if (act === 'cut') change(() => blocks.splice(i, 1));
+        toast(act === 'cut' ? 'Bloc coupé' : 'Bloc copié');
+      } else if (act === 'paste') pasteBelow(id);
+      else if (act === 'full') openBlockFull(id);
       else if (act === 'delete') {
         const preview = Blocks.stripTags(Blocks.toMarkdown(blocks[i])).replace(/\n/g, ' • ').trim();
         $('[data-del-preview]', sheets.delete).textContent = preview ? `« ${preview.slice(0, 160)}${preview.length > 160 ? '…' : ''} »` : '(Bloc vide)';
@@ -435,9 +522,146 @@
       remove(menuId);
     });
 
+    // ---- Copier / coller : du Markdown, découpé en blocs par Blocks.parse ----
+    const copyText = (text) => {
+      Blockquilt.clipboard = text;
+      navigator.clipboard?.writeText(text).catch(() => {});
+    };
+    const pasteBelow = async (id) => {
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch { /* refusé : copie interne */ }
+      if (!text.trim()) text = Blockquilt.clipboard || '';
+      const parsed = Blocks.parse(text).blocks.filter((b) => !Blocks.isEmpty(b));
+      if (!parsed.length) return toast('Presse-papiers vide');
+      const i = blocks.findIndex((b) => b.id === id);
+      const fresh = parsed.map((b) => ({ id: newId(), ...b }));
+      change(() => blocks.splice(i + 1, 0, ...fresh));
+      toast(fresh.length > 1 ? `${fresh.length} blocs collés` : 'Bloc collé');
+    };
+
+    // ---- Plein écran : un <dialog> modal qui couvre toute la fenêtre (éditeur entier ou bloc seul) ----
+    // En plus, le plein écran du navigateur quand il est permis (masque la barre d'adresse) ; sinon le dialogue suffit.
+    const browserFull = () => document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
+    const leaveBrowserFull = () => { if (document.fullscreenElement && !editorFull.open && !blockFull.open) document.exitFullscreen().catch(() => {}); };
+    const toggleEditorFull = () => {
+      if (editorFull.open) return editorFull.close();
+      editorFull.append(app);
+      editorFull.showModal();
+      app.querySelector('[data-full]').setAttribute('aria-label', 'Quitter le plein écran');
+      app.querySelector('[data-full]').innerHTML = ic('minimize');
+      browserFull();
+    };
+    on(editorFull, 'close', () => {
+      element.prepend(app);
+      app.querySelector('[data-full]').setAttribute('aria-label', 'Plein écran');
+      app.querySelector('[data-full]').innerHTML = ic('maximize');
+      placeBar();
+      leaveBrowserFull();
+    });
+    const openBlockFull = (id) => {
+      syncFromDom();
+      const el = canvas.querySelector(`[data-id="${id}"]`);
+      if (!el) return;
+      $('[data-block-full-label]', blockFull).textContent = def(blocks.find((b) => b.id === id)).label;
+      $('[data-block-full-body]', blockFull).append(el);
+      blockFull.append(bar, toastEl.parentElement); // la barre et les messages doivent être dans la couche du dialogue
+      blockFull.showModal();
+      el.querySelector('[contenteditable], textarea, input')?.focus();
+      browserFull();
+    };
+    on(blockFull, 'close', () => {
+      app.append(bar, toastEl.parentElement);
+      hideBar();
+      checkpoint();
+      render();
+      leaveBrowserFull();
+    });
+    // Échap pendant un glissement : annule le glissement, ne ferme pas le plein écran.
+    on(editorFull, 'cancel', (e) => { if (drag) e.preventDefault(); });
+
+    // ---- Glisser-déposer : la carte reste à sa place, une copie suit le doigt, un trait bleu marque l'arrivée ----
+    let drag = null;
+    const scroller = () => (editorFull.open ? editorFull : document.scrollingElement);
+    const dropAt = (y) => {
+      const list = [...canvas.querySelectorAll('[data-id]')];
+      let slot = list.findIndex((c) => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
+      if (slot < 0) slot = list.length;
+      const box = drag.line.parentElement.getBoundingClientRect();
+      const above = list[slot - 1]?.getBoundingClientRect();
+      const below = list[slot]?.getBoundingClientRect();
+      const at = above && below ? (above.bottom + below.top) / 2 : above ? above.bottom + 6 : below.top - 6;
+      drag.line.style.top = (at - box.top - 1.5) + 'px';
+      return slot > drag.origin ? slot - 1 : slot;
+    };
+    const dragMove = () => {
+      drag.ghost.style.top = (drag.y - drag.dy) + 'px';
+      drag.target = dropAt(drag.y);
+    };
+    const dragEnd = (commit) => {
+      if (!drag) return;
+      const { id, target, origin } = drag;
+      cancelAnimationFrame(drag.raf);
+      drag.ghost.remove();
+      drag.line.remove();
+      drag.card.classList.remove('bq-origin');
+      app.classList.remove('bq-dragging');
+      drag = null;
+      if (commit && target !== origin) move(id, target);
+    };
+    on(app, 'pointerdown', (e) => {
+      const grip = e.target.closest('[data-grip]');
+      if (!grip || !canvas.contains(grip) || e.button !== 0 || preview) return;
+      e.preventDefault();
+      syncFromDom();
+      const cardEl = grip.closest('[data-id]');
+      const r = cardEl.getBoundingClientRect();
+      const ghost = cardEl.cloneNode(true);
+      ghost.removeAttribute('data-id');
+      ghost.inert = true;
+      ghost.className += ' bq-ghost';
+      Object.assign(ghost.style, { left: r.left + 'px', width: r.width + 'px', top: r.top + 'px' });
+      const line = document.createElement('div');
+      line.className = 'bq-drop';
+      canvas.firstElementChild.append(line);
+      app.append(ghost);
+      cardEl.classList.add('bq-origin');
+      app.classList.add('bq-dragging');
+      const origin = blocks.findIndex((b) => b.id === cardEl.dataset.id);
+      drag = { id: cardEl.dataset.id, card: cardEl, ghost, line, origin, target: origin, y: e.clientY, dy: e.clientY - r.top };
+      grip.setPointerCapture(e.pointerId);
+      dragMove();
+      // Défilement automatique près du haut ou du bas de l'écran.
+      const tick = () => {
+        if (!drag) return;
+        const edge = 64;
+        const speed = drag.y < edge ? -(edge - drag.y) / 3 : drag.y > innerHeight - edge ? (drag.y - innerHeight + edge) / 3 : 0;
+        if (speed) { scroller().scrollTop += speed; dragMove(); }
+        drag.raf = requestAnimationFrame(tick);
+      };
+      drag.raf = requestAnimationFrame(tick);
+    });
+    on(app, 'pointermove', (e) => { if (drag) { drag.y = e.clientY; dragMove(); } });
+    on(app, 'pointerup', () => dragEnd(true));
+    on(app, 'pointercancel', () => dragEnd(false));
+
+    // ---- Raccourcis : Ctrl+S, Ctrl+Z, Ctrl+Maj+Z, Ctrl+Y, Échap ----
+    const owns = () => app.contains(document.activeElement) || !document.activeElement || document.activeElement === document.body;
+    const inField = () => app.contains(document.activeElement) && document.activeElement.matches('[contenteditable="true"], input, textarea');
+    on(document, 'keydown', (e) => {
+      if (e.key === 'Escape' && drag) { e.preventDefault(); dragEnd(false); return; }
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || !owns()) return;
+      const k = e.key.toLowerCase();
+      if (k === 's') { e.preventDefault(); save(); return; }
+      if (k !== 'z' && k !== 'y') return;
+      // Frappe en cours dans un champ : le navigateur annule sa propre frappe.
+      if (typing && inField()) return;
+      e.preventDefault();
+      if (k === 'y' || e.shiftKey) redo(); else undo();
+    });
+
     // ---- Icône du document ou d'un encadré ----
     const setIcon = (value) => {
-      if (iconTarget === null) { icon = value; showIcon(); setDirty(true); return; }
+      if (iconTarget === null) { checkpoint(); icon = value; showIcon(); setDirty(true); checkpoint(); return; }
       syncFromDom();
       const b = blocks.find((x) => x.id === iconTarget);
       if (b) change(() => { b.icon = value; });
@@ -488,7 +712,7 @@
     // ---- Clics ----
     on(app, 'click', async (e) => {
       const el = e.target;
-      if (el.closest('dialog')) return;
+      if (el.closest('[data-sheet]')) return;
       const cardEl = el.closest('[data-id]');
       const id = cardEl?.dataset.id;
       if (el.closest('[data-insert]')) { const v = el.closest('[data-insert]').dataset.insert; return openAdd(v === 'end' ? null : Number(v)); }
@@ -496,25 +720,39 @@
       if (el.closest('[data-menu]')) return openMenu(id, el.closest('[data-menu]'));
       if (el.closest('[data-callout-icon]')) { syncFromDom(); return openIcon(id); }
       if (el.closest('[data-save]')) return save();
+      if (el.closest('[data-undo]')) return undo();
+      if (el.closest('[data-redo]')) return redo();
+      if (el.closest('[data-full]')) return toggleEditorFull();
+      if (el.closest('[data-more]')) return openSheet('more', el.closest('[data-more]'));
+      if (el.closest('[data-block-full-close]')) return blockFull.close();
       if (el.closest('[data-preview]')) return setPreview(!preview);
       if (el.closest('[data-doc-icon]')) return preview ? null : openIcon(null);
       if (el.closest('[data-back]') && dirty) { e.preventDefault(); return openSheet('leave'); }
+    });
+    on(sheets.more, 'click', (e) => {
+      const act = e.target.closest('[data-more-act]')?.dataset.moreAct;
+      if (!act) return;
+      sheets.more.close();
+      if (act === 'redo') redo();
+      else if (act === 'full') toggleEditorFull();
     });
     on(sheets.leave, 'click', async (e) => {
       if (e.target.closest('[data-leave-discard]')) { setDirty(false); location.href = o.backUrl; }
       if (e.target.closest('[data-leave-save]')) { sheets.leave.close(); if (await save()) location.href = o.backUrl; }
     });
-    on(canvas, 'change', (e) => { if (e.target.matches('[data-convert]')) convert(e.target.closest('[data-id]').dataset.id, e.target.value); });
-    on(canvas, 'input', () => setDirty(true));
-    on(titleEl, 'input', () => setDirty(true));
+    on(app, 'change', (e) => { if (e.target.matches('[data-convert]') && canvas.contains(e.target)) convert(e.target.closest('[data-id]').dataset.id, e.target.value); });
+    // Écouteurs posés sur toute l'application : un bloc en plein écran est hors de la zone des blocs. Les feuilles sont exclues.
+    const inSheet = (t) => !!t.closest?.('[data-sheet]');
+    on(app, 'input', (e) => { if (!inSheet(e.target)) { setDirty(true); typed(); } });
+    on(app, 'focusin', (e) => { const c = e.target.closest?.('[data-id]'); if (c) activeId = c.dataset.id; });
     on(titleEl, 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
-    on(canvas, 'focusout', (e) => { if (e.target.classList?.contains('bq-edit')) clean(e.target); });
-    on(canvas, 'paste', (e) => {
+    on(app, 'focusout', (e) => { if (e.target.classList?.contains('bq-edit')) clean(e.target); });
+    on(app, 'paste', (e) => {
       if (!e.target.closest?.('.bq-edit')) return;
       e.preventDefault();
       document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
     });
-    on(canvas, 'keydown', (e) => {
+    on(app, 'keydown', (e) => {
       const el = e.target;
       // Poignée au clavier : flèches haut et bas déplacent le bloc.
       if (el.matches?.('[data-grip]') && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
@@ -551,20 +789,20 @@
       const sel = getSelection();
       if (!sel.rangeCount || sel.isCollapsed) return;
       const field = richOf(sel.anchorNode);
-      if (field && app.contains(field)) showBar(field);
+      if (field && app.contains(field) && document.activeElement === field) showBar(field);
     });
-    on(canvas, 'dblclick', (e) => showBar(richOf(e.target)));
-    on(canvas, 'contextmenu', (e) => { const f = richOf(e.target); if (f) { e.preventDefault(); showBar(f); } });
+    on(app, 'dblclick', (e) => showBar(richOf(e.target)));
+    on(app, 'contextmenu', (e) => { const f = richOf(e.target); if (f) { e.preventDefault(); showBar(f); } });
     let press = null;
-    on(canvas, 'pointerdown', (e) => {
+    on(app, 'pointerdown', (e) => {
       clearTimeout(press?.timer);
       const f = richOf(e.target);
       press = f ? { x: e.clientX, y: e.clientY, timer: later(() => showBar(f), 450) } : null;
     });
-    on(canvas, 'pointermove', (e) => { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) clearTimeout(press.timer); });
-    on(canvas, 'pointerup', () => clearTimeout(press?.timer));
-    on(canvas, 'pointercancel', () => clearTimeout(press?.timer));
-    on(canvas, 'focusout', (e) => { if (barField && e.target === barField && !bar.contains(e.relatedTarget)) hideBar(); });
+    on(app, 'pointermove', (e) => { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) clearTimeout(press.timer); });
+    on(app, 'pointerup', () => clearTimeout(press?.timer));
+    on(app, 'pointercancel', () => clearTimeout(press?.timer));
+    on(app, 'focusout', (e) => { if (barField && e.target === barField && !bar.contains(e.relatedTarget)) hideBar(); });
     on(window.visualViewport, 'resize', placeBar);
     on(window.visualViewport, 'scroll', placeBar);
     on(window, 'resize', placeBar);
@@ -605,15 +843,19 @@
     };
     load(o.source);
     setDirty(false);
+    checkpoint();
 
     return {
       getMarkdown: markdown,
-      setMarkdown: (md) => { load(md); setDirty(false); },
+      setMarkdown: (md) => { load(md); setDirty(false); past = []; future = []; baseline = null; checkpoint(); },
       save,
+      undo,
+      redo,
       destroy: () => {
         ac.abort();
         timers.forEach(clearTimeout);
-        Object.values(sheets).forEach((d) => d.open && d.close());
+        dragEnd(false);
+        [...Object.values(sheets), blockFull, editorFull].forEach((d) => d.open && d.close());
         element.replaceChildren();
       },
     };
