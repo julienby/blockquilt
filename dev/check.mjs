@@ -17,6 +17,30 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
 const ok = (cond, label) => { console.log((cond ? 'ok   ' : 'FAIL ') + label); if (!cond) failed++; };
 
+// Document de départ des essais (la démo, elle, montre tous les types de blocs).
+fs.writeFileSync(path.join(data, 'document.md'), `---
+title: Arrivée
+icon: 🏡
+---
+
+> [!tip]
+> Garez-vous à gauche du portail.
+
+- porte bleue
+- code **1515**
+
+## Garage
+
+La clé est dans la boîte aux lettres.
+Réseau : maison-wifi
+
+> [!info] 🥖 Boulangerie
+> La boulangerie du village ouvre à 7 h.
+
+> [!warning]
+> Ne pas fumer dans la maison.
+`);
+
 const server = spawn('node', [path.join(DIR, 'server.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR: data }, stdio: 'ignore' });
 const chrome = spawn(process.env.CHROME || 'chromium', ['--headless=new', '--no-sandbox', '--disable-gpu', `--remote-debugging-port=${CDP}`, `--user-data-dir=${path.join(data, 'chrome')}`, 'about:blank'], { stdio: 'ignore', detached: true });
 const exited = (child) => new Promise((r) => (child.exitCode !== null || child.signalCode !== null ? r() : child.once('exit', r)));
@@ -188,7 +212,8 @@ try {
 
   // ---- Phase 5 : interactions ----
   const key = async (k, code, vk, modifiers = 0) => {
-    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key: k, code, windowsVirtualKeyCode: vk, modifiers });
+    // Entrée doit porter son caractère (« \r ») : c'est lui qui active un bouton.
+    await send('Input.dispatchKeyEvent', k === 'Enter' ? { type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk, modifiers, text: '\r', unmodifiedText: '\r' } : { type: 'rawKeyDown', key: k, code, windowsVirtualKeyCode: vk, modifiers });
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk, modifiers });
     await sleep(60);
   };
@@ -442,6 +467,57 @@ try {
     e.destroy(); el.remove();
     return none;
   })()`), 'sans aiUrl : aucun bouton IA');
+
+  // ---- Phase 10 : démo complète, accessibilité, parcours au clavier ----
+  fs.rmSync(doc);
+  await viewport(375);
+  await open();
+  const demoTypes = await ev(`(() => { const md = editor.getMarkdown(); const types = new Set(Blocks.parse(md).blocks.map((b) => b.type)); return { missing: Blocks.order.filter((t) => !types.has(t)), lint: Blocks.lint(md).length }; })()`);
+  ok(demoTypes.missing.length === 0 && demoTypes.lint === 0, `démo : chaque type de bloc est montré, sans alerte (${demoTypes.missing.join(', ')})`);
+  await ev(`document.querySelector('[data-preview]').click()`);
+  await waitFor(() => ev(`[...document.querySelectorAll('[data-canvas] img')].length >= 4 && [...document.querySelectorAll('[data-canvas] img')].every((i) => i.complete && i.naturalWidth > 0)`), 'photos de la démo');
+  ok(true, 'démo : photos et carrousel affichés dans l’aperçu');
+  await ev(`document.querySelector('[data-preview]').click()`);
+  ok(await ev(`[...document.querySelectorAll('[data-bq] button')].filter((b) => !b.textContent.trim() || b.querySelector('svg') && b.textContent.trim().length < 2).every((b) => b.getAttribute('aria-label'))`), 'chaque bouton à icône a un aria-label');
+  ok(await ev(`[...document.querySelectorAll('[data-bq] input, [data-bq] textarea, [data-bq] select, [data-bq] [contenteditable]')].every((f) => f.getAttribute('aria-label') || f.labels?.length)`), 'chaque champ a une étiquette');
+
+  // Parcours complet sans souris : ajouter, écrire, mettre en forme, déplacer, supprimer.
+  await ev(`(() => { editor.setMarkdown('## Début\\n\\nPremier bloc'); document.querySelector('[data-title]').focus(); })()`);
+  const TAB = ['Tab', 'Tab', 9];
+  const tabTo = async (selector, back = false) => {
+    for (let i = 0; i < 60; i++) {
+      if (await ev(`!!document.activeElement?.matches(${JSON.stringify(selector)})`)) return true;
+      await key(...TAB, back ? SHIFT : 0);
+    }
+    throw new Error('clavier : ' + selector + ' introuvable');
+  };
+  await tabTo('[data-insert="end"]');
+  ok(await ev(`getComputedStyle(document.activeElement).outlineStyle !== 'none'`), 'clavier : focus visible');
+  await key('Enter', 'Enter', 13);
+  ok(await ev(`document.querySelector('[data-sheet="add"]').open`), 'clavier : Entrée ouvre le menu d’ajout');
+  await tabTo('[data-sheet="add"] [data-pick="text"]');
+  await key('Enter', 'Enter', 13);
+  ok(await ev(`document.querySelectorAll('[data-bq] [data-id]').length === 3 && document.activeElement.matches('[data-rich]')`), 'clavier : bloc texte ajouté, curseur dedans');
+  await send('Input.insertText', { text: 'Bonjour monde' });
+  for (let i = 0; i < 5; i++) await key('ArrowLeft', 'ArrowLeft', 37, SHIFT);
+  await key('b', 'KeyB', 66, CTRL);
+  ok((await mdNow()).includes('Bonjour **monde**'), 'clavier : Ctrl+B met en gras la sélection');
+  await key('F10', 'F10', 121, 1);
+  ok(await ev(`!document.querySelector('[data-bar]').hidden && document.querySelector('[data-bar]').contains(document.activeElement)`), 'clavier : Alt+F10 donne le focus à la barre de mise en forme');
+  await tabTo('[data-bar] [data-fmt="highlight"]');
+  await key('Enter', 'Enter', 13);
+  ok((await mdNow()).includes('Bonjour ==**monde**==') || (await mdNow()).includes('Bonjour **==monde==**'), 'clavier : surligner depuis la barre');
+  ok(await ev(`document.activeElement.matches('[data-rich]')`), 'clavier : retour au texte après la barre');
+  await tabTo('[data-grip]', true);
+  await key('ArrowUp', 'ArrowUp', 38);
+  ok(await ev(`Blocks.parse(editor.getMarkdown()).blocks[1].type === 'text' && editor.getMarkdown().split('\\n\\n')[1].startsWith('Bonjour')`), 'clavier : flèche haut sur la poignée remonte le bloc');
+  await tabTo('[data-menu]');
+  await key('Enter', 'Enter', 13);
+  await tabTo('[data-sheet="menu"] [data-act="delete"]');
+  await key('Enter', 'Enter', 13);
+  await tabTo('[data-del-confirm]');
+  await key('Enter', 'Enter', 13);
+  ok(await ev(`!editor.getMarkdown().includes('Bonjour') && document.querySelectorAll('[data-bq] [data-id]').length === 2`), 'clavier : bloc supprimé depuis le menu « ⋯ »');
 
   ws.close();
 } catch (error) {

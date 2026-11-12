@@ -13,26 +13,66 @@
 
   <!-- Document de démo (remplacé par le dernier enregistrement par dev/server.js). -->
   <textarea id="source" hidden>---
-title: Arrivée
-icon: 🏡
+title: Bienvenue dans blockquilt
+icon: 🧵
 ---
 
-&gt; [!tip]
-&gt; Garez-vous à gauche du portail.
+blockquilt est un éditeur **par blocs** : chaque bloc a un sens, et tout reste du *Markdown* lisible. Essayez de ++fusionner++ deux blocs, d'en ==glisser== un par sa poignée, ou d'ouvrir le menu « ⋯ ».
 
-- porte bleue
-- code **1515**
+## Les blocs de texte
 
-## Garage
+### Listes
 
-La clé est dans la boîte aux lettres.
-Réseau : maison-wifi
+- une puce
+- une autre, avec un [lien](https://github.com)
 
-&gt; [!info] 🥖 Boulangerie
-&gt; La boulangerie du village ouvre à 7 h.
+1. Ouvrir le menu d'ajout
+2. Choisir un type
+3. Écrire
 
-&gt; [!warning]
-&gt; Ne pas fumer dans la maison.</textarea>
+> Le texte est la source : ce que vous voyez est enregistré en Markdown, sans perte.
+
+## Les encadrés
+
+> [!info]
+> Une information utile. Sélectionnez un mot pour le mettre en forme.
+
+> [!tip] 💡 Astuce
+> Touchez l'icône d'un encadré pour en choisir une autre.
+
+> [!success]
+> Ctrl+S enregistre, Ctrl+Z annule, Ctrl+Y rétablit.
+
+> [!warning] ⚠️ Attention
+> Un bloc supprimé se récupère avec « Annuler ».
+
+> [!danger]
+> Le bloc HTML est filtré : pas de script, pas de style.
+
+## Les médias
+
+![Un dégradé de démonstration](media/de0000000001)
+
+:::carousel
+![Bleu](media/de0000000002)
+![Vert](media/de0000000003)
+![Ambre](media/de0000000004)
+:::
+
+https://vimeo.com/76979871
+
+---
+
+```js
+Blockquilt.mount(document.getElementById('editor'), { source, saveUrl: 'api/save' });
+```
+
+:::html
+<div class="grid grid-cols-2 gap-3">
+  <div class="rounded-xl bg-sky-50 p-3"><strong>HTML filtré</strong></div>
+  <div class="rounded-xl bg-amber-50 p-3">Classes Tailwind de l'hôte</div>
+</div>
+:::</textarea>
 
   <script src="blockquilt.js"></script>
   <script src="blockquilt-editor.js"></script>

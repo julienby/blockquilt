@@ -106,7 +106,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/') return send(res, 200, TYPES['.html'], page());
     const media = /^\/media\/([a-f0-9]{12})$/.exec(url.pathname);
     if (media) {
-      const file = path.join(MEDIA, media[1]);
+      // Photos envoyées, sinon photos du document de démo (dev/demo-media).
+      const file = [path.join(MEDIA, media[1]), path.join(__dirname, 'demo-media', media[1])].find((f) => fs.existsSync(f)) || path.join(MEDIA, media[1]);
       if (!fs.existsSync(file)) return send(res, 404, 'text/plain', 'Introuvable');
       return send(res, 200, fs.readFileSync(file + '.type', 'utf8'), fs.readFileSync(file));
     }

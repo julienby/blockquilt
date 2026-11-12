@@ -960,10 +960,17 @@
         return;
       }
       if (e.key === 'Enter' && !e.shiftKey && el.matches?.('.bq-edit[data-plain], [data-callout-title]')) { e.preventDefault(); el.blur(); }
+      const rich = richOf(el);
+      if (!rich) return;
+      // Mise en forme au clavier : Ctrl+B, Ctrl+I, Ctrl+U ; Alt+F10 donne le focus à la barre.
+      const cmd = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && { b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()];
+      if (cmd) { e.preventDefault(); document.execCommand(cmd); setDirty(true); typed(); return; }
+      if (e.altKey && e.key === 'F10') { e.preventDefault(); showBar(rich); bar.querySelector('button').focus(); }
     });
 
     // ---- Barre de mise en forme : fixe et centrée, en bas de l'écran visible (téléphone) ou sous l'en-tête (ordinateur) ----
     let barField = null;
+    let barRange = null; // sélection gardée : la barre peut prendre le focus (clavier) sans la perdre
     const placeBar = () => {
       if (bar.hidden) return;
       const vv = window.visualViewport;
@@ -982,12 +989,28 @@
       bar.hidden = false;
       placeBar();
     };
-    const hideBar = () => { bar.hidden = true; barField = null; };
+    const hideBar = () => { bar.hidden = true; barField = null; barRange = null; };
+    const backToField = () => {
+      if (!barField || document.activeElement === barField) return;
+      barField.focus({ preventScroll: true });
+      if (barRange) { getSelection().removeAllRanges(); getSelection().addRange(barRange); }
+    };
+    on(bar, 'keydown', (e) => {
+      const buttons = [...bar.querySelectorAll('button')];
+      const i = buttons.indexOf(document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); backToField(); }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); buttons[(i + (e.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length].focus(); }
+    });
+    on(bar, 'focusout', (e) => { if (!bar.contains(e.relatedTarget) && e.relatedTarget !== barField) hideBar(); });
     on(document, 'selectionchange', () => {
       const sel = getSelection();
       if (!sel.rangeCount || sel.isCollapsed) return;
       const field = richOf(sel.anchorNode);
       if (field && app.contains(field) && document.activeElement === field) showBar(field);
+    });
+    on(document, 'selectionchange', () => {
+      const sel = getSelection();
+      if (barField && sel.rangeCount && barField.contains(sel.anchorNode)) barRange = sel.getRangeAt(0).cloneRange();
     });
     on(app, 'dblclick', (e) => showBar(richOf(e.target)));
     on(app, 'contextmenu', (e) => { const f = richOf(e.target); if (f) { e.preventDefault(); showBar(f); } });
@@ -1010,6 +1033,7 @@
       scope.closest('.bq-edit')?.querySelectorAll('mark').forEach((m) => { if (range.intersectsNode(m)) m.replaceWith(...m.childNodes); });
     };
     on(bar, 'click', (e) => {
+      backToField();
       const sel = getSelection();
       if (e.target.closest('[data-split]')) { if (sel.rangeCount) split(sel.getRangeAt(0)); return; }
       if (e.target.closest('[data-emoji-insert]')) {
