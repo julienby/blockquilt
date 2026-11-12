@@ -111,6 +111,14 @@ try {
   await waitFor(() => ev(`(() => { const i = document.querySelector('[data-canvas] img[src*="media/"]'); return !!i && i.complete && i.naturalWidth > 0; })()`), 'photo dans l’aperçu');
   ok(true, 'aperçu : la photo envoyée s’affiche');
 
+  // Registre : un type enregistré à la volée apparaît dans le menu d'ajout et s'ajoute (carte de repli : son texte).
+  await open();
+  await ev(`Blocks.register('demo', { label: 'Démo', group: 'media', match: () => null, toMarkdown: (b) => b.md || '', toHtml: () => '', blank: () => ({ md: ':::demo\\nx\\n:::' }) })`);
+  await ev(`document.querySelector('[data-insert="end"]').click()`);
+  ok(await ev(`!!document.querySelector('#bq-add [data-pick="demo"]')`), 'registre : le type « demo » est dans le menu d’ajout');
+  await ev(`document.querySelector('#bq-add [data-pick="demo"]').click()`);
+  ok(await ev(`[...document.querySelectorAll('#bq [data-id] [data-raw]')].some((t) => t.value.startsWith(':::demo'))`), 'registre : un bloc « demo » est ajouté');
+
   ws.close();
 } catch (error) {
   ok(false, error.message);

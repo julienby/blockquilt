@@ -2,19 +2,23 @@
 // Chaque bloc a un type qui porte le sens (astuce, consigne, conseil…). L'hôte ne voit jamais de Markdown : il voit du gras, des listes, des teintes.
 // Un bloc que l'éditeur ne sait pas refaire à l'identique (tableau, code…) reste du texte tel quel (type « raw ») : rien n'est jamais abîmé.
 const Blocks = {
-  // Classes Tailwind : `card` = fond et bordure du bloc, `badge` = pastille du type.
-  TYPES: {
-    title: { label: 'Titre de section', short: 'Titre', desc: 'Sous-titre structurant pour découper la fiche', icon: 'heading', card: 'bg-white border-stone-300/90 text-stone-900', badge: 'bg-stone-100 text-stone-700 border-stone-200/90' },
-    text: { label: 'Texte / Explication', short: 'Texte', desc: 'Paragraphe fluide ou liste sur fond ivoire doux', icon: 'align_left', card: 'bg-[#FAF8F5] border-stone-200/90 text-stone-800', badge: 'bg-stone-200/80 text-stone-800 border-stone-300/80' },
-    tip: { label: 'Astuce pratique', short: 'Astuce', desc: 'Vert sauge pour une astuce pratique', icon: 'sparkles', mark: '💡', card: 'bg-[#EEF6F0] border-emerald-200/90 text-emerald-950', badge: 'bg-emerald-100 text-emerald-900 border-emerald-300/80' },
-    advice: { label: 'Conseil local / Recommandation', short: 'Conseil', desc: 'Lavande pastel pour vos bonnes adresses et coups de cœur', icon: 'compass', mark: '🧭', card: 'bg-[#F3F1FA] border-indigo-200/80 text-indigo-950', badge: 'bg-indigo-100 text-indigo-900 border-indigo-300/80' },
-    warning: { label: 'Consigne / Vigilance', short: 'Consigne', desc: 'Ambre sable doux pour ce qu’il faut faire ou éviter', icon: 'triangle_alert', mark: '⚠️', card: 'bg-[#FDF6E9] border-amber-200/90 text-amber-950', badge: 'bg-amber-100 text-amber-900 border-amber-300/80' },
-    photo: { label: 'Photo explicative', short: 'Photo', desc: 'Montrer un bouton, un compteur ou l’emplacement exact', icon: 'image', card: 'bg-white border-stone-200/90 text-stone-800', badge: 'bg-stone-100 text-stone-700 border-stone-200' },
-    video: { label: 'Vidéo (YouTube, Vimeo)', short: 'Vidéo', desc: 'Une courte démonstration, par exemple allumer le poêle', icon: 'video', card: 'bg-rose-50/50 border-rose-200/80 text-rose-950', badge: 'bg-rose-100 text-rose-900 border-rose-200' },
-    raw: { label: 'Mise en forme avancée', short: 'Avancé', desc: '', icon: 'sliders', card: 'bg-white border-dashed border-stone-300 text-stone-800', badge: 'bg-stone-100 text-stone-700 border-stone-200' },
+  // ---- Registre des types de blocs ----
+  // Un type = une entrée : lecture (match), écriture (toMarkdown), rendu (toHtml), bloc neuf (blank), libellés et teintes.
+  // L'écran (blockquilt-editor.js) y ajoute edit(b, ui) et read(card, b). Le type « raw » n'est pas dans l'ordre de lecture : c'est le repli.
+  types: {},
+  order: [],
+
+  /** Enregistre (ou remplace) un type. `def` : label, short, icon, group ('text' | 'media'), tone { card, badge }, match, toMarkdown, toHtml, blank, convertible. */
+  register(type, def) {
+    if (!Blocks.types[type] && type !== 'raw') Blocks.order.push(type);
+    Blocks.types[type] = { group: 'text', short: def.label, icon: 'sliders', tone: { card: '', badge: '' }, ...Blocks.types[type], ...def, type };
+    return Blocks.types[type];
   },
-  TEXT_KEYS: ['title', 'text', 'tip', 'advice', 'warning'],
-  MEDIA_KEYS: ['photo', 'video'],
+  def(type) { return Blocks.types[type] || Blocks.types.raw; },
+  /** Types texte convertibles entre eux, dans l'ordre d'enregistrement. */
+  get TEXT_KEYS() { return Blocks.order.filter((k) => Blocks.types[k].convertible); },
+  get TYPES() { return Blocks.types; },
+
   ENTITIES: { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" },
   VIDEO: /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+$/i,
 
@@ -178,58 +182,31 @@ const Blocks = {
   },
 
   // ---- Bloc Markdown ⇄ modèle d'écran ----
-  // Modèle : { type, html } (title, text, tip, advice, warning) · { type:'photo', file, alt } · { type:'video', url } · { type:'raw', md }
+  // Modèle : { type, ...champs du type }. Un bloc est lu par le premier type dont l'écriture redonne le même texte ; sinon il reste « raw ».
+
+  tidy(x) { return x.split('\n').map((l) => l.replace(/\s+$/, '')).join('\n').trim(); },
 
   fromMarkdown(md) {
     const t = md.trim();
-    const quote = (lead) => ({ '💡': 'tip', '🧭': 'advice', '⚠️': 'warning', '🚨': 'warning', '❗': 'warning' })[lead] ?? (lead === '' ? 'tip' : null);
-    let b = null;
     let m;
-    const lines = t.split('\n');
     // Rétrocompatibilité : un ancien bloc :::sensible est repris comme bloc texte normal (sans perte d'information).
-    if (/^:::sensible/.test(t) && (m = /^:::sensible[ \t]*\n?([\s\S]*?)\n?:::\s*$/.exec(t))) {
+    if ((m = /^:::sensible[ \t]*\n?([\s\S]*?)\n?:::\s*$/.exec(t))) {
       const inner = m[1].trim() === '' ? [] : m[1].trim().split('\n');
       return { type: 'text', html: Blocks.linesToHtml(inner) };
     }
-    if ((m = /^!\[((?:\\.|[^\]\\])*)\]\(media\/([^)\s]+)\)$/.exec(t))) {
-      b = { type: 'photo', file: m[2], alt: Blocks.plain(m[1]) };
-    } else if (Blocks.VIDEO.test(t)) {
-      b = { type: 'video', url: t };
-    } else if (lines.length === 1 && /^### /.test(t)) {
-      b = { type: 'title', html: Blocks.esc(Blocks.plain(t.slice(4))) };
-    } else if (lines.every((l) => l.startsWith('>'))) {
-      const lead = (/^> ?(💡|⚠️|🚨|❗|🧭)/u.exec(t) || [, ''])[1];
-      const type = quote(lead);
-      const stripped = lines.map((l) => l.replace(/^> ?(?:💡|⚠️|🚨|❗|🧭)? ?/u, ''));
-      if (type) b = { type, mark: lead, html: Blocks.linesToHtml(stripped) };
-    } else if (!/^\s*\|/m.test(t) && !/^(#{1,6} |:::|!\[|>)/.test(t)) {
-      b = { type: 'text', html: Blocks.linesToHtml(lines) };
-      if (Blocks.toMarkdown(b) !== lines.map((l) => l.replace(/\s+$/, '')).join('\n').trim()) {
-        b = { type: 'text', html: lines.map(Blocks.inlineHtml).join('<br>') };
-      }
+    for (const type of Blocks.order) {
+      const def = Blocks.types[type];
+      const m = def.match ? def.match(t) : null;
+      if (m && Blocks.tidy(def.toMarkdown(m)) === Blocks.tidy(t)) return { type, ...m };
     }
-    const tidy = (x) => x.split('\n').map((l) => l.replace(/\s+$/, '')).join('\n').trim();
-    return b && tidy(Blocks.toMarkdown(b)) === tidy(t) ? b : { type: 'raw', md };
+    return { type: 'raw', md };
   },
 
   /** Modèle → Markdown du bloc (vide si le bloc est vide : il disparaît à l'enregistrement). */
-  toMarkdown(b) {
-    const body = (html) => Blocks.htmlToMd(html, true);
-    switch (b.type) {
-      case 'title': { const x = Blocks.htmlToMd(b.html).replace(/\n+/g, ' ').trim(); return x ? '### ' + x : ''; }
-      case 'text': return body(b.html);
-      case 'tip': case 'advice': case 'warning': {
-        const x = body(b.html);
-        if (x.trim() === '') return '';
-        const mark = b.mark ?? Blocks.TYPES[b.type].mark;
-        const [first, ...rest] = x.split('\n');
-        return [`> ${mark ? mark + ' ' : ''}${first}`, ...rest.map((l) => '> ' + l)].join('\n');
-      }
-      case 'photo': return b.file ? `![${Blocks.htmlToMd(Blocks.esc(b.alt)).replace(/\n/g, ' ')}](media/${b.file})` : '';
-      case 'video': return b.url.trim();
-      default: return b.md ?? '';
-    }
-  },
+  toMarkdown(b) { return Blocks.def(b.type).toMarkdown(b); },
+
+  /** Modèle d'un bloc neuf : vide, c'est le texte d'aide qui guide. */
+  blank(type) { return { type, ...Blocks.def(type).blank() }; },
 
   isEmpty(b) { return Blocks.toMarkdown(b).trim() === ''; },
   stripTags(html) { return Blocks.unesc(html.replace(/<\/li>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')); },
@@ -244,15 +221,16 @@ const Blocks = {
     if (b.type === type) return b;
     let L = Blocks.lines(b).filter((h) => h.replace(/<[^>]+>/g, '').trim() !== '');
     if (L.length === 0) L = [''];
-    if (type === 'title') return { type, html: Blocks.esc(Blocks.stripTags(L.join(' ')).replace(/\s+/g, ' ').trim()) };
+    if (Blocks.def(type).single) return { type, html: Blocks.esc(Blocks.stripTags(L.join(' ')).replace(/\s+/g, ' ').trim()) };
     const rawLines = Blocks.htmlToMd(b.html ?? '', true).split('\n').filter((l) => l.trim() !== '');
     const html = rawLines.length ? Blocks.linesToHtml(rawLines) : L.join('<br>');
-    return { type, html, ...(Blocks.TYPES[type].mark ? { mark: Blocks.TYPES[type].mark } : {}) };
+    return { ...Blocks.blank(type), html };
   },
 
   /** Fusionne deux blocs voisins : le type du dessus l'emporte, les lignes du dessous suivent. null si impossible (titre au-dessus, photo, vidéo, bloc avancé). */
   merge(top, bottom) {
-    if (top.type === 'title' || !Blocks.TEXT_KEYS.includes(top.type) || !Blocks.TEXT_KEYS.includes(bottom.type)) return null;
+    const K = Blocks.TEXT_KEYS;
+    if (Blocks.def(top.type).single || !K.includes(top.type) || !K.includes(bottom.type)) return null;
     const lines = (b) => Blocks.htmlToMd(b.html ?? '', true).split('\n').filter((l) => l.trim() !== '');
     return { ...top, html: Blocks.linesToHtml([...lines(top), ...lines(bottom)]) };
   },
@@ -270,14 +248,6 @@ const Blocks = {
     return { icon, title: text.slice(icon.length).trim() };
   },
 
-  /** Modèle d'un bloc neuf : vide, c'est le texte d'aide qui guide. */
-  blank(type) {
-    return {
-      title: { type, html: '' }, text: { type, html: '' }, tip: { type, html: '', mark: '💡' }, advice: { type, html: '', mark: '🧭' }, warning: { type, html: '', mark: '⚠️' },
-      photo: { type, file: '', alt: '' }, video: { type, url: '' },
-    }[type];
-  },
-
   // ---- Visualisation invité : Markdown d'une rubrique (sans la ligne « ## ») → HTML ----
   // Même lecture que l'éditeur, mêmes teintes que les cartes (Blocks.TYPES). Tout le texte est échappé ; liens limités à http(s), mailto, tel.
 
@@ -290,39 +260,7 @@ const Blocks = {
   },
 
   /** Un bloc → HTML invité. `media` : adresse des photos (« media/<id> » du texte y est réécrit). */
-  blockHtml(b, media) {
-    const attr = (s) => Blocks.esc(s).replace(/"/g, '&quot;');
-    switch (b.type) {
-      case 'title': return `<h3 class="mb-2 mt-6 font-news text-xl font-semibold leading-tight tracking-tight text-stone-900">${b.html}</h3>`;
-      case 'text': return `<p class="my-3 leading-7">${b.html}</p>`;
-      case 'tip': case 'advice': case 'warning': {
-        const mark = b.mark ?? Blocks.TYPES[b.type].mark;
-        return `<aside data-type="${b.type}" class="my-4 rounded-2xl border p-4 leading-7 ${Blocks.TYPES[b.type].card}">${mark ? `<span aria-hidden="true">${mark}</span> ` : ''}${b.html}</aside>`;
-      }
-      case 'photo': return `<img src="${attr(media + b.file)}" alt="${attr(b.alt)}" loading="lazy" class="my-4 h-auto w-full rounded-xl">`;
-      case 'video': {
-        const src = Blocks.embedUrl(b.url);
-        return src
-          ? `<div class="my-4 aspect-video overflow-hidden rounded-xl bg-stone-100"><iframe class="h-full w-full" src="${attr(src)}" title="Vidéo" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
-          : `<p class="my-3"><a href="${attr(b.url)}">${Blocks.esc(b.url)}</a></p>`;
-      }
-      default: {
-        // Bloc « avancé » : titres et photos ligne à ligne, le reste en texte (tableaux et code restent lisibles, jamais interprétés).
-        const out = [];
-        let para = [];
-        const flush = () => { if (para.length) out.push(`<p class="my-3 leading-7">${Blocks.linesToHtml(para)}</p>`); para = []; };
-        for (const line of (b.md ?? '').split('\n')) {
-          let m;
-          if ((m = /^(#{1,6}) +(.*)$/.exec(line))) { flush(); out.push(`<h4 class="mb-2 mt-5 font-semibold tracking-tight text-stone-900">${Blocks.inlineHtml(m[2])}</h4>`); }
-          else if ((m = /^!\[((?:\\.|[^\]\\])*)\]\(media\/([^)\s]+)\)$/.exec(line.trim()))) { flush(); out.push(Blocks.blockHtml({ type: 'photo', file: m[2], alt: Blocks.plain(m[1]) }, media)); }
-          else if (/^:::\w*\s*$/.test(line)) continue;
-          else para.push(line.replace(/^> ?/, ''));
-        }
-        flush();
-        return out.join('');
-      }
-    }
-  },
+  blockHtml(b, media) { return Blocks.def(b.type).toHtml(b, { media }); },
 
   /** Texte d'une rubrique, sans sa ligne « ## titre » → HTML invité, bloc par bloc. */
   toHtml(markdown, media = 'media/') {
@@ -331,625 +269,109 @@ const Blocks = {
     return `<div class="bq-view">${blocks.map((b) => Blocks.blockHtml(Blocks.fromMarkdown(b.text), media)).join('')}</div>`;
   },
 };
+
+// ---- Types de base ----
+{
+  const attr = (s) => Blocks.esc(s).replace(/"/g, '&quot;');
+  const body = (html) => Blocks.htmlToMd(html, true);
+  const PHOTO = /^!\[((?:\\.|[^\]\\])*)\]\(media\/([^)\s]+)\)$/;
+
+  Blocks.register('title', {
+    label: 'Titre de section', short: 'Titre', icon: 'heading', convertible: true, single: true,
+    tone: { card: 'bg-white border-stone-300/90 text-stone-900', badge: 'bg-stone-100 text-stone-700 border-stone-200/90' },
+    match: (t) => (!t.includes('\n') && /^### /.test(t) ? { html: Blocks.esc(Blocks.plain(t.slice(4))) } : null),
+    toMarkdown: (b) => { const x = Blocks.htmlToMd(b.html).replace(/\n+/g, ' ').trim(); return x ? '### ' + x : ''; },
+    toHtml: (b) => `<h3 class="mb-2 mt-6 font-news text-xl font-semibold leading-tight tracking-tight text-stone-900">${b.html}</h3>`,
+    blank: () => ({ html: '' }),
+  });
+
+  Blocks.register('text', {
+    label: 'Texte / Explication', short: 'Texte', icon: 'align_left', convertible: true,
+    tone: { card: 'bg-[#FAF8F5] border-stone-200/90 text-stone-800', badge: 'bg-stone-200/80 text-stone-800 border-stone-300/80' },
+    match: (t) => {
+      if (/^\s*\|/m.test(t) || /^(#{1,6} |:::|!\[|>)/.test(t) || Blocks.VIDEO.test(t)) return null;
+      const lines = t.split('\n');
+      const b = { type: 'text', html: Blocks.linesToHtml(lines) };
+      return body(b.html) === Blocks.tidy(t) ? { html: b.html } : { html: lines.map(Blocks.inlineHtml).join('<br>') };
+    },
+    toMarkdown: (b) => body(b.html),
+    toHtml: (b) => `<p class="my-3 leading-7">${b.html}</p>`,
+    blank: () => ({ html: '' }),
+  });
+
+  // Encadrés : citation Markdown dont la première ligne commence par l'emoji du type.
+  const callout = (type, label, short, icon, marks, tone) => Blocks.register(type, {
+    label, short, icon, convertible: true, tone, mark: marks[0],
+    match: (t) => {
+      const lines = t.split('\n');
+      if (!lines.every((l) => l.startsWith('>'))) return null;
+      const lead = (/^> ?(💡|⚠️|🚨|❗|🧭)/u.exec(t) || [, ''])[1];
+      if (!marks.includes(lead) && !(lead === '' && type === 'tip')) return null;
+      return { mark: lead, html: Blocks.linesToHtml(lines.map((l) => l.replace(/^> ?(?:💡|⚠️|🚨|❗|🧭)? ?/u, ''))) };
+    },
+    toMarkdown: (b) => {
+      const x = body(b.html);
+      if (x.trim() === '') return '';
+      const mark = b.mark ?? marks[0];
+      const [first, ...rest] = x.split('\n');
+      return [`> ${mark ? mark + ' ' : ''}${first}`, ...rest.map((l) => '> ' + l)].join('\n');
+    },
+    toHtml: (b) => {
+      const mark = b.mark ?? marks[0];
+      return `<aside data-type="${type}" class="my-4 rounded-2xl border p-4 leading-7 ${tone.card}">${mark ? `<span aria-hidden="true">${mark}</span> ` : ''}${b.html}</aside>`;
+    },
+    blank: () => ({ html: '', mark: marks[0] }),
+  });
+  callout('tip', 'Astuce pratique', 'Astuce', 'sparkles', ['💡'], { card: 'bg-[#EEF6F0] border-emerald-200/90 text-emerald-950', badge: 'bg-emerald-100 text-emerald-900 border-emerald-300/80' });
+  callout('advice', 'Conseil local / Recommandation', 'Conseil', 'compass', ['🧭'], { card: 'bg-[#F3F1FA] border-indigo-200/80 text-indigo-950', badge: 'bg-indigo-100 text-indigo-900 border-indigo-300/80' });
+  callout('warning', 'Consigne / Vigilance', 'Consigne', 'triangle_alert', ['⚠️', '🚨', '❗'], { card: 'bg-[#FDF6E9] border-amber-200/90 text-amber-950', badge: 'bg-amber-100 text-amber-900 border-amber-300/80' });
+
+  Blocks.register('photo', {
+    label: 'Photo explicative', short: 'Photo', icon: 'image', group: 'media',
+    tone: { card: 'bg-white border-stone-200/90 text-stone-800', badge: 'bg-stone-100 text-stone-700 border-stone-200' },
+    match: (t) => { const m = PHOTO.exec(t); return m ? { file: m[2], alt: Blocks.plain(m[1]) } : null; },
+    toMarkdown: (b) => (b.file ? `![${Blocks.htmlToMd(Blocks.esc(b.alt)).replace(/\n/g, ' ')}](media/${b.file})` : ''),
+    toHtml: (b, ctx) => `<img src="${attr(ctx.media + b.file)}" alt="${attr(b.alt)}" loading="lazy" class="my-4 h-auto w-full rounded-xl">`,
+    blank: () => ({ file: '', alt: '' }),
+  });
+
+  Blocks.register('video', {
+    label: 'Vidéo (YouTube, Vimeo)', short: 'Vidéo', icon: 'video', group: 'media',
+    tone: { card: 'bg-rose-50/50 border-rose-200/80 text-rose-950', badge: 'bg-rose-100 text-rose-900 border-rose-200' },
+    match: (t) => (Blocks.VIDEO.test(t) ? { url: t } : null),
+    toMarkdown: (b) => b.url.trim(),
+    toHtml: (b) => {
+      const src = Blocks.embedUrl(b.url);
+      return src
+        ? `<div class="my-4 aspect-video overflow-hidden rounded-xl bg-stone-100"><iframe class="h-full w-full" src="${attr(src)}" title="Vidéo" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+        : `<p class="my-3"><a href="${attr(b.url)}">${Blocks.esc(b.url)}</a></p>`;
+    },
+    blank: () => ({ url: '' }),
+  });
+
+  // Repli : tout ce que l'éditeur ne sait pas refaire à l'identique reste du texte tel quel.
+  Blocks.register('raw', {
+    label: 'Mise en forme avancée', short: 'Avancé', icon: 'sliders', group: 'none',
+    tone: { card: 'bg-white border-dashed border-stone-300 text-stone-800', badge: 'bg-stone-100 text-stone-700 border-stone-200' },
+    toMarkdown: (b) => b.md ?? '',
+    toHtml: (b, ctx) => {
+      // Titres et photos ligne à ligne, le reste en texte (tableaux et code restent lisibles, jamais interprétés).
+      const out = [];
+      let para = [];
+      const flush = () => { if (para.length) out.push(`<p class="my-3 leading-7">${Blocks.linesToHtml(para)}</p>`); para = []; };
+      for (const line of (b.md ?? '').split('\n')) {
+        let m;
+        if ((m = /^(#{1,6}) +(.*)$/.exec(line))) { flush(); out.push(`<h4 class="mb-2 mt-5 font-semibold tracking-tight text-stone-900">${Blocks.inlineHtml(m[2])}</h4>`); }
+        else if ((m = PHOTO.exec(line.trim()))) { flush(); out.push(Blocks.types.photo.toHtml({ file: m[2], alt: Blocks.plain(m[1]) }, ctx)); }
+        else if (/^:::\w*\s*$/.test(line)) continue;
+        else para.push(line.replace(/^> ?/, ''));
+      }
+      flush();
+      return out.join('');
+    },
+    blank: () => ({ md: '' }),
+  });
+}
+
 if (typeof module !== 'undefined') module.exports = Blocks;
 
-// ---- Écran : actif seulement si la page contient #bq ----
-(function () {
-  const root = typeof document !== 'undefined' ? document.getElementById('bq') : null;
-  if (!root) return;
-  const $ = (s, r = root) => r.querySelector(s);
-  const media = root.dataset.media;
-  const csrf = root.dataset.csrf;
-  const saveUrl = root.dataset.save;
-  const previewUrl = root.dataset.preview;
-  const uploadUrl = root.dataset.upload;
-  const canvas = $('[data-canvas]');
-  const pill = $('[data-pill]');
-  const status = $('[data-status]');
-  const titleEl = $('[data-title]');
-  const iconEl = $('[data-icon]');
-  const toast = $('[data-toast]');
-  const T = Blocks.TYPES;
-
-  let slug = root.dataset.slug;
-  let icon = '';
-  let blocks = [];
-  let dirty = false;
-  let guestMode = false;
-  let insertAt = null; // null = en bas
-  let deleteId = null;
-  let activeBlockId = null;
-  let fullscreenId = null;
-  let nextId = 1;
-
-  const ic = (name, cls = 'size-4') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#ic-${name}"/></svg>`;
-  const esc = Blocks.esc;
-  const attr = (s) => esc(s).replace(/"/g, '&quot;');
-  const showToast = (text) => {
-    $('[data-toast-text]').textContent = text;
-    toast.classList.remove('opacity-0');
-    clearTimeout(showToast.timer);
-    showToast.timer = setTimeout(() => toast.classList.add('opacity-0'), 1800);
-  };
-
-  // ---- État enregistré (grisé) / à enregistrer (vert avec icône disquette) ----
-  const setDirty = (value) => {
-    if (dirty === value && status.innerHTML !== '') return;
-    dirty = value;
-    status.innerHTML = `${ic('save', 'size-3.5')} <span>${value ? 'Enregistrer' : 'Enregistré'}</span>`;
-    status.disabled = !value;
-    status.className = value
-      ? 'inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-brand-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-brand-700 active:scale-95 transition-all'
-      : 'inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-400 transition-all';
-  };
-  addEventListener('beforeunload', (event) => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
-
-  // ---- Titre et icône de la rubrique : « ## 🔑 Arrivée » ----
-  const splitHeading = Blocks.splitHeading;
-  const heading = () => '## ' + [icon, titleEl.textContent.trim()].filter(Boolean).join(' ');
-  const showIcon = () => { iconEl.textContent = icon || '📄'; };
-
-  // ---- Lecture de l'écran vers le modèle (avant tout nouveau dessin) ----
-  const syncFromDom = () => {
-    if (guestMode) return;
-    canvas.querySelectorAll('[data-id]').forEach((card) => {
-      const b = blocks.find((x) => x.id === card.dataset.id);
-      if (!b) return;
-      const rich = (sel) => $(sel, card)?.innerHTML ?? '';
-      if (['title', 'text', 'tip', 'advice', 'warning'].includes(b.type)) b.html = rich('[data-body]');
-      else if (b.type === 'photo') b.alt = $('[data-body]', card).textContent;
-      else if (b.type === 'video') b.url = $('[data-url]', card).value;
-      else if (b.type === 'raw') b.md = $('[data-raw]', card).value;
-    });
-  };
-  const markdown = () => {
-    syncFromDom();
-    return Blocks.serialize(heading(), blocks.map((b) => ({ text: Blocks.toMarkdown(b) })));
-  };
-
-  // ---- Dessin : bouton + Insérer au milieu SANS trait horizontal ----
-  const gapBtn = 'inline-flex h-7 items-center justify-center gap-1 rounded-full border border-stone-200/90 bg-white px-3 text-[11px] font-bold text-stone-600 shadow-sm transition-all hover:border-stone-400 hover:bg-stone-50 active:scale-95';
-  const gap = (index, label) => {
-    const canMerge = index > 0 && index < blocks.length && Blocks.merge(blocks[index - 1], blocks[index]) !== null;
-    return `<div class="flex items-center justify-center gap-2 py-2.5">
-      <button type="button" data-insert="${index}" aria-label="${label}" class="${gapBtn}">${ic('plus', 'size-3.5')}<span>Insérer</span></button>
-      ${canMerge ? `<button type="button" data-merge="${index}" aria-label="Fusionner le bloc n°${index + 1} dans le bloc n°${index}" class="${gapBtn}">${ic('fold_vertical', 'size-3.5')}<span>Fusionner</span></button>` : ''}
-    </div>`;
-  };
-
-  const editable = (cls, html, ph, extra = '') => `<div ${extra} contenteditable="true" role="textbox" aria-multiline="true" spellcheck="false" data-placeholder="${attr(ph)}" class="bq-edit ${cls}">${html}</div>`;
-
-  const body = (b) => {
-    switch (b.type) {
-      case 'title': return editable('font-news text-base sm:text-lg font-semibold leading-tight tracking-tight text-stone-900', b.html, 'Saisissez un titre de section…', 'data-body data-plain');
-      case 'photo': return `<div class="space-y-2">${b.file ? `<div class="overflow-hidden rounded-xl border border-stone-200 bg-stone-100"><img src="${attr(media + b.file)}" alt="" class="h-36 w-full object-cover"></div>` : ''}
-          ${editable('text-xs italic text-stone-600', esc(b.alt), 'Légende de la photo (lue aux personnes malvoyantes)…', 'data-body data-plain')}</div>`;
-      case 'video': return `<div class="space-y-2"><div class="flex h-24 flex-col items-center justify-center gap-1 rounded-xl bg-stone-900 text-white"><span class="flex size-9 items-center justify-center rounded-full bg-white/20">${ic('video', 'size-4')}</span><span class="text-[11px] text-stone-300">Lecteur affiché à l’invité</span></div>
-          <input data-url type="url" value="${attr(b.url)}" class="w-full rounded-lg border border-rose-200 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo"></div>`;
-      case 'raw': return `<div class="space-y-1"><textarea data-raw rows="3" class="w-full rounded-xl border border-stone-300 bg-white p-3 font-mono text-xs leading-5" aria-label="Contenu du bloc">${esc(b.md)}</textarea></div>`;
-      default: return editable('min-h-10 text-sm leading-relaxed', b.html, 'Insérez votre texte…', 'data-body data-rich');
-    }
-  };
-
-  // Structure de bloc :
-  // (type contenu)   []fullscreen   | haut
-  // contenu                         | drag
-  //                  []poubelle     | bas
-  const card = (b, i) => {
-    const t = T[b.type];
-    const isTitle = b.type === 'title';
-    const isFull = fullscreenId === b.id;
-    const canFullscreen = ['text', 'tip', 'advice', 'warning', 'raw'].includes(b.type);
-    const head = Blocks.TEXT_KEYS.includes(b.type)
-      ? `<div class="relative inline-flex items-center">${ic(t.icon, 'pointer-events-none absolute left-2.5 size-3.5 opacity-80')}
-          <select data-convert aria-label="Type du bloc" class="cursor-pointer appearance-none rounded-full border py-0.5 pl-7 pr-6 text-[11px] font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${t.badge}">
-            ${Blocks.TEXT_KEYS.map((k) => `<option value="${k}" ${k === b.type ? 'selected' : ''}>${T[k].label}</option>`).join('')}</select>
-          ${ic('chevron_down', 'pointer-events-none absolute right-2 size-3 opacity-70')}</div>`
-      : `<span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${t.badge}">${ic(t.icon, 'size-3.5')}<span>${t.label}</span></span>`;
-    const fsBtn = canFullscreen
-      ? `<button type="button" data-fullscreen aria-label="${isFull ? 'Quitter le plein écran' : 'Plein écran'}" title="${isFull ? 'Quitter le plein écran' : 'Plein écran'}" class="-mr-1.5 -mt-1 flex size-8 items-center justify-center rounded-xl text-stone-500 hover:bg-black/5 hover:text-stone-900">${ic(isFull ? 'minimize' : 'maximize', 'size-3.5')}</button>`
-      : '<span></span>';
-    const rail = (name, act, label, disabled) => `<button type="button" data-move="${act}" ${disabled ? 'disabled' : ''} aria-label="${label}" class="flex ${isTitle ? 'size-7' : 'size-8'} items-center justify-center rounded-lg text-stone-500 active:bg-white/80 disabled:pointer-events-none disabled:opacity-20">${ic(name, 'size-3.5')}</button>`;
-    return `<article data-id="${b.id}" class="bq-card flex items-stretch overflow-hidden rounded-2xl border ${t.card} ${isFull ? 'bq-fullscreen' : ''}">
-        <div class="flex min-w-0 flex-1 flex-col ${isTitle ? 'px-3.5 py-2.5' : 'p-3.5'}">
-          <div class="${isTitle ? 'mb-1' : 'mb-2'} flex items-center justify-between gap-2">${head}${fsBtn}</div>
-          <div class="flex-1">${body(b)}</div>
-          <div class="mt-2 flex justify-end">
-            <button type="button" data-delete aria-label="Supprimer ce bloc" class="-mb-1 -mr-1.5 flex size-8 items-center justify-center rounded-xl text-red-600 hover:bg-red-50 active:bg-red-100">${ic('trash2', 'size-3.5')}</button>
-          </div>
-        </div>
-        <div class="flex w-10 shrink-0 select-none flex-col items-center justify-between border-l border-black/5 bg-black/[0.02] py-1">
-          ${rail('chevron_up', '-1', 'Monter ce bloc', i === 0)}
-          <div data-grip role="button" aria-label="Glisser pour déplacer" class="flex ${isTitle ? 'size-7' : 'size-8'} cursor-grab touch-none items-center justify-center rounded-lg text-stone-400 active:cursor-grabbing">${ic('grip', 'size-3.5')}</div>
-          ${rail('chevron_down', '1', 'Descendre ce bloc', i === blocks.length - 1)}</div></article>`;
-  };
-
-  const render = () => (guestMode ? renderGuest() : renderEdit());
-  const renderEdit = () => {
-    canvas.innerHTML = `${blocks.length ? gap(0, 'Insérer un bloc au début') : ''}${blocks.map((b, i) => card(b, i) + (i < blocks.length - 1 ? gap(i + 1, 'Insérer un bloc ici') : '')).join('')}
-      <div class="${blocks.length ? 'pt-3' : ''} flex items-center gap-2.5">
-        <button type="button" data-insert="end" class="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-2xl border border-stone-200/90 bg-white px-4 py-2.5 text-xs font-bold text-stone-600 shadow-sm transition-all hover:border-stone-300 hover:bg-stone-50 active:scale-[0.99] sm:text-sm">
-          <span class="flex size-5 items-center justify-center rounded-full bg-stone-100 text-stone-500">${ic('plus', 'size-3.5')}</span><span>Insérer un bloc</span></button>
-      </div>`;
-    pill.hidden = true;
-    canvas.querySelectorAll('.bq-edit').forEach(clean);
-  };
-  const clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };
-
-  const renderGuest = async () => {
-    pill.hidden = true;
-    canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
-    const text = markdown().split('\n').slice(1).join('\n');
-    const data = new FormData();
-    data.set('_csrf', csrf);
-    data.set('text', text);
-    try {
-      // Sans data-preview, le rendu se fait ici (Blocks.toHtml) ; avec, le serveur hôte peut compléter le texte (variables, etc.).
-      const html = previewUrl
-        ? await (await fetch(previewUrl, { method: 'POST', body: data, headers: { 'HX-Request': 'true' } })).text()
-        : Blocks.toHtml(text, media);
-      canvas.innerHTML = `<div class="rounded-2xl bg-white p-4"><h2 class="font-news text-2xl font-bold text-stone-900">${esc((icon + ' ' + titleEl.textContent).trim())}</h2>${html}</div>`;
-    } catch {
-      canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
-    }
-  };
-
-  // ---- Modes ----
-  const setMode = async (guest) => {
-    if (guest === guestMode) return;
-    syncFromDom();
-    guestMode = guest;
-    fullscreenId = null;
-    root.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.mode === 'guest') === guest)));
-    titleEl.contentEditable = String(!guest);
-    render();
-    showToast(guest ? 'Visualisation invité' : 'Mode édition');
-  };
-
-  // ---- Positionnement fluide au-dessus du clavier virtuel mobile lors de l'ajout d'un bloc ----
-  // Règle UX : uniquement déclenché à l'ajout d'un bloc neuf (jamais pendant la frappe ni au focusin sur une liste existante).
-  let addedCard = null;
-  let addedAt = 0;
-  const ensureVisibleAboveKeyboard = (cardEl) => {
-    if (!cardEl || fullscreenId) return;
-    const vh = window.visualViewport ? window.visualViewport.height : innerHeight;
-    const rect = cardEl.getBoundingClientRect();
-    const targetTop = Math.max(96, Math.round(vh * 0.26));
-    if (rect.bottom > vh - 20 || rect.top > vh * 0.5) {
-      const delta = rect.top - targetTop;
-      if (Math.abs(delta) > 16) window.scrollBy({ top: delta, behavior: 'smooth' });
-    }
-  };
-  const scrollAboveKeyboard = (cardEl) => {
-    if (!cardEl) return;
-    addedCard = cardEl;
-    addedAt = Date.now();
-    const field = cardEl.querySelector('[contenteditable], input, textarea');
-    field?.focus({ preventScroll: true });
-    requestAnimationFrame(() => ensureVisibleAboveKeyboard(cardEl));
-    setTimeout(() => ensureVisibleAboveKeyboard(cardEl), 180);
-    setTimeout(() => ensureVisibleAboveKeyboard(cardEl), 360);
-  };
-  window.visualViewport?.addEventListener('resize', () => {
-    if (addedCard && Date.now() - addedAt < 800) {
-      ensureVisibleAboveKeyboard(addedCard);
-    }
-  });
-
-  // ---- Ajout, déplacement, suppression ----
-  const add = (type, at) => {
-    syncFromDom();
-    const b = { id: 'b' + nextId++, ...Blocks.blank(type) };
-    const index = at === null || at > blocks.length ? blocks.length : at;
-    blocks.splice(index, 0, b);
-    setDirty(true);
-    render();
-    const el = canvas.querySelector(`[data-id="${b.id}"]`);
-    el.classList.add('bq-new');
-    scrollAboveKeyboard(el);
-  };
-  const move = (id, delta) => {
-    syncFromDom();
-    const i = blocks.findIndex((b) => b.id === id);
-    const j = i + delta;
-    if (j < 0 || j >= blocks.length) return;
-    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
-    setDirty(true);
-    render();
-    canvas.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  };
-
-  // Le bloc n°index rejoint celui du dessus, qui garde son type.
-  const merge = (index) => {
-    syncFromDom();
-    const fused = Blocks.merge(blocks[index - 1], blocks[index]);
-    if (!fused) return;
-    blocks.splice(index - 1, 2, fused);
-    setDirty(true);
-    render();
-    showToast('Blocs fusionnés');
-  };
-  // Coupe le bloc au curseur : ce qui suit part dans un nouveau bloc du même type, juste en dessous.
-  const split = (range) => {
-    const field = richOf(range.startContainer);
-    const id = field?.closest('[data-id]')?.dataset.id;
-    if (!id) return;
-    const tail = document.createRange();
-    tail.setStart(range.startContainer, range.startOffset);
-    tail.setEnd(field, field.childNodes.length);
-    const box = document.createElement('div');
-    box.append(tail.extractContents());
-    syncFromDom();
-    const i = blocks.findIndex((b) => b.id === id);
-    const nb = { ...blocks[i], id: 'b' + nextId++, html: box.innerHTML };
-    blocks.splice(i + 1, 0, nb);
-    setDirty(true);
-    render();
-    canvas.querySelector(`[data-id="${nb.id}"] [data-body]`)?.focus();
-    showToast('Bloc scindé');
-  };
-
-  const dialog = (name) => document.getElementById('bq-' + name);
-  // Feuilles <dialog> : [data-close] ferme celle qui le contient ; un toucher qui commence ET finit sur le fond la ferme.
-  const outside = (d, event) => {
-    const box = d.getBoundingClientRect();
-    return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
-  };
-  let pressedBackdrop = false;
-  document.querySelectorAll('dialog[id^="bq-"]').forEach((d) => {
-    d.addEventListener('pointerdown', (event) => { pressedBackdrop = event.target === d && outside(d, event); });
-    d.addEventListener('click', (event) => {
-      if (event.target.closest('[data-close]')) d.close();
-      else if (pressedBackdrop && event.target === d && outside(d, event)) d.close();
-      pressedBackdrop = false;
-    });
-  });
-  const openAdd = (at) => {
-    insertAt = at;
-    const n = blocks.length;
-    $('[data-add-where]', dialog('add')).textContent = at === null || at >= n ? `Ajout en bas de fiche (bloc n°${n + 1})` : at === 0 ? 'Insertion tout en haut de la fiche' : `Insertion entre le bloc n°${at} et n°${at + 1}`;
-    dialog('add').showModal();
-  };
-
-  canvas.addEventListener('focusin', (event) => {
-    const cardEl = event.target.closest?.('[data-id]');
-    if (cardEl) activeBlockId = cardEl.dataset.id;
-  });
-  canvas.addEventListener('click', (event) => {
-    const el = event.target;
-    const cardEl = el.closest('[data-id]');
-    const id = cardEl?.dataset.id;
-    if (id) activeBlockId = id;
-    if (el.closest('[data-fullscreen]')) {
-      syncFromDom();
-      fullscreenId = fullscreenId === id ? null : id;
-      render();
-      canvas.querySelector(`[data-id="${id}"] [contenteditable], [data-id="${id}"] textarea`)?.focus();
-      return;
-    }
-    if (el.closest('[data-insert]')) { const v = el.closest('[data-insert]').dataset.insert; syncFromDom(); return openAdd(v === 'end' ? null : Number(v)); }
-    if (el.closest('[data-merge]')) return merge(Number(el.closest('[data-merge]').dataset.merge));
-    if (el.closest('[data-move]')) return move(id, Number(el.closest('[data-move]').dataset.move));
-    if (el.closest('[data-delete]')) {
-      syncFromDom();
-      const b = blocks.find((x) => x.id === id);
-      deleteId = id;
-      const badge = $('[data-del-type]', dialog('delete'));
-      badge.textContent = T[b.type].label;
-      badge.className = `inline-block rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${T[b.type].badge}`;
-      const preview = Blocks.stripTags(Blocks.toMarkdown(b)).replace(/\n/g, ' • ').replace(/^[#>:*\s]+/, '').trim();
-      $('[data-del-preview]', dialog('delete')).textContent = preview ? `« ${preview.slice(0, 140)}${preview.length > 140 ? '…' : ''} »` : '(Bloc sans texte)';
-      $('[data-del-fiche]', dialog('delete')).textContent = titleEl.textContent.trim() || 'cette rubrique';
-      return dialog('delete').showModal();
-    }
-  });
-
-  canvas.addEventListener('change', (event) => {
-    if (!event.target.matches('[data-convert]')) return;
-    syncFromDom();
-    const i = blocks.findIndex((b) => b.id === event.target.closest('[data-id]').dataset.id);
-    blocks[i] = { id: blocks[i].id, ...Blocks.convert(blocks[i], event.target.value) };
-    setDirty(true);
-    render();
-    showToast('Converti en ' + T[blocks[i].type].label);
-  });
-
-  canvas.addEventListener('input', () => {
-    setDirty(true);
-  });
-  canvas.addEventListener('focusout', (event) => {
-    if (event.target.classList?.contains('bq-edit')) clean(event.target);
-  });
-  canvas.addEventListener('paste', (event) => {
-    if (!event.target.closest?.('.bq-edit')) return;
-    event.preventDefault();
-    document.execCommand('insertText', false, event.clipboardData.getData('text/plain'));
-  });
-  canvas.addEventListener('keydown', (event) => {
-    const el = event.target;
-    if (event.key === 'Escape' && fullscreenId) {
-      syncFromDom();
-      fullscreenId = null;
-      render();
-      return;
-    }
-    if (event.key !== 'Enter' || event.shiftKey || !el.matches?.('.bq-edit[data-plain]')) return;
-    event.preventDefault();
-    el.blur();
-  });
-
-  // ---- Suppression confirmée ----
-  dialog('delete').addEventListener('click', (event) => {
-    if (!event.target.closest('[data-del-confirm]')) return;
-    blocks = blocks.filter((b) => b.id !== deleteId);
-    if (fullscreenId === deleteId) fullscreenId = null;
-    deleteId = null;
-    dialog('delete').close();
-    setDirty(true);
-    render();
-    showToast('Bloc supprimé');
-  });
-
-  // ---- Choix du type à ajouter ----
-  const fileInput = $('[data-file]');
-  const tile = (key, flat) => `<button type="button" data-pick="${key}" class="rounded-2xl border p-3 text-left transition-transform active:scale-95 ${flat ? 'flex items-center justify-between gap-2' : 'flex flex-col items-center gap-1.5 text-center'} ${T[key].card}">
-      <span class="flex size-8 shrink-0 items-center justify-center rounded-xl border ${T[key].badge}">${ic(T[key].icon)}</span>
-      <span class="min-w-0 flex-1"><span class="block text-xs font-bold text-stone-900">${T[key].label}</span>${flat ? `<span class="mt-0.5 block text-[11px] leading-snug opacity-75">${T[key].desc}</span>` : ''}</span></button>`;
-  $('[data-add-text]', dialog('add')).innerHTML = Blocks.TEXT_KEYS.map((k) => tile(k, true)).join('');
-  $('[data-add-media]', dialog('add')).innerHTML = Blocks.MEDIA_KEYS.map((k) => tile(k, false)).join('');
-  dialog('add').addEventListener('click', (event) => {
-    const pick = event.target.closest('[data-pick]');
-    if (!pick) return;
-    if (pick.dataset.pick === 'photo') { fileInput.click(); dialog('add').close(); return; }
-    dialog('add').close();
-    add(pick.dataset.pick, insertAt);
-  });
-  fileInput.addEventListener('change', async () => {
-    const file = fileInput.files[0];
-    fileInput.value = '';
-    if (!file) return;
-    showToast('Envoi de la photo…');
-    const data = new FormData();
-    data.set('_csrf', csrf);
-    data.set('photo', file);
-    try {
-      const r = await fetch(uploadUrl, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Envoi impossible');
-      syncFromDom();
-      const b = { id: 'b' + nextId++, ...Blocks.blank('photo'), file: j.id };
-      blocks.splice(insertAt === null || insertAt > blocks.length ? blocks.length : insertAt, 0, b);
-      setDirty(true);
-      render();
-      const el = canvas.querySelector(`[data-id="${b.id}"]`);
-      scrollAboveKeyboard(el);
-      showToast('Photo ajoutée');
-    } catch (error) {
-      showToast(error.message);
-    }
-  });
-
-  // ---- Icône de la rubrique ----
-  dialog('icon').addEventListener('click', (event) => {
-    const pick = event.target.closest('[data-icon-pick]');
-    if (!pick) return;
-    icon = pick.dataset.iconPick;
-    showIcon();
-    setDirty(true);
-    dialog('icon').close();
-    showToast(icon ? `Icône changée en ${icon}` : 'Icône retirée');
-  });
-  // Emoji libre : collé depuis un clavier ou un site ; seul le premier emoji est gardé.
-  dialog('icon').querySelector('[data-icon-use]').addEventListener('click', () => {
-    const input = dialog('icon').querySelector('[data-icon-input]');
-    const picked = Blocks.firstEmoji(input.value);
-    if (!picked) { showToast('Collez un emoji, par exemple 🏡'); return; }
-    icon = picked;
-    input.value = '';
-    showIcon();
-    setDirty(true);
-    dialog('icon').close();
-    showToast(`Icône changée en ${icon}`);
-  });
-  dialog('icon').querySelector('[data-icon-input]').addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') { event.preventDefault(); dialog('icon').querySelector('[data-icon-use]').click(); }
-  });
-  iconEl.closest('button').addEventListener('click', () => dialog('icon').showModal());
-  $('[data-title]').addEventListener('input', () => setDirty(true));
-  titleEl.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); titleEl.blur(); } });
-
-  // ---- Modes, ajout, retour sécurisé, enregistrement ----
-  root.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode === 'guest')));
-  root.querySelectorAll('[data-open-add]').forEach((b) => b.addEventListener('click', () => { syncFromDom(); openAdd(null); }));
-
-  const save = async () => {
-    if (!dirty) return true;
-    const data = new FormData();
-    data.set('_csrf', csrf);
-    data.set('slug', slug);
-    data.set('text', markdown());
-    status.textContent = 'Enregistrement…';
-    try {
-      const r = await fetch(saveUrl, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Enregistrement impossible');
-      if (j.slug !== slug) {
-        slug = j.slug;
-        history.replaceState(null, '', saveUrl + '/' + encodeURIComponent(slug));
-      }
-      setDirty(false);
-      showToast('Sauvegardé');
-      return true;
-    } catch (error) {
-      setDirty(true);
-      showToast(error.message);
-      return false;
-    }
-  };
-  status.addEventListener('click', save);
-
-  // Retour vers les rubriques : modale de confirmation si des modifications ne sont pas enregistrées.
-  const backBtn = $('[data-back]');
-  backBtn?.addEventListener('click', (event) => {
-    if (!dirty) return;
-    event.preventDefault();
-    dialog('leave')?.showModal();
-  });
-  dialog('leave')?.addEventListener('click', async (event) => {
-    if (event.target.closest('[data-leave-discard]')) {
-      dirty = false;
-      return;
-    }
-    if (event.target.closest('[data-leave-save]')) {
-      dialog('leave').close();
-      if (await save()) location.href = backBtn.href;
-    }
-  });
-
-  // ---- Glisser par la poignée (doigt ou souris) ----
-  let drag = null;
-  canvas.addEventListener('pointerdown', (event) => {
-    const grip = event.target.closest('[data-grip]');
-    if (!grip) return;
-    syncFromDom();
-    drag = grip.closest('[data-id]');
-    drag.classList.add('bq-dragging');
-    grip.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (!drag) return;
-    const others = [...canvas.querySelectorAll('[data-id]')].filter((c) => c !== drag);
-    const next = others.find((c) => event.clientY < c.getBoundingClientRect().top + c.offsetHeight / 2);
-    if (next) next.before(drag); else if (others.length) others[others.length - 1].after(drag);
-  });
-  const dropped = () => {
-    if (!drag) return;
-    const order = [...canvas.querySelectorAll('[data-id]')].map((c) => c.dataset.id);
-    drag = null;
-    const same = order.every((id, i) => blocks[i].id === id);
-    if (!same) { blocks.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); setDirty(true); }
-    render();
-  };
-  canvas.addEventListener('pointerup', dropped);
-  canvas.addEventListener('pointercancel', dropped);
-
-  // ---- Pilule de mise en forme style Medium (z-50 : apparaît à la sélection de texte OU sur un appui long, et déplaçable) ----
-  const richOf = (node) => (node && (node.nodeType === 1 ? node : node.parentElement))?.closest('.bq-edit[data-rich], .bq-edit:not([data-plain]):not([data-body])');
-  let pillDismissed = false;
-  let pillForced = false;
-  let pillDrag = null;
-  let longPressTimer = null;
-  let pressPt = null;
-  const placePill = (force = false) => {
-    if (pillDrag) return;
-    if (force) { pillForced = true; pillDismissed = false; }
-    if (guestMode || pillDismissed) { pill.hidden = true; return; }
-    const sel = getSelection();
-    const hasSel = sel && sel.rangeCount > 0 && !sel.isCollapsed;
-    if (!hasSel && !pillForced) { pill.hidden = true; return; }
-    const field = (sel && sel.rangeCount ? richOf(sel.anchorNode) : null) || richOf(document.activeElement);
-    if (!field || !canvas.contains(field) || field.hasAttribute('data-plain')) { pill.hidden = true; return; }
-    let rect = sel && sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : { width: 0, height: 0, top: 0, bottom: 0, left: 0 };
-    if (rect.width === 0 && rect.height === 0) {
-      const fRect = field.getBoundingClientRect();
-      rect = pressPt ? { left: pressPt.x, width: 0, top: pressPt.y - 10, bottom: pressPt.y + 10 } : fRect;
-    }
-    pill.hidden = false;
-    const w = pill.offsetWidth;
-    const h = pill.offsetHeight;
-    const minTop = fullscreenId ? 12 : 72;
-    const top = rect.top - h - 8;
-    pill.style.left = Math.max(8, Math.min(innerWidth - w - 8, rect.left + rect.width / 2 - w / 2)) + 'px';
-    pill.style.top = (top < minTop ? rect.bottom + 8 : top) + 'px';
-  };
-  document.addEventListener('selectionchange', () => { pillDismissed = false; placePill(); });
-  canvas.addEventListener('input', () => { pillForced = false; });
-  canvas.addEventListener('keydown', () => { pillForced = false; pill.hidden = true; });
-  canvas.addEventListener('pointerdown', (event) => {
-    clearTimeout(longPressTimer);
-    const field = richOf(event.target);
-    if (!field || field.hasAttribute('data-plain')) { pillForced = false; return; }
-    pressPt = { x: event.clientX, y: event.clientY };
-    longPressTimer = setTimeout(() => placePill(true), 450);
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (pressPt && (Math.abs(event.clientX - pressPt.x) > 10 || Math.abs(event.clientY - pressPt.y) > 10)) {
-      clearTimeout(longPressTimer);
-    }
-  });
-  canvas.addEventListener('pointerup', () => clearTimeout(longPressTimer));
-  canvas.addEventListener('pointercancel', () => clearTimeout(longPressTimer));
-  canvas.addEventListener('contextmenu', (event) => {
-    if (event.target.closest?.('.bq-edit')) {
-      event.preventDefault();
-      clearTimeout(longPressTimer);
-      pressPt = { x: event.clientX || innerWidth / 2, y: event.clientY || 160 };
-      placePill(true);
-    }
-  });
-  document.addEventListener('pointerdown', (event) => {
-    if (!pill.hidden && !pill.contains(event.target) && !richOf(event.target)) { pillForced = false; pill.hidden = true; }
-  });
-  addEventListener('scroll', () => { if (!pill.hidden && !pillDrag) placePill(); }, { passive: true });
-  const keepSelection = (event) => event.preventDefault();
-  pill.addEventListener('mousedown', keepSelection);
-  pill.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    const grip = event.target.closest('[data-pill-grip]');
-    if (!grip) return;
-    pillDrag = { dx: event.clientX - pill.offsetLeft, dy: event.clientY - pill.offsetTop };
-    grip.setPointerCapture(event.pointerId);
-  });
-  pill.addEventListener('pointermove', (event) => {
-    if (!pillDrag) return;
-    pill.style.left = Math.max(8, Math.min(innerWidth - pill.offsetWidth - 8, event.clientX - pillDrag.dx)) + 'px';
-    pill.style.top = Math.max(8, Math.min(innerHeight - pill.offsetHeight - 8, event.clientY - pillDrag.dy)) + 'px';
-  });
-  const endPillDrag = () => { pillDrag = null; };
-  pill.addEventListener('pointerup', endPillDrag);
-  pill.addEventListener('pointercancel', endPillDrag);
-  const unwrapMarks = (range) => {
-    const scope = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
-    scope.closest('.bq-edit')?.querySelectorAll('mark').forEach((m) => {
-      if (range.intersectsNode(m)) m.replaceWith(...m.childNodes);
-    });
-  };
-  pill.addEventListener('click', (event) => {
-    if (event.target.closest('[data-pill-close]')) { pillDismissed = true; pill.hidden = true; return; }
-    if (event.target.closest('[data-split]')) { const sel = getSelection(); if (sel.rangeCount) split(sel.getRangeAt(0)); return; }
-    const button = event.target.closest('[data-fmt]');
-    if (!button) return;
-    const sel = getSelection();
-    if (!sel.rangeCount) return;
-    const what = button.dataset.fmt;
-    const range = sel.getRangeAt(0);
-    if (what === 'highlight') {
-      if (range.collapsed) return;
-      const inside = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement).closest('mark');
-      if (inside) unwrapMarks(range);
-      else { const m = document.createElement('mark'); m.className = 'bq-highlight'; m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
-    } else if (what === 'clear') {
-      document.execCommand('removeFormat');
-      unwrapMarks(sel.getRangeAt(0));
-    } else document.execCommand(what);
-    setDirty(true);
-  });
-
-  // ---- Chargement ----
-  const load = (md) => {
-    const { title, blocks: parsed } = Blocks.parse(md);
-    const h = splitHeading(title);
-    icon = h.icon;
-    titleEl.textContent = h.title;
-    showIcon();
-    blocks = parsed.map((p) => ({ id: 'b' + nextId++, ...Blocks.fromMarkdown(p.text) }));
-    if (blocks.length === 0) {
-      blocks = [{ id: 'b' + nextId++, type: 'text', html: '' }];
-    }
-    render();
-  };
-  load($('[data-source]').value);
-  setDirty(false);
-  root.hidden = false;
-})();

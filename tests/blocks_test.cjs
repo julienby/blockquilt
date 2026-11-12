@@ -98,7 +98,7 @@ ok(JSON.stringify(Blocks.splitHeading('## 🇫🇷 Accueil')) === JSON.stringify
 // Visualisation invité : Blocks.toHtml rend photos, encadrés sémantiques, titres, vidéos ; tout le texte est échappé.
 const view = Blocks.toHtml(sample.split('\n').slice(1).join('\n'), '/m/');
 ok(view.includes('<img src="/m/abcdef123456" alt="Piscine"'), 'aperçu : photo affichée avec l’adresse des médias et sa légende');
-ok(view.includes(`data-type="tip" class="my-4 rounded-2xl border p-4 leading-7 ${Blocks.TYPES.tip.card}"`) && view.includes('Garez-vous à gauche.'), 'aperçu : astuce dans un encadré vert, teinte de l’éditeur');
+ok(view.includes(`data-type="tip" class="my-4 rounded-2xl border p-4 leading-7 ${Blocks.TYPES.tip.tone.card}"`) && view.includes('Garez-vous à gauche.'), 'aperçu : astuce dans un encadré vert, teinte de l’éditeur');
 ok(view.includes('data-type="warning"') && view.includes('Ne pas fumer.'), 'aperçu : consigne dans un encadré ambre');
 ok(Blocks.toHtml('> 🧭 Le Fournil, à 150 m.').includes('data-type="advice"'), 'aperçu : conseil local dans un encadré lavande');
 ok(/<h3[^>]*>Garage<\/h3>/.test(view), 'aperçu : titre de section');
@@ -110,5 +110,21 @@ const evil = Blocks.toHtml('<script>alert(1)</script>\n\n[x](javascript:alert(1)
 ok(!evil.includes('<script') && !evil.includes('href="javascript') && !evil.includes('"onerror'), 'aperçu : HTML échappé, liens javascript: refusés, adresses de photo échappées');
 ok(Blocks.toHtml('## Pas un titre de rubrique').includes('Pas un titre de rubrique') && Blocks.toHtml('') === '<div class="bq-view"></div>', 'aperçu : « ## » en tête de texte gardé, texte vide');
 ok(Blocks.toHtml(':::sensible\nCode : 1234\n:::').includes('Code : 1234'), 'aperçu : ancien :::sensible affiché en texte');
+
+// Registre : un type inconnu enregistré à la volée est lu, écrit et rendu sans toucher au reste.
+Blocks.register('demo', {
+  label: 'Démo', icon: 'sliders', group: 'media',
+  match: (t) => { const m = /^:::demo\n([\s\S]*)\n:::$/.exec(t); return m ? { body: m[1] } : null; },
+  toMarkdown: (b) => (b.body ? `:::demo\n${b.body}\n:::` : ''),
+  toHtml: (b) => `<div class="demo">${Blocks.esc(b.body)}</div>`,
+  blank: () => ({ body: '' }),
+});
+const demo = Blocks.fromMarkdown(':::demo\nbonjour <b>\n:::');
+ok(demo.type === 'demo' && demo.body === 'bonjour <b>', 'registre : type « demo » lu');
+ok(Blocks.toMarkdown(demo) === ':::demo\nbonjour <b>\n:::', 'registre : type « demo » écrit à l’identique');
+ok(Blocks.toHtml(':::demo\nx < y\n:::').includes('<div class="demo">x &lt; y</div>'), 'registre : type « demo » rendu');
+ok(Blocks.blank('demo').type === 'demo' && Blocks.blank('demo').body === '' && !Blocks.TEXT_KEYS.includes('demo'), 'registre : bloc neuf, pas convertible');
+ok(Blocks.fromMarkdown(':::autre\nx\n:::').type === 'raw', 'registre : syntaxe inconnue toujours en « raw »');
+delete Blocks.types.demo; Blocks.order.splice(Blocks.order.indexOf('demo'), 1);
 
 process.exit(failed ? 1 : 0);

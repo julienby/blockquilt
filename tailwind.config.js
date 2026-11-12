@@ -1,5 +1,5 @@
 module.exports = {
-  content: ['./index.html', './blockquilt.js'],
+  content: ['./index.html', './blockquilt.js', './blockquilt-editor.js'],
   theme: {
     extend: {
       // Bleu du logo (#075985) décliné en gamme et deux polices hébergées (assets/fonts).
