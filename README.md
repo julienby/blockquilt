@@ -55,3 +55,7 @@ Ce sont les points à reprendre pour faire de blockquilt un produit facile à in
 - `app.js` est copié entier ;
 - l'identifiant `#ehg` et les classes `ehg-*` ;
 - dans l'app, l'en-tête de l'éditeur porte `md:top-[61px]` (hauteur de la barre de l'app). Ce décalage est retiré de `index.html`.
+
+## Licence
+
+MIT (voir `LICENSE`). Les polices de `fonts/` restent sous leur propre licence, SIL OFL 1.1.
