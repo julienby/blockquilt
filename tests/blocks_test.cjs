@@ -9,7 +9,7 @@ const types = (md) => Blocks.parse(md).blocks.map((b) => b.type).join();
 // ---- Fixtures : un fichier par type, un document complet. Aller-retour exact. ----
 const FIX = path.join(__dirname, 'fixtures');
 const expected = {
-  'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
+  'h1.md': 'h1', 't.md': 't1,t2,t3', 'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
   'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
 };
@@ -96,7 +96,7 @@ for (const md of ['Bonjour **tout le monde**, voir *ici*.', 'Ligne un\nLigne deu
   'Du `code` ici', '```js\nlet a = `x`;\n```', '````\n```\nimbriqué\n```\n````', '---']) {
   ok(roundtrip(md), 'aller-retour : ' + JSON.stringify(md));
 }
-ok(['| a | b |\n|---|---|\n| 1 | 2 |', '# Titre un', 'a\n---', ':::columns\nx\n:::'].every((md) => kind(md) === 'raw' && Blocks.toMarkdown(Blocks.fromMarkdown(md)) === md), 'ce que l’éditeur ne sait pas refaire reste intact (tableau, titre #, « --- » collé, colonnes)');
+ok(['| a | b |\n|---|---|\n| 1 | 2 |', '#### Titre quatre', 'a\n---', ':::columns\nx\n:::'].every((md) => kind(md) === 'raw' && Blocks.toMarkdown(Blocks.fromMarkdown(md)) === md), 'ce que l’éditeur ne sait pas refaire reste intact (tableau, titre ####, « --- » collé, colonnes)');
 ok(Blocks.toMarkdown(Blocks.fromMarkdown('- pain \n- lait')) === '- pain\n- lait', 'espaces en fin de ligne : ignorés');
 
 // ---- Ce que produit le navigateur en modifiant ----
@@ -119,7 +119,17 @@ ok(Blocks.toMarkdown({ type: 'photo', src: 'media/aabbccddeeff', alt: 'La [pisci
 ok(Blocks.toMarkdown({ type: 'code', lang: 'js', code: 'a\n```\nb' }) === '````js\na\n```\nb\n````', 'code : clôture plus longue que le code');
 
 // ---- Conversion entre types texte : aucune ligne perdue ----
-ok(Blocks.TEXT_KEYS.join() === 'h2,h3,text,quote,info,tip,success,warning,danger', 'types texte convertibles');
+ok(Blocks.TEXT_KEYS.join() === 'h1,h2,h3,t1,t2,t3,text,quote,info,tip,success,warning,danger', 'types texte convertibles');
+
+// ---- H1, et texte en grand T1 / T2 / T3 (taille d'un titre, sans sa sémantique) ----
+ok(kind('# Grand titre') === 'h1' && roundtrip('# Grand titre') && kind('## Deux') === 'h2', 'H1 : « # Titre », distinct de « ## »');
+ok(Blocks.toHtml('# Été chaud', { title: false }).includes('<h1 id="ete-chaud">Été chaud</h1>'), 'H1 : rendu <h1> avec ancre');
+ok(!Blocks.toHtml('---\ntitle: Doc\n---\n\n# Vrai titre').includes('Doc') && Blocks.toHtml('---\ntitle: Doc\n---\n\n# Vrai titre').split('<h1').length === 2, 'H1 : avec un bloc H1, pas de second <h1> tiré du frontmatter');
+for (const md of [':::t1\nBienvenue', ':::t2\nDeux\nlignes', ':::t3\nUn **mot** et un [lien](https://exemple.fr)']) ok(roundtrip(md + '\n:::'), 'texte en grand, aller-retour : ' + JSON.stringify(md));
+const big = Blocks.toHtml(':::t1\nGros **texte**\n:::', { title: false });
+ok(big.includes('<div class="bq-t1"><p>Gros <strong>texte</strong></p></div>') && !/<h\d/.test(big), 'texte en grand : paragraphe <div class="bq-t1"><p>, aucune balise de titre');
+ok(kind(':::t1\n## pas un titre\n:::') === 'raw' && kind(':::t4\nx\n:::') === 'raw', 'texte en grand : ligne de titre dedans ou T4 → bloc source');
+ok(Blocks.lint('# Titre\n\n:::t2\nGrand\n:::').length === 0, 'lint : H1 et texte en grand sans alerte');
 const L = (b) => Blocks.lines(b).map((h) => Blocks.stripTags(h).trim());
 const start = { type: 'text', html: 'Allumez la machine<br>Attendez 15 s<br><b>Servez</b>' };
 for (const from of Blocks.TEXT_KEYS) {

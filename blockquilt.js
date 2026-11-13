@@ -415,13 +415,14 @@ const Blocks = {
   /** Un bloc → HTML. `ctx` : { media, ids } (ids : ancres déjà prises dans la page). */
   blockHtml(b, ctx = {}) { return Blocks.def(b.type).toHtml(b, { media: 'media/', ids: new Set(), ...ctx }); },
 
-  /** Texte complet → `<article class="bq-content">`. options : { media: 'media/', title: true (h1 depuis le frontmatter) }. */
+  /** Texte complet → `<article class="bq-content">`. options : { media: 'media/', title: true (h1 depuis le frontmatter, s'il n'y a pas de bloc H1) }. */
   toHtml(markdown, options = {}) {
     const { media = 'media/', title = true } = typeof options === 'string' ? { media: options } : options;
     const { meta, blocks } = Blocks.parse(markdown);
     const ctx = { media, ids: new Set() };
     const icon = meta.icon ? `<span class="bq-icon" aria-hidden="true">${Blocks.esc(meta.icon)}</span> ` : '';
-    const head = title && meta.title ? `<header><h1>${icon}${Blocks.esc(meta.title)}</h1></header>\n` : '';
+    // Titre du frontmatter en <h1>, sauf si le contenu a déjà son bloc H1 : jamais deux <h1>.
+    const head = title && meta.title && !blocks.some((b) => b.type === 'h1') ? `<header><h1>${icon}${Blocks.esc(meta.title)}</h1></header>\n` : '';
     return `<article class="bq-content">\n${head}${blocks.map((b) => Blocks.def(b.type).toHtml(b, ctx)).filter(Boolean).join('\n')}\n</article>`;
   },
 };
@@ -433,7 +434,7 @@ const Blocks = {
   const lead = /^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)/;
   const tone = (card, badge) => ({ card, badge });
 
-  // Bordure noire : épaisse pour H2, fine pour H3 — la page se lit par sections.
+  // Bordure noire : 3 px pour H1, 2 px pour H2, 1 px pour H3 — la page se lit par sections.
   const heading = (type, level, label, border) => Blocks.register(type, {
     label, short: label.replace('Titre ', ''), icon: 'heading', convertible: true, single: true,
     tone: tone(`bg-white ${border} text-stone-900`, 'bg-stone-100 text-stone-700 border-stone-200/90'),
@@ -448,8 +449,26 @@ const Blocks = {
     },
     blank: () => ({ html: '' }),
   });
+  heading('h1', 1, 'Titre H1', 'border-[3px] border-stone-900');
   heading('h2', 2, 'Titre H2', 'border-2 border-stone-900');
   heading('h3', 3, 'Titre H3', 'border-stone-900');
+
+  // Texte en grand (taille H1, H2, H3) sans la sémantique d'un titre : un paragraphe, hors du plan de la page et des ancres.
+  // `:::t1` … `:::` (comme `:::carousel`), le texte en Markdown entre les deux.
+  for (const [n, cls] of [[1, 'text-2xl font-extrabold'], [2, 'text-xl font-bold'], [3, 'text-[17px] font-bold']]) {
+    Blocks.register('t' + n, {
+      label: `Texte T${n} (taille H${n})`, short: 'T' + n, icon: 'type', convertible: true, size: cls,
+      tone: tone('bg-white border-dashed border-stone-400 text-stone-900', 'bg-stone-100 text-stone-700 border-stone-300'),
+      match: (t) => {
+        const m = new RegExp(`^:::t${n}\n([\\s\\S]+)\n:::$`).exec(t);
+        if (!m || m[1].split('\n').some((l) => lead.test(l))) return null;
+        return { html: Blocks.linesToHtml(m[1].split('\n')) };
+      },
+      toMarkdown: (b) => { const x = body(b.html); return x.trim() ? `:::t${n}\n${x}\n:::` : ''; },
+      toHtml: (b) => `<div class="bq-t${n}">${Blocks.flowHtml(body(b.html).split('\n'))}</div>`,
+      blank: () => ({ html: '' }),
+    });
+  }
 
   Blocks.register('text', {
     label: 'Texte', short: 'Texte', icon: 'align_left', convertible: true,
