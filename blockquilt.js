@@ -430,9 +430,10 @@ const Blocks = {
   const lead = /^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)/;
   const tone = (card, badge) => ({ card, badge });
 
-  const heading = (type, level, label) => Blocks.register(type, {
+  // Bordure noire : épaisse pour H2, fine pour H3 — la page se lit par sections.
+  const heading = (type, level, label, border) => Blocks.register(type, {
     label, short: label.replace('Titre ', ''), icon: 'heading', convertible: true, single: true,
-    tone: tone('bg-white border-stone-300/90 text-stone-900', 'bg-stone-100 text-stone-700 border-stone-200/90'),
+    tone: tone(`bg-white ${border} text-stone-900`, 'bg-stone-100 text-stone-700 border-stone-200/90'),
     match: (t) => { const m = new RegExp(`^#{${level}} (.+)$`).exec(t); return m ? { html: Blocks.esc(Blocks.plain(m[1])) } : null; },
     toMarkdown: (b) => { const x = Blocks.htmlToMd(Blocks.esc(Blocks.stripTags(b.html))).replace(/\n+/g, ' ').trim(); return x ? '#'.repeat(level) + ' ' + x : ''; },
     toHtml: (b, ctx) => {
@@ -444,8 +445,8 @@ const Blocks = {
     },
     blank: () => ({ html: '' }),
   });
-  heading('h2', 2, 'Titre H2');
-  heading('h3', 3, 'Titre H3');
+  heading('h2', 2, 'Titre H2', 'border-2 border-stone-900');
+  heading('h3', 3, 'Titre H3', 'border-stone-900');
 
   Blocks.register('text', {
     label: 'Texte', short: 'Texte', icon: 'align_left', convertible: true,

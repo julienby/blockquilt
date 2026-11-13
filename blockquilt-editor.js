@@ -298,8 +298,9 @@
     const pill = 'inline-flex h-7 items-center gap-1 rounded-full border border-stone-200/90 bg-white px-2.5 text-[11px] font-bold text-stone-500 shadow-sm group-hover:border-stone-400 group-hover:text-stone-800';
     const gap = (index) => {
       const canMerge = index > 0 && index < blocks.length && Blocks.merge(blocks[index - 1], blocks[index]) !== null;
-      return `<div class="bq-gap -my-1.5 flex justify-center gap-1">
-        <button type="button" data-insert="${index}" aria-label="Insérer un bloc ici" class="group flex h-11 items-center px-1"><span class="${pill}">${ic('plus', 'size-3.5')}Insérer</span></button>
+      // Intervalle aéré : la pastille de 28 px est à 12 px de chaque carte (cible tactile de 44 px + 4 px de marge).
+      return `<div class="bq-gap flex justify-center gap-1 py-1">
+        <button type="button" data-insert="${index}" aria-label="${index === 0 ? 'Insérer un bloc au début' : 'Insérer un bloc ici'}" class="group flex h-11 items-center px-1"><span class="${pill}">${ic('plus', 'size-3.5')}Insérer</span></button>
         ${canMerge ? `<button type="button" data-merge="${index}" aria-label="Fusionner avec le bloc du dessus" class="group flex h-11 items-center px-1"><span class="${pill}">${ic('merge', 'size-3.5')}Fusionner</span></button>` : ''}</div>`;
     };
     const badge = (b) => {
@@ -331,7 +332,7 @@
     const editorOf = (b) => (def(b).edit && (b.type !== 'html' || o.html) ? def(b) : Blocks.fallbackEditor);
     const render = () => (preview ? renderPreview() : renderEdit());
     const renderEdit = () => {
-      canvas.innerHTML = `<div class="relative mx-auto max-w-3xl">${blocks.map((b, i) => (i ? gap(i) : '') + card(b, i)).join('')}
+      canvas.innerHTML = `<div class="relative mx-auto max-w-3xl">${blocks.map((b, i) => gap(i) + card(b, i)).join('')}
         <button type="button" data-insert="end" class="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
       canvas.querySelectorAll('.bq-edit').forEach(clean);
     };

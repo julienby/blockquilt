@@ -184,6 +184,27 @@ try {
   }
   await viewport(375);
 
+  // ---- Evol2 : intervalles aérés, insertion au début, bordures des titres ----
+  await open();
+  const spacing = await ev(`(() => {
+    const out = [];
+    document.querySelectorAll('[data-bq] .bq-gap').forEach((g) => {
+      const pill = g.querySelector('span').getBoundingClientRect();
+      const prev = g.previousElementSibling?.getBoundingClientRect();
+      const next = g.nextElementSibling.getBoundingClientRect();
+      if (prev) out.push(pill.top - prev.bottom);
+      out.push(next.top - pill.bottom);
+    });
+    return Math.min(...out);
+  })()`);
+  ok(spacing >= 10, `Insérer / Fusionner : au moins 10 px entre la pastille et les blocs (${spacing} px)`);
+  ok(await ev(`(() => { const first = document.querySelector('[data-bq] [data-canvas] > div').firstElementChild; return first.matches('.bq-gap') && !!first.querySelector('[data-insert="0"]') && !first.querySelector('[data-merge]'); })()`), 'insérer en première position : bouton avant le premier bloc');
+  await ev(`document.querySelector('[data-insert="0"]').click()`);
+  await ev(`document.querySelector('[data-sheet="add"] [data-pick="hr"]').click()`);
+  ok(await ev(`Blocks.parse(editor.getMarkdown()).blocks[0].type === 'hr'`), 'insérer en première position : le bloc arrive en tête');
+  const borders = await ev(`(() => { editor.setMarkdown('## Section\\n\\n### Sous-section'); const w = (t) => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === t); const s = getComputedStyle(c); return s.borderTopWidth + ' ' + s.borderTopColor; }; return { h2: w('h2'), h3: w('h3') }; })()`);
+  ok(borders.h2 === '2px rgb(28, 25, 23)' && borders.h3 === '1px rgb(28, 25, 23)', `bordure noire : H2 épaisse, H3 fine (${JSON.stringify(borders)})`);
+
   // ---- Deux éditeurs dans la même page, puis destroy() ----
   await open();
   const two = await ev(`(() => {
