@@ -34,6 +34,8 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 
 `mount` renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
 
+Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte, sans l'habillage de la carte). C'est un `<dialog>` qui couvre la fenêtre ; quand le navigateur le permet, il passe aussi en plein écran (barre d'adresse masquée). Échap ou « Terminer » quittent les deux.
+
 | Option | Rôle |
 |---|---|
 | `source` | Texte du document au format blockquilt. |
@@ -45,6 +47,7 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 | `backUrl` | Bouton retour (avec confirmation si des modifications ne sont pas enregistrées). |
 | `fields` | Champs ajoutés à chaque envoi (par exemple un jeton CSRF). |
 | `html` | `true` pour proposer le bloc HTML (désactivé par défaut). |
+| `width` | Largeur maximale du texte (CSS, `48rem` par défaut ; `100%` pour toute la largeur). L'éditeur prend la largeur de l'élément qui le contient : il s'intègre dans n'importe quelle mise en page. Aussi réglable en CSS : `--bq-width`. En plein écran, un bouton fait le tour de trois largeurs. |
 | `emojiUrl` | Adresse de `emoji.json` (par défaut, à côté de `blockquilt-editor.js`). Chargé au premier usage du sélecteur. |
 
 ### Échanges avec le serveur

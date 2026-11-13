@@ -15,6 +15,7 @@
     images: '<path d="M18 22H4a2 2 0 0 1-2-2V6"/><path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18"/><circle cx="12" cy="8" r="2"/><rect width="16" height="16" x="6" y="2" rx="2"/>',
     video: '<path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
     minus: '<path d="M5 12h14"/>',
+    width: '<path d="M21 12H3"/><path d="m7 8-4 4 4 4"/><path d="m17 8 4 4-4 4"/>',
     code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
     html: '<path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/>',
     sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
@@ -136,7 +137,7 @@
     const timers = new Set();
     const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); return t; };
 
-    element.innerHTML = `<div data-bq class="bq-app flex min-h-full w-full flex-col bg-white font-jakarta text-stone-800">
+    element.innerHTML = `<div data-bq class="bq-app flex min-h-full w-full flex-col bg-white font-jakarta text-stone-800"${o.width ? ` style="--bq-width: ${attr(o.width)}"` : ''}>
       <header data-head class="sticky top-0 z-20 flex min-h-14 items-center gap-0.5 border-b border-stone-200/80 bg-white/95 px-1.5 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-3">
         ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn text-stone-500">${ic('chevron_left')}</a>` : ''}
         <button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
@@ -146,6 +147,7 @@
         <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn text-stone-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
         ${o.aiUrl ? `<button type="button" data-ai aria-label="Assistant IA" title="Assistant IA" class="bq-btn hidden text-amber-600 sm:inline-flex">${ic('wand')}</button>` : ''}
         <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative text-stone-400">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
+        <button type="button" data-width hidden aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn text-stone-600 max-sm:hidden">${ic('width')}</button>
         <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('maximize')}</button>
         <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn text-stone-600 sm:hidden">${ic('more')}</button>
       </header>
@@ -194,18 +196,20 @@
         <div data-emoji-grid class="mt-1 grid h-[min(19rem,42dvh)] grid-cols-7 content-start overflow-y-auto sm:grid-cols-9"></div>
         <div class="mt-3 flex gap-2"><input data-icon-input aria-label="Votre emoji" placeholder="Ou collez un emoji" class="h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-xl"><button type="button" data-icon-use class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Utiliser</button></div>
         <button type="button" data-icon-pick="" data-emoji-none class="mt-2 min-h-11 rounded-xl px-3 font-medium text-brand-700 hover:bg-brand-50">Aucune icône</button>`)}
-      <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full bg-stone-50">
-        <div class="sticky top-0 z-10 flex min-h-14 items-center gap-2 border-b border-stone-200/80 bg-white/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-          <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-600"></span>
+      <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full bg-white"><div data-full-inner class="bq-full-inner">
+        <div class="sticky top-0 z-10 flex min-h-14 items-center gap-1 border-b border-stone-200/80 bg-white/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+          <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-500"></span>
+          <button type="button" data-width aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('width')}</button>
           <button type="button" data-block-full-close class="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-brand-600 px-4 text-sm font-bold text-white">${ic('minimize', 'size-4')}Terminer</button></div>
-        <div data-block-full-body class="mx-auto w-full max-w-3xl p-3 sm:p-6"></div>
-      </dialog>
+        <div data-block-full-body class="bq-column px-4 py-6 sm:px-8"></div></div>
     </div>
-    <dialog data-editor-full aria-label="Éditeur en plein écran" class="bq-full bg-white"></dialog>`;
+    <dialog data-editor-full aria-label="Éditeur en plein écran" class="bq-full bg-white"><div data-full-inner class="bq-full-inner"></div></dialog>`;
 
     const app = element.firstElementChild;
     const editorFull = element.lastElementChild;
     const blockFull = app.querySelector('[data-block-full]');
+    // Chrome refuse le plein écran du navigateur sur un <dialog> : il est demandé sur ce conteneur intérieur, qui défile.
+    const inner = (d) => d.querySelector('[data-full-inner]');
     const $ = (s, r = app) => r.querySelector(s);
     const canvas = $('[data-canvas]');
     const bar = $('[data-bar]');
@@ -338,7 +342,7 @@
     const editorOf = (b) => (def(b).edit && (b.type !== 'html' || o.html) ? def(b) : Blocks.fallbackEditor);
     const render = () => (preview ? renderPreview() : renderEdit());
     const renderEdit = () => {
-      canvas.innerHTML = `<div class="relative mx-auto max-w-3xl">${blocks.map((b, i) => gap(i) + card(b, i)).join('')}
+      canvas.innerHTML = `<div class="bq-column relative">${blocks.map((b, i) => gap(i) + card(b, i)).join('')}
         <button type="button" data-insert="end" class="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
       canvas.querySelectorAll('.bq-edit').forEach(clean);
     };
@@ -349,7 +353,7 @@
       canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
       try {
         const html = o.previewUrl ? await (await fetch(o.previewUrl, { method: 'POST', body: form({ text }), signal: ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
-        if (preview) canvas.innerHTML = `<div class="mx-auto max-w-3xl rounded-2xl bg-white p-4 sm:p-8">${html}</div>`;
+        if (preview) canvas.innerHTML = `<div class="bq-column rounded-2xl bg-white p-4 sm:p-8">${html}</div>`;
       } catch {
         if (preview) canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
       }
@@ -424,6 +428,7 @@
     };
     const undo = () => {
       if (preview) return false;
+      if (blockFull.open) blockFull.close();
       checkpoint();
       if (!past.length) return false;
       future.push(baseline);
@@ -433,6 +438,7 @@
     };
     const redo = () => {
       if (preview || !future.length) return false;
+      if (blockFull.open) blockFull.close();
       past.push(baseline);
       baseline = future.pop();
       restore(baseline);
@@ -692,49 +698,75 @@
       toast(fresh.length > 1 ? `${fresh.length} blocs collés` : 'Bloc collé');
     };
 
-    // ---- Plein écran : un <dialog> modal qui couvre toute la fenêtre (éditeur entier ou bloc seul) ----
-    // En plus, le plein écran du navigateur quand il est permis (masque la barre d'adresse) ; sinon le dialogue suffit.
-    const browserFull = () => document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
-    const leaveBrowserFull = () => { if (document.fullscreenElement && !editorFull.open && !blockFull.open) document.exitFullscreen().catch(() => {}); };
+    // ---- Plein écran : un <dialog> modal qui couvre toute la fenêtre (éditeur entier, ou un bloc seul sans son habillage de carte) ----
+    // En plus, le plein écran du navigateur, demandé sur le dialogue lui-même (jamais sur la page : la page passerait au-dessus du dialogue).
+    // Quitter l'un quitte l'autre : Échap, « Terminer », ou la sortie du plein écran du navigateur.
+    const enterFull = (d) => {
+      d.showModal();
+      inner(d).requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
+      app.querySelectorAll('[data-width]').forEach((w) => { w.hidden = false; });
+    };
+    const leaveFull = (d) => {
+      if (document.fullscreenElement === inner(d)) document.exitFullscreen().catch(() => {});
+      app.querySelectorAll('[data-head] [data-width]').forEach((w) => { w.hidden = !editorFull.open; });
+    };
+    on(document, 'fullscreenchange', () => {
+      for (const d of [blockFull, editorFull]) if (d.open && d.dataset.fs === '1' && document.fullscreenElement !== inner(d)) d.close();
+      for (const d of [blockFull, editorFull]) d.dataset.fs = document.fullscreenElement === inner(d) ? '1' : '';
+    });
+    // Largeur du texte : variable CSS --bq-width (option `width`, 48rem par défaut) ; en plein écran, le bouton fait le tour des trois largeurs.
+    const WIDTHS = [['40rem', 'étroite'], ['48rem', 'moyenne'], ['100%', 'pleine']];
+    const cycleWidth = () => {
+      const now = app.style.getPropertyValue('--bq-width') || '48rem';
+      const next = WIDTHS[(WIDTHS.findIndex(([w]) => w === now) + 1) % WIDTHS.length];
+      app.style.setProperty('--bq-width', next[0]);
+      blockFull.style.setProperty('--bq-width', next[0]);
+      toast('Largeur ' + next[1]);
+    };
     const toggleEditorFull = () => {
       if (editorFull.open) return editorFull.close();
-      editorFull.append(app);
-      editorFull.showModal();
+      inner(editorFull).append(app);
+      enterFull(editorFull);
       app.querySelector('[data-full]').setAttribute('aria-label', 'Quitter le plein écran');
       app.querySelector('[data-full]').innerHTML = ic('minimize');
-      browserFull();
     };
     on(editorFull, 'close', () => {
       element.prepend(app);
       app.querySelector('[data-full]').setAttribute('aria-label', 'Plein écran');
       app.querySelector('[data-full]').innerHTML = ic('maximize');
+      leaveFull(editorFull);
       placeBar();
-      leaveBrowserFull();
     });
+    // Le bloc est redessiné seul dans le dialogue ; sa carte, restée dans la page, perd data-id le temps de l'édition.
     const openBlockFull = (id) => {
       syncFromDom();
-      const el = canvas.querySelector(`[data-id="${id}"]`);
-      if (!el) return;
-      $('[data-block-full-label]', blockFull).textContent = def(blocks.find((b) => b.id === id)).label;
-      $('[data-block-full-body]', blockFull).append(el);
-      blockFull.append(bar, toastEl.parentElement); // la barre et les messages doivent être dans la couche du dialogue
-      blockFull.showModal();
-      el.querySelector('[contenteditable], textarea, input')?.focus();
-      browserFull();
+      const b = blocks.find((x) => x.id === id);
+      const cardEl = canvas.querySelector(`[data-id="${id}"]`);
+      if (!b || !cardEl) return;
+      cardEl.removeAttribute('data-id');
+      cardEl.dataset.away = id;
+      const tools = editorOf(b) === def(b) && def(b).tools ? `<div class="-mt-2 mb-2 flex">${def(b).tools(b, views.get(id))}</div>` : '';
+      $('[data-block-full-label]', blockFull).textContent = def(b).label;
+      $('[data-block-full-body]', blockFull).innerHTML = `<div data-id="${id}" data-view="${views.get(id) || 'edit'}" class="bq-focus">${tools}${editorOf(b).edit(b, ui)}</div>`;
+      blockFull.style.setProperty('--bq-width', app.style.getPropertyValue('--bq-width') || '');
+      inner(blockFull).append(bar, toastEl.parentElement); // la barre et les messages doivent être dans la couche du dialogue
+      enterFull(blockFull);
+      blockFull.querySelector('[contenteditable], textarea, input')?.focus();
     };
     on(blockFull, 'close', () => {
       app.append(bar, toastEl.parentElement);
       hideBar();
-      checkpoint();
+      checkpoint(); // lit le bloc dans le dialogue
+      $('[data-block-full-body]', blockFull).replaceChildren();
+      leaveFull(blockFull);
       render();
-      leaveBrowserFull();
     });
     // Échap pendant un glissement : annule le glissement, ne ferme pas le plein écran.
     on(editorFull, 'cancel', (e) => { if (drag) e.preventDefault(); });
 
     // ---- Glisser-déposer : la carte reste à sa place, une copie suit le doigt, un trait bleu marque l'arrivée ----
     let drag = null;
-    const scroller = () => (editorFull.open ? editorFull : document.scrollingElement);
+    const scroller = () => (editorFull.open ? inner(editorFull) : document.scrollingElement);
     const dropAt = (y) => {
       const list = [...canvas.querySelectorAll('[data-id]')];
       let slot = list.findIndex((c) => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
@@ -937,6 +969,7 @@
       if (el.closest('[data-undo]')) return undo();
       if (el.closest('[data-redo]')) return redo();
       if (el.closest('[data-full]')) return toggleEditorFull();
+      if (el.closest('[data-width]')) return cycleWidth();
       if (el.closest('[data-ai]')) return openAi(null);
       if (el.closest('[data-more]')) return openSheet('more', el.closest('[data-more]'));
       if (el.closest('[data-block-full-close]')) return blockFull.close();
