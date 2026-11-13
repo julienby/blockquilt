@@ -478,8 +478,12 @@ try {
   await ev(`document.querySelector('[data-insert="end"]').click()`);
   await ev(`document.querySelector('[data-sheet="add"] [data-pick="html"]').click()`);
   await ev(`(() => { const t = document.querySelector('[data-bq] [data-html]'); t.value = '<div class="p-4" onclick="alert(1)"><strong>Gras</strong><script>window.pwned = 1</script><img src=x onerror="window.pwned = 2"></div>'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+  ok(await ev(`(() => { const c = document.querySelector('[data-bq] [data-html]').closest('[data-id]'); const eye = c.querySelector('[data-toggle-view]'); return !!eye && eye.compareDocumentPosition(c.querySelector('[data-convert], .rounded-full')) & Node.DOCUMENT_POSITION_PRECEDING && c.querySelector('[data-html]').offsetParent !== null && c.querySelector('[data-html-preview]').offsetParent === null; })()`), 'bloc HTML : œil à côté du type, code affiché par défaut');
+  await ev(`document.querySelector('[data-bq] [data-toggle-view]').click()`);
   const live = await ev(`document.querySelector('[data-html-preview]').innerHTML`);
-  ok(live === '<div class="p-4"><strong>Gras</strong></div>', 'bloc HTML : aperçu filtré en direct (' + live + ')');
+  ok(live === '<div class="p-4"><strong>Gras</strong></div>' && await ev(`document.querySelector('[data-html-preview]').offsetParent !== null && document.querySelector('[data-bq] [data-html]').offsetParent === null && document.querySelector('[data-toggle-view]').getAttribute('aria-pressed') === 'true'`), 'bloc HTML : l’œil montre l’aperçu filtré à la place du code (' + live + ')');
+  await ev(`document.querySelector('[data-bq] [data-toggle-view]').click()`);
+  ok(await ev(`document.querySelector('[data-bq] [data-html]').offsetParent !== null`), 'bloc HTML : l’œil revient au code');
   await ev(`document.querySelector('[data-save]').click()`);
   md = await saved((x) => x.includes(':::html'), 'enregistrement du bloc HTML');
   ok(md.includes(':::html\n<div class="p-4" onclick="alert(1)"><strong>Gras</strong><script>window.pwned = 1</script><img src=x onerror="window.pwned = 2"></div>\n:::'), 'bloc HTML : texte source enregistré tel quel');

@@ -105,6 +105,8 @@ Blocks.register('quote-author', {
 
 Le type apparaît aussitôt dans le menu d'ajout (groupe `text`, `media` ou `structure`). `icon` : un nom de `Blockquilt.icons`.
 
+Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans la carte), `tools(b, view)` (boutons à côté du type ; un bouton `data-toggle-view` bascule la carte entre `data-view="edit"` et `data-view="preview"`, avec les classes `bq-view-code` / `bq-view-preview`), `fullscreen: false` (pas de bouton plein écran).
+
 ## Fichiers
 
 | Fichier | Rôle | Taille (gzip) |

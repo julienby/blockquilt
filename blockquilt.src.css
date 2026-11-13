@@ -56,3 +56,6 @@ html:has(dialog.bq-full[open]) { overflow: hidden; }
 dialog.bq-full .bq-app { min-height: 100%; }
 [data-block-full] [data-grip], [data-block-full] [data-menu] { display: none; }
 [data-block-full] .bq-card { min-height: calc(100dvh - 6rem); }
+
+/* Carte à deux affichages (bloc HTML) : le code, ou l'aperçu. */
+.bq-card:not([data-view="preview"]) .bq-view-preview, .bq-card[data-view="preview"] .bq-view-code { display: none; }

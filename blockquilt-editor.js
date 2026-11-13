@@ -93,11 +93,12 @@
       edit: (b) => `<input data-url type="url" value="${attr(b.url)}" class="h-11 w-full rounded-xl border border-rose-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo YouTube ou Vimeo">`,
       read: (card, b) => { b.url = card.querySelector('[data-url]').value.trim(); },
     });
-    // Bloc HTML : source à gauche (au-dessus sur téléphone), aperçu filtré en direct.
+    // Bloc HTML : le code, ou son aperçu filtré (bouton œil à côté du type, `tools`). La carte porte data-view="preview" en aperçu.
     Object.assign(Blocks.types.html, {
-      edit: (b, ui) => `<div class="grid gap-2 sm:grid-cols-2">
-          <textarea data-html rows="${Math.min(16, Math.max(4, b.html.split('\n').length))}" spellcheck="false" aria-label="Code HTML" placeholder="<div class=&quot;…&quot;>…</div>" class="w-full rounded-xl border border-indigo-200 bg-white p-3 font-mono text-[13px] leading-5">${esc(b.html)}</textarea>
-          <div data-html-preview aria-label="Aperçu filtré" class="bq-content min-h-16 overflow-auto rounded-xl border border-dashed border-indigo-200 bg-white p-3 text-sm">${Blocks.sanitize(b.html, ui.media)}</div></div>`,
+      tools: (b, view) => `<button type="button" data-toggle-view aria-pressed="${view === 'preview'}" aria-label="Aperçu du HTML" title="Aperçu du HTML" class="group ml-1 inline-flex size-11 items-center justify-center rounded-full">
+          <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white/70 text-indigo-700 group-hover:bg-white group-aria-pressed:bg-indigo-600 group-aria-pressed:text-white">${ic('eye', 'size-4')}</span></button>`,
+      edit: (b, ui) => `<textarea data-html rows="${Math.min(16, Math.max(4, b.html.split('\n').length))}" spellcheck="false" aria-label="Code HTML" placeholder="<div class=&quot;…&quot;>…</div>" class="bq-view-code w-full rounded-xl border border-indigo-200 bg-white p-3 font-mono text-[13px] leading-5">${esc(b.html)}</textarea>
+          <div data-html-preview aria-label="Aperçu filtré" class="bq-view-preview bq-content min-h-16 overflow-auto rounded-xl border border-dashed border-indigo-200 bg-white p-3 text-sm">${Blocks.sanitize(b.html, ui.media)}</div>`,
       read: (card, b) => { b.html = card.querySelector('[data-html]').value; },
       onInput: (card, ui) => { card.querySelector('[data-html-preview]').innerHTML = Blocks.sanitize(card.querySelector('[data-html]').value, ui.media); },
     });
@@ -319,9 +320,11 @@
     // colonne de droite : monter, poignée, descendre. Une action = un seul endroit.
     const round = (data, icon, label, cls = 'text-stone-600') => `<button type="button" ${data} aria-label="${label}" title="${label}" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
         <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white/70 transition-colors group-hover:bg-white group-active:bg-stone-100 ${cls}">${ic(icon, 'size-4')}</span></button>`;
-    const card = (b, i) => `<article data-id="${b.id}" aria-label="${attr(def(b).label)}" class="bq-card flex rounded-2xl border ${def(b).tone.card}">
+    // Outils propres à un type (ex. œil du bloc HTML), à côté du type ; `views` garde l'affichage choisi par bloc (code / aperçu).
+    const views = new Map();
+    const card = (b, i) => `<article data-id="${b.id}" data-view="${views.get(b.id) || 'edit'}" aria-label="${attr(def(b).label)}" class="bq-card flex rounded-2xl border ${def(b).tone.card}">
         <div class="min-w-0 flex-1 pb-3 pl-3 pr-1">
-          <div class="flex h-11 items-center">${badge(b)}<span class="flex-1"></span>
+          <div class="flex h-11 items-center">${badge(b)}${editorOf(b) === def(b) && def(b).tools ? def(b).tools(b, views.get(b.id)) : ''}<span class="flex-1"></span>
             ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
             ${def(b).fullscreen === false ? '' : round('data-expand', 'maximize', 'Plein écran')}
             ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>
@@ -915,6 +918,14 @@
       if (el.closest('[data-merge]')) return merge(Number(el.closest('[data-merge]').dataset.merge));
       if (el.closest('[data-menu]')) return openMenu(id, el.closest('[data-menu]'));
       if (el.closest('[data-expand]')) return openBlockFull(id);
+      if (el.closest('[data-toggle-view]')) {
+        const view = cardEl.dataset.view === 'preview' ? 'edit' : 'preview';
+        views.set(id, view);
+        cardEl.dataset.view = view;
+        el.closest('[data-toggle-view]').setAttribute('aria-pressed', String(view === 'preview'));
+        def(blocks.find((b) => b.id === id)).onInput?.(cardEl, ui);
+        return;
+      }
       if (el.closest('[data-delete]')) return askDelete(id);
       if (el.closest('[data-move]')) {
         const step = el.closest('[data-move]').dataset.move;
