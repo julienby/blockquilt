@@ -257,6 +257,7 @@ try {
   const count0 = (await cards()).length;
   await ev(`document.querySelectorAll('[data-bq] [data-id] [data-menu]')[1].click()`);
   ok(await ev(`!!document.querySelector('[data-sheet="menu"][open]')`), 'menu du bloc : s’ouvre depuis « ⋯ »');
+  ok(await ev(`!document.querySelector('[data-sheet="menu"] h2, [data-sheet="more"] h2') && document.querySelector('[data-sheet="menu"]').getAttribute('aria-label').startsWith('Actions du bloc')`), 'menus d’actions : pas de ligne de titre (nom gardé pour les lecteurs d’écran)');
   ok(await ev(`[...document.querySelectorAll('[data-sheet="menu"] [data-act]')].map((b) => b.dataset.act).join() === 'duplicate,copy,paste-above,paste,ai'`), 'menu du bloc : dupliquer, copier, coller au-dessus, coller dessous, IA — rien d’autre');
   await ev(`document.querySelector('[data-sheet="menu"]').close()`);
   ok(await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].every((c) => c.querySelector('[data-menu]') && c.querySelector('[data-delete]') && c.querySelectorAll('[data-rail] button').length === 3)`), 'carte : menu, agrandir, supprimer à droite du type ; monter, poignée, descendre dans la colonne de droite');

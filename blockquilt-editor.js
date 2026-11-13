@@ -124,6 +124,8 @@
 
   const GROUPS = { text: 'Texte', media: 'Médias', structure: 'Structure' };
   const sheetCls = 'bq-sheet m-0 mt-auto max-h-[88dvh] w-full max-w-full overflow-auto rounded-t-3xl bg-white p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-stone-900 shadow-xl backdrop:bg-black/40 sm:m-auto sm:max-w-lg sm:rounded-3xl';
+  // Feuille avec une ligne de titre (contenu à expliquer), ou menu d'actions sans titre (`menu`) : chaque ligne se suffit.
+  const menu = (name, label, inner) => `<dialog data-sheet="${name}" autofocus aria-label="${attr(label)}" class="${sheetCls} !pt-2 outline-none">${inner}</dialog>`;
   const sheet = (name, label, inner) => `<dialog data-sheet="${name}" aria-label="${attr(label)}" class="${sheetCls}">
       <div class="-mx-1 -mt-1 mb-2 flex items-center gap-2"><h2 tabindex="-1" autofocus class="min-w-0 flex-1 truncate px-1 text-base font-bold outline-none">${esc(label)}</h2>
         <button type="button" data-close aria-label="Fermer" class="bq-btn text-stone-500">${ic('x')}</button></div>${inner}</dialog>`;
@@ -172,7 +174,7 @@
       </div>
       <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden aria-label="Choisir une photo">
       ${sheet('add', 'Ajouter un bloc', '<div data-add-list></div>')}
-      ${sheet('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}${o.aiUrl ? item('data-more-act="ai"', 'wand', 'Assistant IA') : ''}</div>`)}
+      ${menu('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}${o.aiUrl ? item('data-more-act="ai"', 'wand', 'Assistant IA') : ''}</div>`)}
       ${o.aiUrl ? sheet('ai', 'Assistant IA', `<div data-ai-form>
           <p data-ai-scope class="mb-2 truncate rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900"></p>
           <div class="flex flex-wrap gap-1.5">${[['Corriger', 'Corrige l’orthographe et la grammaire, sans changer le sens ni la structure.'], ['Raccourcir', 'Raccourcis le texte en gardant l’essentiel.'], ['En étapes', 'Réécris sous forme d’étapes numérotées.'], ['Traduire', 'Traduis en anglais, en gardant la structure.']].map(([l, t]) => `<button type="button" data-ai-preset="${attr(t)}" class="min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950 hover:bg-amber-100">${l}</button>`).join('')}</div>
@@ -187,7 +189,7 @@
           <div data-ai-after class="bq-content mt-1 max-h-64 overflow-auto rounded-xl border border-amber-200 bg-white p-3 text-sm"></div>
           <div class="mt-3 grid grid-cols-2 gap-2"><button type="button" data-ai-ignore class="min-h-11 rounded-xl border border-stone-300 px-4 font-semibold">Ignorer</button>
             <button type="button" data-ai-apply class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white disabled:opacity-40">Appliquer</button></div></div>`) : ''}
-      ${sheet('menu', 'Bloc', '<div data-menu-list class="grid gap-0.5"></div>')}
+      ${menu('menu', 'Actions du bloc', '<div data-menu-list class="grid gap-0.5"></div>')}
       ${sheet('delete', 'Supprimer ce bloc ?', `<p data-del-preview class="line-clamp-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm italic text-stone-700"></p>
         <button type="button" data-del-confirm class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 font-semibold text-white hover:bg-red-700">${ic('trash')}Supprimer</button>`)}
       ${sheet('leave', 'Modifications non enregistrées', `<div class="grid gap-2"><button type="button" data-leave-save class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Enregistrer et quitter</button>
@@ -575,7 +577,7 @@
       menuId = id;
       const i = blocks.findIndex((b) => b.id === id);
       const b = blocks[i];
-      sheets.menu.querySelector('h2').textContent = def(b).label;
+      sheets.menu.setAttribute('aria-label', 'Actions du bloc ' + def(b).label);
       // Le type, l'ordre, le plein écran et la suppression ont leur bouton sur la carte : ils ne sont pas répétés ici.
       $('[data-menu-list]', sheets.menu).innerHTML = item('data-act="duplicate"', 'duplicate', 'Dupliquer')
         + item('data-act="copy"', 'copy', 'Copier')
