@@ -524,6 +524,19 @@ try {
   await waitFor(() => ev(`!!document.querySelector('[data-canvas] .bq-carousel')`), 'aperçu du carrousel');
   const track = await ev(`(() => { const t = document.querySelector('.bq-carousel-track'); return { figures: t.querySelectorAll('figure').length, sw: t.scrollWidth, cw: t.clientWidth, snap: getComputedStyle(t).scrollSnapType }; })()`);
   ok(track.figures === 3 && track.sw > track.cw && track.snap.includes('x'), `carrousel : 3 <figure>, défilement horizontal à 375 px (${track.sw} > ${track.cw})`);
+  const carNav = () => ev(`(() => { const c = document.querySelector('[data-canvas] .bq-carousel'); const d = [...c.querySelectorAll('.bq-carousel-dots button')]; return { ready: c.classList.contains('is-ready'), dots: d.length, cur: d.findIndex((x) => x.getAttribute('aria-current') === 'true'), prev: !c.querySelector('.bq-carousel-prev').hidden && !c.querySelector('.bq-carousel-prev').disabled, next: !c.querySelector('.bq-carousel-next').hidden && !c.querySelector('.bq-carousel-next').disabled, bar: getComputedStyle(c.querySelector('.bq-carousel-track')).scrollbarWidth, one: Math.round(c.querySelector('figure').getBoundingClientRect().width) === Math.round(c.querySelector('.bq-carousel-track').clientWidth) }; })()`);
+  let nav = await carNav();
+  ok(nav.ready && nav.dots === 3 && nav.cur === 0 && !nav.prev && nav.next && nav.bar === 'none' && nav.one, `carrousel : une photo à la fois, flèches et 3 puces, sans barre de défilement (${JSON.stringify(nav)})`);
+  await ev(`document.querySelector('[data-canvas] .bq-carousel-next').click()`);
+  await waitFor(async () => (await carNav()).cur === 1, 'flèche suivante');
+  nav = await carNav();
+  ok(nav.prev && nav.next, 'carrousel : la flèche droite passe à la photo 2, les deux flèches sont actives');
+  await ev(`document.querySelectorAll('[data-canvas] .bq-carousel-dots button')[2].click()`);
+  await waitFor(async () => (await carNav()).cur === 2, 'puce 3');
+  ok(!(await carNav()).next, 'carrousel : la puce 3 montre la dernière photo, flèche droite masquée');
+  await ev(`document.querySelector('[data-canvas] .bq-carousel-prev').click()`);
+  await waitFor(async () => (await carNav()).cur === 1, 'flèche précédente');
+  ok(true, 'carrousel : la flèche gauche revient à la photo 2');
   await ev(`document.querySelector('[data-preview]').click()`);
   ok(await ev(`(() => { const t = ':::columns\\nGauche\\n\\nDroite\\n:::'; editor.setMarkdown(t); return !!document.querySelector('[data-bq] [data-raw]') && editor.getMarkdown() === t + '\\n'; })()`), ':::columns écrit à la main : bloc source, texte intact');
 

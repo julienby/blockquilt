@@ -360,7 +360,10 @@
       canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
       try {
         const html = o.previewUrl ? await (await fetch(o.previewUrl, { method: 'POST', body: form({ text }), signal: ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
-        if (preview) canvas.innerHTML = `<div class="bq-column rounded-2xl bg-white p-4 sm:p-8">${html}</div>`;
+        if (preview) {
+          canvas.innerHTML = `<div class="bq-column rounded-2xl bg-white p-4 sm:p-8">${html}</div>`;
+          window.BlockquiltContent?.enhance(canvas); // flèches et puces des carrousels, si blockquilt-content.js est chargé
+        }
       } catch {
         if (preview) canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
       }

@@ -51,13 +51,33 @@
 .bq-content .bq-callout-warning { background: var(--bq-warning-bg); border-color: var(--bq-warning-line); color: var(--bq-warning-text); }
 .bq-content .bq-callout-danger { background: var(--bq-danger-bg); border-color: var(--bq-danger-line); color: var(--bq-danger-text); }
 
-/* Carrousel : défilement horizontal en CSS (scroll-snap), une photo par page, points de repère dessous. */
-.bq-content .bq-carousel { margin: 1.25rem 0; }
-.bq-content .bq-carousel-track { display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0 1rem; padding-bottom: 0.25rem; scrollbar-width: thin; }
-.bq-content .bq-carousel-track > figure { flex: 0 0 88%; margin: 0; scroll-snap-align: center; }
+/* Carrousel : une photo à la fois (scroll-snap). Avec blockquilt-content.js : flèches sur les côtés, puces dessous, sans barre de défilement. */
+.bq-content .bq-carousel { position: relative; margin: 1.25rem 0; }
+.bq-content .bq-carousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; border-radius: var(--bq-radius); scrollbar-width: thin; }
+.bq-content .bq-carousel.is-ready .bq-carousel-track { scrollbar-width: none; }
+.bq-content .bq-carousel.is-ready .bq-carousel-track::-webkit-scrollbar { display: none; }
+.bq-content .bq-carousel-track:focus-visible { outline: 2px solid var(--bq-link); outline-offset: 2px; }
+.bq-content .bq-carousel-track > figure { flex: 0 0 100%; margin: 0; scroll-snap-align: start; }
 .bq-content .bq-carousel-track img { aspect-ratio: 4 / 3; object-fit: cover; }
-.bq-content .bq-carousel-dots { display: flex; justify-content: center; gap: 0.4rem; margin: 0.5rem 0 0; }
-.bq-content .bq-carousel-dots span { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--bq-line); }
+.bq-content .bq-carousel-prev, .bq-content .bq-carousel-next {
+  position: absolute; top: calc((100% - 2.25rem) / 2); transform: translateY(-50%);
+  width: 2.75rem; height: 2.75rem; border: 0; border-radius: 50%; cursor: pointer;
+  background: rgb(255 255 255 / 0.9); box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); color: var(--bq-text);
+}
+.bq-content .bq-carousel-prev { left: 0.5rem; }
+.bq-content .bq-carousel-next { right: 0.5rem; }
+.bq-content .bq-carousel-prev::before, .bq-content .bq-carousel-next::before {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 0.6rem; height: 0.6rem;
+  border-top: 2px solid currentColor; border-right: 2px solid currentColor;
+}
+.bq-content .bq-carousel-prev::before { transform: translate(-30%, -50%) rotate(-135deg); }
+.bq-content .bq-carousel-next::before { transform: translate(-70%, -50%) rotate(45deg); }
+.bq-content .bq-carousel-prev:disabled, .bq-content .bq-carousel-next:disabled { opacity: 0; pointer-events: none; }
+.bq-content .bq-carousel-dots { display: flex; justify-content: center; gap: 0.15rem; margin-top: 0.25rem; }
+.bq-content .bq-carousel-dots button { width: 1.75rem; height: 1.75rem; padding: 0; border: 0; background: none; cursor: pointer; }
+.bq-content .bq-carousel-dots button::before { content: ''; display: block; width: 0.5rem; height: 0.5rem; margin: auto; border-radius: 50%; background: var(--bq-line); transition: background 0.2s, transform 0.2s; }
+.bq-content .bq-carousel-dots button[aria-current="true"]::before { background: var(--bq-text); transform: scale(1.2); }
+.bq-content [hidden] { display: none !important; }
 
 /* Bloc HTML filtré : le contenu garde ses classes ; seules celles présentes dans le CSS de l'hôte ont un effet. */
 .bq-content .bq-html { margin: 1rem 0; }

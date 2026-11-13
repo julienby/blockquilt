@@ -518,7 +518,7 @@ const Blocks = {
     blank: () => ({ src: '', alt: '' }),
   });
 
-  // Carrousel : `:::carousel`, une photo par ligne, `:::`. Rendu en défilement horizontal CSS (scroll-snap), sans JavaScript.
+  // Carrousel : `:::carousel`, une photo par ligne, `:::`. Rendu : une photo à la fois (scroll-snap), flèches et puces avec blockquilt-content.js.
   Blocks.register('carousel', {
     label: 'Carrousel', short: 'Carrousel', icon: 'images', group: 'media',
     tone: tone('bg-white border-stone-200/90 text-stone-800', 'bg-violet-100 text-violet-900 border-violet-200'),
@@ -534,9 +534,11 @@ const Blocks = {
     },
     toHtml: (b, ctx) => {
       const items = b.items.filter((x) => x.src);
+      // Flèches et puces cachées : blockquilt-content.js les montre et les relie (sans lui, la piste défile au doigt).
       return `<div class="bq-carousel" role="group" aria-roledescription="carrousel" aria-label="${items.length} photos">`
         + `<div class="bq-carousel-track">${items.map((x) => Blocks.types.photo.toHtml(x, ctx)).join('')}</div>`
-        + `<p class="bq-carousel-dots" aria-hidden="true">${items.map(() => '<span></span>').join('')}</p></div>`;
+        + '<button type="button" class="bq-carousel-prev" aria-label="Photo précédente" hidden></button><button type="button" class="bq-carousel-next" aria-label="Photo suivante" hidden></button>'
+        + '<div class="bq-carousel-dots" hidden></div></div>';
     },
     blank: () => ({ items: [] }),
   });

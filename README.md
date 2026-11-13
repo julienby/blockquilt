@@ -24,6 +24,7 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 <div id="editor"></div>
 <script src="blockquilt.js"></script>
 <script src="blockquilt-editor.js"></script>
+<script src="blockquilt-content.js"></script>   <!-- facultatif : flèches et puces des carrousels dans l'aperçu -->
 <script>
   const editor = Blockquilt.mount(document.getElementById('editor'), {
     source: '---\ntitle: Ma page\n---\n\nBonjour.',
@@ -84,6 +85,8 @@ const { meta, blocks } = Blocks.parse(markdown);              // meta.title, met
 const problems = Blocks.lint(markdown);                       // [{ line, message }]
 ```
 
+Sur la page publique, `blockquilt-content.js` (facultatif, sans dépendance) donne aux carrousels leurs flèches et leurs puces ; sans lui, un carrousel défile au doigt. Pour du contenu ajouté après le chargement : `BlockquiltContent.enhance(élément)`.
+
 Le HTML produit est sémantique (`<h2 id>`, `<aside role="note">`, `<figure>`, `<blockquote>`, `<pre><code class="language-js">`…) et porte des classes `bq-*`, sans Tailwind. La feuille `blockquilt-content.css` (écrite à la main, couleurs en variables CSS `--bq-…`) suffit à l'afficher. Tout le texte est échappé ; le bloc HTML passe par `Blocks.sanitize` (liste blanche, voir `DECISIONS.md`).
 
 ## Ajouter un type de bloc
@@ -120,6 +123,7 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 | `blockquilt-editor.js` | Écran : `Blockquilt.mount`, cartes d'édition, menus, historique, glisser-déposer, plein écran, emoji, IA. | 72 ko (21 ko) |
 | `blockquilt.css` | CSS de l'éditeur, généré par Tailwind 3.4.17 (`./build-css`). Ne pas modifier à la main. | 26 ko (6 ko) |
 | `blockquilt-content.css` | CSS du rendu publié, écrit à la main. | 5 ko (2 ko) |
+| `blockquilt-content.js` | Facultatif, pour la page publique : flèches et puces des carrousels. | 2 ko (1 ko) |
 | `emoji.json` | Bibliothèque d'emoji (nom français, mots-clés, catégorie), chargée au premier usage. | 121 ko (37 ko) |
 | `FORMAT.md` | Le format, pour les humains et les IA. | |
 | `index.html` | Démo et exemple d'intégration : un document qui montre chaque type de bloc. | |
