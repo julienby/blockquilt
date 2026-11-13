@@ -371,8 +371,10 @@ try {
     else await ev(`document.querySelector('[data-full]').click()`);
     const full = await ev(`(() => { const d = document.querySelector('[data-editor-full]'); const r = d.getBoundingClientRect(); return { open: d.open, w: r.width, h: r.height, W: innerWidth, H: innerHeight, inside: d.contains(document.querySelector('[data-bq]')) }; })()`);
     ok(full.open && full.inside && full.w === full.W && full.h === full.H, `${width} px : éditeur en plein écran, exactement ${full.W} × ${full.H} (${full.w} × ${full.h})`);
-    await key('Escape', 'Escape', 27);
-    ok(await ev(`!document.querySelector('[data-editor-full]').open && document.getElementById('editor').firstElementChild.matches('[data-bq]')`), `${width} px : Échap quitte le plein écran, l’éditeur revient à sa place`);
+    ok(await ev(`(() => { const b = document.querySelector('[data-head] [data-full]'); const r = b.getBoundingClientRect(); return b.offsetParent !== null && r.width >= 44 && !!b.querySelector('svg[data-icon="minimize"]') && b.getAttribute('aria-label') === 'Quitter le plein écran'; })()`), `${width} px : icône « réduire » visible dans la barre du haut`);
+    if (width < 640) await ev(`document.querySelector('[data-head] [data-full]').click()`); else await key('Escape', 'Escape', 27);
+    await sleep(100); // l'événement « close » d'un dialogue arrive au tour suivant
+    ok(await ev(`!document.querySelector('[data-editor-full]').open && document.getElementById('editor').firstElementChild.matches('[data-bq]') && (innerWidth >= 640 || document.querySelector('[data-head] [data-full]').offsetParent === null)`), `${width} px : ${width < 640 ? 'l’icône « réduire »' : 'Échap'} quitte le plein écran, l’éditeur revient à sa place`);
     await ev(`(() => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === 'text'); c.querySelector('[data-expand]').click(); })()`);
     const bf = await ev(`(() => { const d = document.querySelector('[data-block-full]'); const r = d.getBoundingClientRect(); const f = d.querySelector('[data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, ' Plein${width}'); return { open: d.open, w: r.width, h: r.height, W: innerWidth, H: innerHeight }; })()`);
     ok(bf.open && bf.w === bf.W && bf.h === bf.H, `${width} px : bloc en plein écran, exactement ${bf.W} × ${bf.H} (${bf.w} × ${bf.h})`);

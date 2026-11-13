@@ -727,13 +727,21 @@
       if (editorFull.open) return editorFull.close();
       inner(editorFull).append(app);
       enterFull(editorFull);
-      app.querySelector('[data-full]').setAttribute('aria-label', 'Quitter le plein écran');
-      app.querySelector('[data-full]').innerHTML = ic('minimize');
+      setFullButton(true);
+    };
+    // En plein écran, l'icône « réduire » reste dans la barre du haut, sur téléphone aussi ; le menu « ⋯ » suit.
+    const setFullButton = (full) => {
+      const b = app.querySelector('[data-full]');
+      b.classList.toggle('hidden', !full);
+      b.setAttribute('aria-label', full ? 'Quitter le plein écran' : 'Plein écran');
+      b.title = b.getAttribute('aria-label');
+      b.innerHTML = ic(full ? 'minimize' : 'maximize');
+      const more = sheets.more.querySelector('[data-more-act="full"]');
+      more.innerHTML = ic(full ? 'minimize' : 'maximize') + `<span class="min-w-0 flex-1 truncate">${full ? 'Quitter le plein écran' : 'Plein écran'}</span>`;
     };
     on(editorFull, 'close', () => {
       element.prepend(app);
-      app.querySelector('[data-full]').setAttribute('aria-label', 'Plein écran');
-      app.querySelector('[data-full]').innerHTML = ic('maximize');
+      setFullButton(false);
       leaveFull();
       placeBar();
     });
