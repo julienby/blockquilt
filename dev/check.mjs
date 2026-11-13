@@ -208,7 +208,7 @@ try {
   // ---- Titre facultatif : par défaut, pas de titre imposé dans l'en-tête ----
   await viewport(375);
   await open();
-  ok(await ev(`!document.querySelector('[data-bq] [data-title], [data-bq] [data-doc-icon]') && document.querySelector('[data-bq] [data-label]').textContent === 'Démo blockquilt'`), 'en-tête : pas de titre imposé, libellé fixe de l’hôte (option label)');
+  ok(await ev(`!document.querySelector('[data-bq] [data-title], [data-bq] [data-doc-icon], [data-bq] [data-label]')`), 'en-tête : pas de titre imposé (actions seulement)');
   ok(await ev(`editor.getMarkdown().startsWith('---\\ntitle: Arrivée\\nicon: 🏡\\n---')`), 'sans titre affiché : le frontmatter (title, icon) est gardé tel quel');
   ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: '---\\ntitle: T\\n---\\n\\nx', title: true }); const ok = el.querySelector('[data-title]').textContent === 'T' && !!el.querySelector('[data-doc-icon]'); el.querySelector('[data-title]').textContent = 'Nouveau'; const md = e.getMarkdown(); e.destroy(); el.remove(); return ok && md.startsWith('---\\ntitle: Nouveau'); })()`), 'option title : titre et icône du document dans l’en-tête, écrits dans le frontmatter');
 

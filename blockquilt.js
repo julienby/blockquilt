@@ -407,7 +407,7 @@ const Blocks = {
     if ((m = /^https?:\/\/(?:www\.)?vimeo\.com\/(\d+)/i.exec(url))) return 'https://player.vimeo.com/video/' + m[1];
     return '';
   },
-  /** Adresse d'une image : « media/<id> » est réécrit avec l'adresse des médias de l'hôte. */
+  /** Adresse d'une image : « media/<id> » est réécrit avec l'adresse des médias (option `media`). */
   mediaUrl(src, media = 'media/') { return src.startsWith('media/') ? media + src.slice(6) : src; },
 
   // ---- Rendu publié : HTML sémantique, classes bq-*, sans Tailwind (feuille blockquilt-content.css) ----
@@ -577,7 +577,7 @@ const Blocks = {
   });
 
   // Bloc HTML : le source est gardé tel quel ; le rendu passe toujours par Blocks.sanitize.
-  // Classes Tailwind : seules celles déjà présentes dans le CSS de l'hôte ont un effet.
+  // Classes (Tailwind ou autres) : seules celles présentes dans le CSS de la page ont un effet.
   Blocks.register('html', {
     label: 'HTML', short: 'HTML', icon: 'html', group: 'structure',
     tone: tone('bg-white border-indigo-200/90 text-stone-900', 'bg-indigo-100 text-indigo-900 border-indigo-200'),

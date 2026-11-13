@@ -45,8 +45,7 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 | `media` | Adresse des photos : `media/<id>` du texte devient `media + id` à l'écran (`media/` par défaut). |
 | `previewUrl` | Aperçu rendu par le serveur. Sans elle, l'éditeur rend lui-même avec `Blocks.toHtml`. |
 | `aiUrl` | Assistant IA. Sans elle, aucun bouton IA. |
-| `title` | `true` pour montrer le titre et l'icône du document dans l'en-tête (frontmatter `title` / `icon`). Absent par défaut : l'éditeur peut ne remplir qu'une partie d'une page ; le frontmatter est alors gardé tel quel. |
-| `label` | Libellé fixe (non modifiable) dans l'en-tête, à la place du titre. Par exemple « Description du logement ». |
+| `title` | `true` pour montrer le titre et l'icône du document dans l'en-tête (frontmatter `title` / `icon`). Absent par défaut : l'éditeur peut ne remplir qu'une partie d'une page ; le frontmatter est alors gardé tel quel. Pour un titre dans le contenu : un bloc H1. |
 | `backUrl` | Bouton retour (avec confirmation si des modifications ne sont pas enregistrées). |
 | `fields` | Champs ajoutés à chaque envoi (par exemple un jeton CSRF). |
 | `html` | `true` pour proposer le bloc HTML (désactivé par défaut). |
@@ -64,7 +63,7 @@ Tous en `POST multipart/form-data`, avec les champs de `fields`. Les fins de lig
 | Aperçu (`previewUrl`) | `text` | Fragment HTML. |
 | IA (`aiUrl`) | `scope` (`document` ou `block`), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`) | JSON `{ "markdown": "…" }`. L'éditeur passe la réponse par `Blocks.lint`, montre avant / après, et n'applique qu'après « Appliquer » (annulable). |
 
-L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le serveur hôte qui le fait. Le serveur de démo répond par une transformation fixe (texte en majuscules), ou appelle Claude si `ANTHROPIC_API_KEY` est définie (`AI_MODEL` pour choisir le modèle), avec `FORMAT.md` en consigne système.
+L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le service désigné par `aiUrl` qui le fait. Le serveur de démo répond par une transformation fixe (texte en majuscules), ou appelle Claude si `ANTHROPIC_API_KEY` est définie (`AI_MODEL` pour choisir le modèle), avec `FORMAT.md` en consigne système.
 
 ### Au clavier
 

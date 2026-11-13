@@ -60,7 +60,7 @@ dialog.bq-full .bq-app { min-height: 100%; }
 .bq-focus [data-rich], .bq-focus textarea { min-height: calc(100dvh - 12rem); }
 .bq-focus [data-plain] { font-size: 1.75rem; line-height: 1.25; }
 
-/* Largeur du texte : réglable par l'hôte (option `width` ou --bq-width) ; l'éditeur prend la largeur de l'élément qui le contient. */
+/* Largeur du texte : réglable (option `width` ou --bq-width) ; l'éditeur prend la largeur de l'élément qui le contient. */
 .bq-column { width: 100%; max-width: var(--bq-width, 48rem); margin-inline: auto; }
 
 /* Carte à deux affichages (bloc HTML) : le code, ou l'aperçu. */

@@ -1,5 +1,5 @@
 /* blockquilt — rendu publié (Blocks.toHtml). Feuille écrite à la main, sans Tailwind.
-   Tout est sous .bq-content ; les couleurs sont des variables à redéfinir chez l'hôte. */
+   Tout est sous .bq-content ; les couleurs sont des variables CSS (--bq-…), à redéfinir au besoin. */
 .bq-content {
   --bq-text: #1c1917;
   --bq-muted: #57534e;
@@ -85,7 +85,7 @@
 .bq-content .bq-carousel-dots button[aria-current="true"]::before { background: var(--bq-text); transform: scale(1.2); }
 .bq-content [hidden] { display: none !important; }
 
-/* Bloc HTML filtré : le contenu garde ses classes ; seules celles présentes dans le CSS de l'hôte ont un effet. */
+/* Bloc HTML filtré : le contenu garde ses classes ; seules celles présentes dans le CSS de la page ont un effet. */
 .bq-content .bq-html { margin: 1rem 0; }
 .bq-content .bq-html table { width: 100%; border-collapse: collapse; }
 .bq-content .bq-html th, .bq-content .bq-html td { border: 1px solid var(--bq-line); padding: 0.4rem 0.6rem; text-align: left; }

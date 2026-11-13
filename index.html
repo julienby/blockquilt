@@ -84,7 +84,7 @@ Blockquilt.mount(document.getElementById('editor'), { source, saveUrl: 'api/save
 :::html
 <div class="grid grid-cols-2 gap-3">
   <div class="rounded-xl bg-sky-50 p-3"><strong>HTML filtré</strong></div>
-  <div class="rounded-xl bg-amber-50 p-3">Classes Tailwind de l'hôte</div>
+  <div class="rounded-xl bg-amber-50 p-3">Classes Tailwind de la page</div>
 </div>
 :::</textarea>
 
@@ -99,7 +99,6 @@ Blockquilt.mount(document.getElementById('editor'), { source, saveUrl: 'api/save
       uploadUrl: 'api/upload',
       previewUrl: 'api/preview',
       fields: { _csrf: 'demo' },
-      label: 'Démo blockquilt', // libellé fixe dans l'en-tête ; `title: true` montre à la place le titre et l'icône du document
       html: true,
       aiUrl: 'api/ai',
     });

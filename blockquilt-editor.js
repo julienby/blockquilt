@@ -147,7 +147,7 @@
         ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn text-stone-500">${ic('chevron_left')}</a>` : ''}
         ${o.title ? `<button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
         <div data-title contenteditable="true" role="textbox" aria-label="Titre du document" data-placeholder="Sans titre" spellcheck="false" class="bq-edit min-w-0 flex-1 truncate px-1 text-base font-extrabold leading-snug text-stone-900 sm:text-lg"></div>`
-          : `<span data-label class="min-w-0 flex-1 truncate px-2 text-sm font-semibold text-stone-500">${esc(o.label || '')}</span>`}
+          : '<span class="flex-1"></span>'}
         <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn text-stone-600">${ic('undo')}</button>
         <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('redo')}</button>
         <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn text-stone-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
@@ -387,7 +387,7 @@
       if (field) field.focus({ preventScroll: true }); else el.querySelector('[data-menu]')?.focus({ preventScroll: true });
     };
 
-    // ---- Envois au serveur hôte : champs fixes (`fields`, ex. jeton CSRF) + champs de l'échange ----
+    // ---- Envois au serveur : champs fixes (`fields`, ex. jeton CSRF) + champs de l'échange ----
     const form = (extra) => {
       const data = new FormData();
       for (const [k, v] of Object.entries({ ...o.fields, ...extra })) data.set(k, v);
@@ -621,7 +621,7 @@
       remove(menuId);
     });
 
-    // ---- Assistant IA : l'hôte fournit `aiUrl` ; l'éditeur n'appelle aucun modèle lui-même et ne contient aucune clé ----
+    // ---- Assistant IA : `aiUrl` désigne le service ; l'éditeur n'appelle aucun modèle lui-même et ne contient aucune clé ----
     // Envoi : scope (document | block), instruction, text (document), block (Markdown du bloc). Réponse : { markdown }.
     // La réponse passe par Blocks.lint, s'affiche avant / après, puis « Appliquer » (annulable) ou « Ignorer ».
     let ai = null; // { id, markdown }
