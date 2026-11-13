@@ -18,7 +18,8 @@ fs.mkdirSync(MEDIA, { recursive: true });
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.md': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml' };
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const send = (res, code, type, body) => { res.writeHead(code, { 'Content-Type': type }); res.end(body); };
+// no-cache : le navigateur revérifie chaque fichier, une démo mise à jour n'est jamais servie à moitié depuis le cache.
+const send = (res, code, type, body) => { res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-cache' }); res.end(body); };
 const json = (res, code, data) => send(res, code, 'application/json', JSON.stringify(data));
 
 // Formulaire multipart reçu → FormData (le parseur de fetch, intégré à Node).
