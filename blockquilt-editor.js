@@ -973,11 +973,44 @@
       if (e.key === 'Enter' && !e.shiftKey && el.matches?.('.bq-edit[data-plain], [data-callout-title]')) { e.preventDefault(); el.blur(); }
       const rich = richOf(el);
       if (!rich) return;
+      // Listes : Tab descend l'élément d'un niveau, Maj+Tab le remonte. Sans effet possible, Tab garde son rôle (focus suivant).
+      if (e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const sel = getSelection();
+        const node = sel.rangeCount ? sel.anchorNode : null;
+        const li = (node && (node.nodeType === 1 ? node : node.parentElement))?.closest('li');
+        if (li && rich.contains(li) && shiftLevel(li, e.shiftKey ? -1 : 1)) { e.preventDefault(); setDirty(true); typed(); return; }
+      }
       // Mise en forme au clavier : Ctrl+B, Ctrl+I, Ctrl+U ; Alt+F10 donne le focus à la barre.
       const cmd = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && { b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()];
       if (cmd) { e.preventDefault(); document.execCommand(cmd); setDirty(true); typed(); return; }
       if (e.altKey && e.key === 'F10') { e.preventDefault(); showBar(rich); bar.querySelector('button').focus(); }
     });
+
+    // Change le niveau d'un élément de liste ; le curseur et la sélection restent en place. Renvoie false si impossible.
+    const shiftLevel = (li, dir) => {
+      const sel = getSelection();
+      const r = sel.rangeCount ? sel.getRangeAt(0) : null;
+      const keep = r && [r.startContainer, r.startOffset, r.endContainer, r.endOffset];
+      const list = li.parentElement;
+      if (dir > 0) {
+        // Sous l'élément précédent, dans sa dernière sous-liste du même genre (créée au besoin).
+        const prev = li.previousElementSibling;
+        if (!prev || prev.tagName !== 'LI') return false;
+        let sub = prev.lastElementChild;
+        if (!sub || sub.tagName !== list.tagName) { sub = document.createElement(list.tagName.toLowerCase()); prev.append(sub); }
+        sub.append(li);
+      } else {
+        // Après l'élément parent ; les éléments qui le suivaient deviennent ses enfants.
+        const parentLi = list.parentElement;
+        if (!parentLi || parentLi.tagName !== 'LI') return false;
+        const after = [...list.children].slice([...list.children].indexOf(li) + 1);
+        if (after.length) { const sub = document.createElement(list.tagName.toLowerCase()); sub.append(...after); li.append(sub); }
+        parentLi.after(li);
+        if (!list.children.length) list.remove();
+      }
+      if (keep) sel.setBaseAndExtent(...keep);
+      return true;
+    };
 
     // ---- Barre de mise en forme : fixe et centrée, en bas de l'écran visible (téléphone) ou sous l'en-tête (ordinateur) ----
     let barField = null;

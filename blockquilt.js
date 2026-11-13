@@ -131,57 +131,62 @@ const Blocks = {
     return out + Blocks.esc(md.slice(at));
   },
 
-  /** Lignes de Markdown → HTML d'un champ modifiable : lignes séparées par `<br>`, listes en `<ul><li>` / `<ol><li>`. */
-  linesToHtml(lines) {
+  /**
+   * Lignes de Markdown → suite de { line } et { list: { tag, items: [{ text, subs: [list…] }] } }.
+   * Listes à plusieurs niveaux : un élément enfant est indenté de la largeur de la puce du parent (« - » : 2 espaces, « 1. » : 3).
+   * Une indentation hors de ces règles n'est pas réécrite à l'identique : le bloc reste alors du texte source.
+   */
+  listTree(lines) {
     const out = [];
-    let listTag = null;
-    let items = [];
-    const closeList = () => {
-      if (listTag) {
-        out.push(`<${listTag}>${items.map((x) => `<li>${x}</li>`).join('')}</${listTag}>`);
-        listTag = null;
-        items = [];
-      }
-    };
+    let stack = []; // [{ indent, list }]
     for (const l of lines) {
-      let m;
-      if ((m = /^- (.*)$/.exec(l))) {
-        if (listTag && listTag !== 'ul') closeList();
-        listTag = 'ul';
-        items.push(Blocks.inlineHtml(m[1]));
-      } else if ((m = /^\d+\. (.*)$/.exec(l))) {
-        if (listTag && listTag !== 'ol') closeList();
-        listTag = 'ol';
-        items.push(Blocks.inlineHtml(m[1]));
-      } else {
-        closeList();
-        out.push(Blocks.inlineHtml(l));
+      const m = /^( *)(-|\d+\.) (.*)$/.exec(l);
+      if (!m || (!stack.length && m[1].length)) { stack = []; out.push({ line: l }); continue; }
+      const indent = m[1].length;
+      const tag = m[2] === '-' ? 'ul' : 'ol';
+      while (stack.length > 1 && indent < stack[stack.length - 1].indent) stack.pop();
+      let top = stack[stack.length - 1];
+      if (top && indent > top.indent) {
+        const list = { tag, items: [] };
+        top.list.items[top.list.items.length - 1].subs.push(list);
+        stack.push({ indent, list });
+      } else if (!top || top.list.tag !== tag) {
+        const list = { tag, items: [] };
+        if (stack.length > 1) {
+          stack.pop();
+          const parent = stack[stack.length - 1].list.items;
+          parent[parent.length - 1].subs.push(list);
+          stack.push({ indent, list });
+        } else {
+          out.push({ list });
+          stack = [{ indent, list }];
+        }
       }
+      top = stack[stack.length - 1];
+      top.list.items.push({ text: m[3], subs: [] });
     }
-    closeList();
-    return out.join('<br>');
+    return out;
+  },
+  listHtml(list) {
+    return `<${list.tag}>${list.items.map((x) => `<li>${Blocks.inlineHtml(x.text)}${x.subs.map(Blocks.listHtml).join('')}</li>`).join('')}</${list.tag}>`;
   },
 
-  /** Lignes de Markdown → HTML publié : paragraphes `<p>` (lignes jointes par `<br>`), listes `<ul>` / `<ol>`. */
+  /** Lignes de Markdown → HTML d'un champ modifiable : lignes séparées par `<br>`, listes en `<ul><li>` / `<ol><li>` (imbriquées). */
+  linesToHtml(lines) {
+    return Blocks.listTree(lines).map((n) => (n.list ? Blocks.listHtml(n.list) : Blocks.inlineHtml(n.line))).join('<br>');
+  },
+
+  /** Lignes de Markdown → HTML publié : paragraphes `<p>` (lignes jointes par `<br>`), listes `<ul>` / `<ol>` (imbriquées). */
   flowHtml(lines) {
     const out = [];
     let para = [];
-    let list = null;
-    const flushPara = () => { if (para.length) out.push(`<p>${para.map(Blocks.inlineHtml).join('<br>')}</p>`); para = []; };
-    const flushList = () => { if (list) out.push(`<${list.tag}>${list.items.map((x) => `<li>${Blocks.inlineHtml(x)}</li>`).join('')}</${list.tag}>`); list = null; };
-    for (const l of lines) {
-      const m = /^(?:(-)|\d+\.) (.*)$/.exec(l);
-      if (m) {
-        flushPara();
-        const tag = m[1] ? 'ul' : 'ol';
-        if (list && list.tag !== tag) flushList();
-        list = list || { tag, items: [] };
-        list.items.push(m[2]);
-      } else if (l.trim() === '') { flushPara(); flushList(); }
-      else { flushList(); para.push(l); }
+    const flush = () => { if (para.length) out.push(`<p>${para.map(Blocks.inlineHtml).join('<br>')}</p>`); para = []; };
+    for (const n of Blocks.listTree(lines)) {
+      if (n.list) { flush(); out.push(Blocks.listHtml(n.list)); }
+      else if (n.line.trim() === '') flush();
+      else para.push(n.line);
     }
-    flushPara();
-    flushList();
+    flush();
     return out.join('');
   },
 
@@ -242,20 +247,17 @@ const Blocks = {
           else put(lead + f.mark + core + f.mark + trail);
         }
       } else if (tag === 'ul' || tag === 'ol') {
-        if (!closing) {
-          if (cur !== '') flush();
-          lists.push({ tag, n: 0 });
-        } else {
-          if (cur !== '' || liPrefix !== '') flush();
-          lists.pop();
-        }
+        // Liste, éventuellement dans une autre (dans un <li>, ou directement dans la liste comme le fait execCommand('indent')).
+        if (cur !== '' || liPrefix !== '') flush();
+        if (!closing) lists.push({ tag, n: 0, width: 2 });
+        else lists.pop();
       } else if (tag === 'li') {
+        if (cur !== '' || liPrefix !== '') flush();
         if (!closing) {
-          if (cur !== '') flush();
           const top = lists[lists.length - 1];
-          liPrefix = top && top.tag === 'ol' ? `${++top.n}. ` : '- ';
-        } else {
-          flush();
+          const marker = top && top.tag === 'ol' ? `${++top.n}. ` : '- ';
+          if (top) top.width = marker.length;
+          liPrefix = ' '.repeat(lists.slice(0, -1).reduce((w, l) => w + l.width, 0)) + marker;
         }
       } else if (tag === 'br') {
         if (liPrefix === '') flush();
@@ -365,7 +367,7 @@ const Blocks = {
     return b.title ? ['**' + b.title + '**', ...lines] : lines;
   },
   /** Les lignes d'un bloc texte, en HTML, sans puces : sert à vérifier qu'une conversion ne perd rien. */
-  lines(b) { return Blocks.mdLines(b).map((l) => l.replace(/^(?:[-*]|\d+\.) /, '')).map(Blocks.inlineHtml); },
+  lines(b) { return Blocks.mdLines(b).map((l) => l.replace(/^\s*(?:[-*]|\d+\.) /, '')).map(Blocks.inlineHtml); },
 
   /** Convertit un bloc texte en un autre type texte. Entre encadrés, l'icône et le titre suivent ; sinon le titre devient une ligne. */
   convert(b, type) {
@@ -373,7 +375,8 @@ const Blocks = {
     const to = Blocks.def(type);
     const keep = Blocks.CALLOUTS.includes(b.type) && Blocks.CALLOUTS.includes(type);
     const lines = keep ? Blocks.htmlToMd(b.html ?? '', true).split('\n').filter((l) => l.trim() !== '') : Blocks.mdLines(b);
-    if (to.single) return { type, html: Blocks.esc(Blocks.stripTags(lines.map(Blocks.inlineHtml).join(' ').replace(/<\/li>/g, ' ')).replace(/\s+/g, ' ').trim()) };
+    // Vers un titre : une seule ligne, sans puces.
+    if (to.single) return { type, html: Blocks.esc(Blocks.stripTags(lines.map((l) => Blocks.inlineHtml(l.replace(/^\s*(?:[-*]|\d+\.) /, ''))).join(' ')).replace(/\s+/g, ' ').trim()) };
     return { ...Blocks.blank(type), ...(keep ? { icon: b.icon, title: b.title } : {}), html: Blocks.linesToHtml(lines) };
   },
 

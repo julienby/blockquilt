@@ -16,7 +16,9 @@ Le portail s'ouvre avec le **bip gris**. Garez-vous *à gauche*, devant le ++gar
 Le code est ==1515==, voir [le plan](https://exemple.fr/plan).
 
 - porte bleue
-- boîte aux lettres à droite
+- boîte aux lettres
+  - à droite du portail
+  - nom sur l'étiquette
 
 > [!tip] 🔑 La clé
 > Elle est dans la boîte aux lettres.
@@ -53,7 +55,7 @@ ssh maison.local
 | Titre H2 | `## Titre` sur une seule ligne |
 | Titre H3 | `### Titre` sur une seule ligne |
 | Texte | Lignes de texte. Un retour à la ligne simple reste dans le même paragraphe. |
-| Liste | Lignes `- élément` ou `1. élément`, dans un bloc texte |
+| Liste | Lignes `- élément` ou `1. élément`, dans un bloc texte. Sous-liste : indenter de la largeur de la puce du parent (2 espaces sous `- `, 3 sous `1. `). |
 | Citation | Chaque ligne commence par `> ` |
 | Encadré | Première ligne `> [!type]`, puis facultatifs un emoji et un titre : `> [!tip] 🔑 La clé`. Le texte suit, chaque ligne commençant par `> `. |
 | Photo | `![légende](media/<id>)` ou `![légende](https://…)`, seule sur sa ligne |
@@ -70,7 +72,7 @@ ssh maison.local
 ## Ce qu'il ne faut pas écrire
 
 - `#` (titre de niveau 1) dans le corps : le titre du document est dans le frontmatter.
-- Un encadré dans un autre, ou une liste à plusieurs niveaux.
+- Un encadré dans un autre.
 - Du HTML brut, des tableaux : gardés tels quels, mais affichés comme du texte source.
 - Un bloc `:::` dans un autre bloc `:::`.
 

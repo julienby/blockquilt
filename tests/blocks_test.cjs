@@ -9,7 +9,7 @@ const types = (md) => Blocks.parse(md).blocks.map((b) => b.type).join();
 // ---- Fixtures : un fichier par type, un document complet. Aller-retour exact. ----
 const FIX = path.join(__dirname, 'fixtures');
 const expected = {
-  'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
+  'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
   'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
 };
@@ -140,6 +140,15 @@ ok(Blocks.toMarkdown(Blocks.merge({ type: 'text', html: 'Avant' }, { type: 'h2',
 ok(Blocks.toMarkdown(Blocks.merge({ type: 'warning', icon: '', title: '', html: 'a' }, { type: 'info', icon: '', title: 'T', html: 'b' })) === '> [!warning]\n> a\n> **T**\n> b', 'fusion attention + info : attention l’emporte, le titre du dessous devient une ligne');
 ok(Blocks.merge({ type: 'h2', html: 'Garage' }, list) === null, 'fusion sous un titre : refusée');
 ok(Blocks.merge(tip, { type: 'photo', src: 'media/aabbccddeeff', alt: '' }) === null && Blocks.merge({ type: 'raw', md: '| a |' }, list) === null && Blocks.merge(tip, { type: 'hr' }) === null, 'fusion avec média, ligne ou bloc source : refusée');
+
+// ---- Listes à plusieurs niveaux ----
+for (const md of ['- a\n  - b\n    - c\n- d', '1. un\n   - sous\n2. deux', '- a\n  1. x\n  2. y\n- b', [...Array(10)].map((_, i) => `${i + 1}. n${i + 1}`).join('\n') + '\n    - sous dix']) ok(roundtrip(md), 'liste imbriquée, aller-retour : ' + JSON.stringify(md));
+ok(Blocks.fromMarkdown('- a\n  - b').html === '<ul><li>a<ul><li>b</li></ul></li></ul>', 'liste imbriquée : <ul> dans le <li> parent');
+ok(Blocks.toHtml('- a\n  - b\n- c', { title: false }).includes('<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>'), 'liste imbriquée : rendu publié');
+ok(md('<ul><li>a</li><ul><li>b</li></ul><li>c</li></ul>') === '- a\n  - b\n- c', 'liste imbriquée à la manière d’execCommand (ul dans ul) : lue');
+ok(md('<ol><li>un<ul><li>sous</li></ul></li><li>deux</li></ol>') === '1. un\n   - sous\n2. deux', 'liste imbriquée sous une liste numérotée : 3 espaces');
+ok(Blocks.toMarkdown(Blocks.merge({ type: 'tip', icon: '', title: '', html: 'a' }, Blocks.fromMarkdown('- x\n  - y'))) === '> [!tip]\n> a\n> - x\n>   - y', 'fusion : l’imbrication est gardée');
+ok(L(Blocks.convert(Blocks.fromMarkdown('- x\n  - y'), 'h2')).join(' ') === 'x y', 'conversion en titre : lignes imbriquées gardées');
 
 // ---- Icône : un emoji collé depuis n'importe où ----
 ok(Blocks.firstEmoji(' 🏊 piscine') === '🏊' && Blocks.firstEmoji('🇫🇷') === '🇫🇷' && Blocks.firstEmoji('👨‍👩‍👧 x') === '👨‍👩‍👧' && Blocks.firstEmoji('❤️') === '❤️' && Blocks.firstEmoji('👍🏽') === '👍🏽' && Blocks.firstEmoji('1️⃣') === '1️⃣', 'icône : premier emoji gardé (drapeau, famille, cœur, teinte, touche)');

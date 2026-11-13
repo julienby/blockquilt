@@ -6,3 +6,14 @@ Seconde ligne du même paragraphe.
 
 1. ouvrir
 2. fermer
+
+- fruits
+  - pommes
+    - golden
+  - poires
+- légumes
+
+1. Préparer
+   - laver
+   - couper
+2. Cuire

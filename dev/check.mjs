@@ -373,6 +373,27 @@ try {
   }
   await viewport(375);
 
+  await open();
+  // Listes : Tab / Maj+Tab
+  await ev(`(() => {
+    editor.setMarkdown('- a\\n- b\\n- c');
+    const li = [...document.querySelectorAll('[data-bq] [data-rich] li')][1];
+    li.closest('[data-rich]').focus();
+    getSelection().collapse(li.firstChild, 1);
+  })()`);
+  await key('Tab', 'Tab', 9);
+  ok((await mdNow()) === '- a\n  - b\n- c\n', 'liste : Tab descend l’élément d’un niveau');
+  ok(await ev(`getSelection().anchorNode.textContent === 'b' && document.activeElement.matches('[data-rich]')`), 'liste : le curseur reste dans l’élément');
+  await ev(`(() => { const li = [...document.querySelectorAll('[data-bq] [data-rich] li')].find((x) => x.firstChild.textContent === 'c'); getSelection().collapse(li.firstChild, 1); })()`);
+  await key('Tab', 'Tab', 9);
+  await key('Tab', 'Tab', 9);
+  ok((await mdNow()) === '- a\n  - b\n    - c\n', 'liste : Tab répété, trois niveaux');
+  await ev(`(() => { const li = [...document.querySelectorAll('[data-bq] [data-rich] li')].find((x) => x.firstChild.textContent === 'b'); getSelection().collapse(li.firstChild, 1); })()`);
+  await key('Tab', 'Tab', 9, SHIFT);
+  ok((await mdNow()) === '- a\n- b\n  - c\n', 'liste : Maj+Tab remonte l’élément, ses enfants le suivent');
+  await key('Tab', 'Tab', 9, SHIFT);
+  ok(await ev(`!document.activeElement.matches('[data-rich]')`) && (await mdNow()) === '- a\n- b\n  - c\n', 'liste : Maj+Tab au premier niveau rend le focus (pas de piège clavier)');
+
   // ---- Phase 6 : emoji ----
   ok(fs.statSync(path.join(DIR, '..', 'emoji.json')).size < 150 * 1024, 'emoji.json : moins de 150 ko');
   requests.length = 0;
