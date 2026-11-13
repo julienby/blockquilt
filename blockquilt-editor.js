@@ -140,8 +140,9 @@
     element.innerHTML = `<div data-bq class="bq-app flex min-h-full w-full flex-col bg-white font-jakarta text-stone-800"${o.width ? ` style="--bq-width: ${attr(o.width)}"` : ''}>
       <header data-head class="sticky top-0 z-20 flex min-h-14 items-center gap-0.5 border-b border-stone-200/80 bg-white/95 px-1.5 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-3">
         ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn text-stone-500">${ic('chevron_left')}</a>` : ''}
-        <button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
-        <div data-title contenteditable="true" role="textbox" aria-label="Titre du document" data-placeholder="Sans titre" spellcheck="false" class="bq-edit min-w-0 flex-1 truncate px-1 text-base font-extrabold leading-snug text-stone-900 sm:text-lg"></div>
+        ${o.title ? `<button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
+        <div data-title contenteditable="true" role="textbox" aria-label="Titre du document" data-placeholder="Sans titre" spellcheck="false" class="bq-edit min-w-0 flex-1 truncate px-1 text-base font-extrabold leading-snug text-stone-900 sm:text-lg"></div>`
+          : `<span data-label class="min-w-0 flex-1 truncate px-2 text-sm font-semibold text-stone-500">${esc(o.label || '')}</span>`}
         <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn text-stone-600">${ic('undo')}</button>
         <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('redo')}</button>
         <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn text-stone-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
@@ -214,8 +215,10 @@
     const canvas = $('[data-canvas]');
     const bar = $('[data-bar]');
     const head = $('[data-head]');
-    const titleEl = $('[data-title]');
-    const iconBtn = $('[data-doc-icon]');
+    // Titre et icône du document : seulement avec l'option `title` (l'éditeur peut ne remplir qu'une partie d'une page).
+    // Sans elle, ces deux éléments existent hors de la page (aucun écouteur n'y arrive) et le frontmatter est gardé tel quel.
+    const titleEl = $('[data-title]') || document.createElement('div');
+    const iconBtn = $('[data-doc-icon]') || document.createElement('button');
     const saveBtn = $('[data-save]');
     const fileInput = $('[data-file]');
     const toastEl = $('[data-toast]');
@@ -285,6 +288,7 @@
     const showIcon = () => { iconBtn.textContent = icon || '📄'; iconBtn.classList.toggle('grayscale', !icon); };
     const docMeta = () => {
       const m = { ...meta };
+      if (!o.title) return m;
       const title = titleEl.textContent.replace(/\s+/g, ' ').trim();
       if (title) m.title = title; else delete m.title;
       if (icon) m.icon = icon; else delete m.icon;

@@ -84,6 +84,7 @@ Blockquilt.mount(document.getElementById('editor'), { source, saveUrl: 'api/save
       uploadUrl: 'api/upload',
       previewUrl: 'api/preview',
       fields: { _csrf: 'demo' },
+      label: 'Démo blockquilt', // libellé fixe dans l'en-tête ; `title: true` montre à la place le titre et l'icône du document
       html: true,
       aiUrl: 'api/ai',
     });

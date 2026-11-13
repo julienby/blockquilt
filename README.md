@@ -44,6 +44,8 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 | `media` | Adresse des photos : `media/<id>` du texte devient `media + id` à l'écran (`media/` par défaut). |
 | `previewUrl` | Aperçu rendu par le serveur. Sans elle, l'éditeur rend lui-même avec `Blocks.toHtml`. |
 | `aiUrl` | Assistant IA. Sans elle, aucun bouton IA. |
+| `title` | `true` pour montrer le titre et l'icône du document dans l'en-tête (frontmatter `title` / `icon`). Absent par défaut : l'éditeur peut ne remplir qu'une partie d'une page ; le frontmatter est alors gardé tel quel. |
+| `label` | Libellé fixe (non modifiable) dans l'en-tête, à la place du titre. Par exemple « Description du logement ». |
 | `backUrl` | Bouton retour (avec confirmation si des modifications ne sont pas enregistrées). |
 | `fields` | Champs ajoutés à chaque envoi (par exemple un jeton CSRF). |
 | `html` | `true` pour proposer le bloc HTML (désactivé par défaut). |

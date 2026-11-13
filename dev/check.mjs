@@ -205,6 +205,13 @@ try {
   const borders = await ev(`(() => { editor.setMarkdown('## Section\\n\\n### Sous-section'); const w = (t) => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === t); const s = getComputedStyle(c); return s.borderTopWidth + ' ' + s.borderTopColor; }; return { h2: w('h2'), h3: w('h3') }; })()`);
   ok(borders.h2 === '2px rgb(28, 25, 23)' && borders.h3 === '1px rgb(28, 25, 23)', `bordure noire : H2 épaisse, H3 fine (${JSON.stringify(borders)})`);
 
+  // ---- Titre facultatif : par défaut, pas de titre imposé dans l'en-tête ----
+  await viewport(375);
+  await open();
+  ok(await ev(`!document.querySelector('[data-bq] [data-title], [data-bq] [data-doc-icon]') && document.querySelector('[data-bq] [data-label]').textContent === 'Démo blockquilt'`), 'en-tête : pas de titre imposé, libellé fixe de l’hôte (option label)');
+  ok(await ev(`editor.getMarkdown().startsWith('---\\ntitle: Arrivée\\nicon: 🏡\\n---')`), 'sans titre affiché : le frontmatter (title, icon) est gardé tel quel');
+  ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: '---\\ntitle: T\\n---\\n\\nx', title: true }); const ok = el.querySelector('[data-title]').textContent === 'T' && !!el.querySelector('[data-doc-icon]'); el.querySelector('[data-title]').textContent = 'Nouveau'; const md = e.getMarkdown(); e.destroy(); el.remove(); return ok && md.startsWith('---\\ntitle: Nouveau'); })()`), 'option title : titre et icône du document dans l’en-tête, écrits dans le frontmatter');
+
   // ---- Deux éditeurs dans la même page, puis destroy() ----
   await open();
   const two = await ev(`(() => {
@@ -292,9 +299,9 @@ try {
   })()`), 'Ctrl+Z pendant la frappe : laissé au navigateur');
 
   // Ctrl+S
-  await ev(`(() => { const t = document.querySelector('[data-title]'); t.textContent = 'Titre Ctrl S'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); document.activeElement.blur(); })()`);
+  await ev(`(() => { const t = document.querySelector('[data-bq] [data-rich]'); t.focus(); document.execCommand('insertText', false, 'Titre Ctrl S'); document.activeElement.blur(); })()`);
   await key('s', 'KeyS', 83, CTRL);
-  md = await saved((x) => x.includes('title: Titre Ctrl S'), 'Ctrl+S');
+  md = await saved((x) => x.includes('Titre Ctrl S'), 'Ctrl+S');
   ok(true, 'Ctrl+S : document.md écrit sur le disque');
 
   // Barre de mise en forme stable
@@ -460,12 +467,17 @@ try {
   await open();
   ok(await ev(`[...document.querySelectorAll('[data-callout-icon]')].some((b) => b.textContent === '🔑')`), 'icône d’encadré : revient à l’ouverture');
   ok(await ev(`(async () => {
-    document.querySelector('[data-doc-icon]').click();
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: '---\\ntitle: Doc\\n---\\n\\nTexte', title: true });
+    el.querySelector('[data-doc-icon]').click();
     await new Promise((r) => setTimeout(r, 100));
-    const recents = [...document.querySelectorAll('[data-sheet="icon"] [data-emoji-grid] button')].map((b) => b.dataset.iconPick);
-    document.querySelector('[data-sheet="icon"] [data-icon-pick="🔑"]').click();
-    return recents[0] === '🔑' && document.querySelector('[data-doc-icon]').textContent === '🔑' && editor.getMarkdown().includes('icon: 🔑');
-  })()`), 'icône du document : choisie dans « Récents » (localStorage), écrite dans le frontmatter');
+    const sheet = el.querySelector('[data-sheet="icon"]');
+    const recents = [...sheet.querySelectorAll('[data-emoji-grid] button')].map((b) => b.dataset.iconPick);
+    sheet.querySelector('[data-icon-pick="🔑"]').click();
+    const ok = recents[0] === '🔑' && el.querySelector('[data-doc-icon]').textContent === '🔑' && e.getMarkdown().startsWith('---\\ntitle: Doc\\nicon: 🔑\\n---');
+    e.destroy(); el.remove();
+    return ok;
+  })()`), 'icône du document (option title) : choisie dans « Récents » (localStorage), écrite dans le frontmatter');
   ok(await ev(`(async () => {
     const f = document.querySelector('[data-bq] [data-rich]'); f.focus();
     getSelection().selectAllChildren(f); getSelection().collapseToEnd();
@@ -586,7 +598,7 @@ try {
   ok(await ev(`[...document.querySelectorAll('[data-bq] input, [data-bq] textarea, [data-bq] select, [data-bq] [contenteditable]')].every((f) => f.getAttribute('aria-label') || f.labels?.length)`), 'chaque champ a une étiquette');
 
   // Parcours complet sans souris : ajouter, écrire, mettre en forme, déplacer, supprimer.
-  await ev(`(() => { editor.setMarkdown('## Début\\n\\nPremier bloc'); document.querySelector('[data-title]').focus(); })()`);
+  await ev(`(() => { editor.setMarkdown('## Début\\n\\nPremier bloc'); document.querySelector('[data-head] [data-preview]').focus(); })()`);
   const TAB = ['Tab', 'Tab', 9];
   const tabTo = async (selector, back = false) => {
     for (let i = 0; i < 60; i++) {
