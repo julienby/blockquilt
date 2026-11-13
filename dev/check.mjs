@@ -433,6 +433,7 @@ try {
   const real = await ev(`(() => { const d = document.querySelector('[data-block-full]'); const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2); return { open: d.open, fs: !document.fullscreenElement, w: d.getBoundingClientRect().width === innerWidth && d.getBoundingClientRect().height === innerHeight, hit: d.contains(hit), chrome: !!d.querySelector('.bq-card, [data-rail], [data-convert], [data-delete]'), field: d.contains(document.activeElement) && document.activeElement.matches('[contenteditable], textarea, input') }; })()`);
   ok(real.open && real.fs && real.w && real.hit, `PC : bloc en plein écran, toute la fenêtre, au premier plan, sans plein écran du navigateur (${JSON.stringify(real)})`);
   ok(!real.chrome && real.field, 'bloc en plein écran : sans habillage de carte, curseur dans le texte');
+  ok(await ev(`(() => { const b = document.querySelector('[data-block-full] [data-block-full-close]'); const r = b.getBoundingClientRect(); return !!b.querySelector('svg[data-icon="minimize"]') && b.getAttribute('aria-label') === 'Quitter le plein écran' && r.right > innerWidth - 60 && r.top < 60; })()`), 'bloc en plein écran : l’icône « agrandir » devient « réduire », en haut à droite');
   await send('Input.insertText', { text: ' (vrai clic)' });
   await key('Escape', 'Escape', 27);
   await sleep(200);
