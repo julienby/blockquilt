@@ -44,7 +44,6 @@
     paste: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
     split: '<path d="M3 12h4M17 12h4M10 12h4"/><path d="m8 5 4 4 4-4"/><path d="m8 19 4-4 4 4"/>',
     list: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
-    eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
     smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
     wand: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>',
   };
@@ -150,14 +149,18 @@
         <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn text-stone-600 sm:hidden">${ic('more')}</button>
       </header>
       <div data-canvas class="flex-1 bg-stone-50/60 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
-      <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 px-1 text-white shadow-2xl">
+      <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 text-white shadow-2xl">
+        <div data-bar-clip hidden role="group" aria-label="Presse-papiers" class="flex basis-full justify-center gap-1 border-b border-white/15 py-1">
+          <button type="button" data-clip="copy" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('copy', 'size-4')}Copier</button>
+          <button type="button" data-clip="cut" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('cut', 'size-4')}Couper</button>
+          <button type="button" data-clip="paste" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('paste', 'size-4')}Coller</button></div>
         <button type="button" data-fmt="bold" aria-label="Gras" class="bq-btn font-extrabold">B</button>
         <button type="button" data-fmt="italic" aria-label="Italique" class="bq-btn font-news italic">I</button>
         <button type="button" data-fmt="underline" aria-label="Souligner" class="bq-btn underline">U</button>
         <button type="button" data-fmt="highlight" aria-label="Surligner" class="bq-btn"><span class="size-4 rounded bg-amber-300"></span></button>
         <button type="button" data-fmt="insertUnorderedList" aria-label="Liste à puces" class="bq-btn">${ic('list')}</button>
         <button type="button" data-emoji-insert aria-label="Insérer un emoji" class="bq-btn">${ic('smile')}</button>
-        <button type="button" data-fmt="clear" aria-label="Effacer la mise en forme" class="bq-btn text-stone-300">${ic('eraser')}</button>
+        <button type="button" data-clip-toggle aria-label="Copier, couper, coller" aria-expanded="false" class="bq-btn text-stone-300 aria-expanded:bg-white/15 aria-expanded:text-white">${ic('paste')}</button>
         <button type="button" data-split aria-label="Scinder le bloc au curseur" class="bq-btn text-stone-300">${ic('split')}</button>
       </div>
       <div class="pointer-events-none fixed inset-x-0 top-16 z-[60] flex justify-center">
@@ -983,7 +986,7 @@
       // Mise en forme au clavier : Ctrl+B, Ctrl+I, Ctrl+U ; Alt+F10 donne le focus à la barre.
       const cmd = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && { b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()];
       if (cmd) { e.preventDefault(); document.execCommand(cmd); setDirty(true); typed(); return; }
-      if (e.altKey && e.key === 'F10') { e.preventDefault(); showBar(rich); bar.querySelector('button').focus(); }
+      if (e.altKey && e.key === 'F10') { e.preventDefault(); showBar(rich); bar.querySelector('[data-fmt]').focus(); }
     });
 
     // Change le niveau d'un élément de liste ; le curseur et la sélection restent en place. Renvoie false si impossible.
@@ -1033,14 +1036,44 @@
       bar.hidden = false;
       placeBar();
     };
-    const hideBar = () => { bar.hidden = true; barField = null; barRange = null; };
+    const hideBar = () => { bar.hidden = true; barField = null; barRange = null; toggleClip(false); };
+    // Sous-menu presse-papiers de la barre : copier, couper, coller le texte sélectionné (texte simple).
+    const toggleClip = (open) => {
+      const row = bar.querySelector('[data-bar-clip]');
+      const show = open ?? row.hidden;
+      row.hidden = !show;
+      bar.querySelector('[data-clip-toggle]').setAttribute('aria-expanded', String(show));
+      placeBar();
+    };
+    const clipboard = async (what) => {
+      const sel = getSelection();
+      if (!barField || !sel.rangeCount) return;
+      if (what === 'paste') {
+        let text = '';
+        try { text = await navigator.clipboard.readText(); } catch { /* refusé : copie interne */ }
+        if (!text) text = Blockquilt.clipboard || '';
+        if (!text) return toast('Presse-papiers vide');
+        backToField();
+        document.execCommand('insertText', false, text);
+      } else {
+        const text = sel.toString();
+        if (!text) return toast('Sélectionnez du texte');
+        Blockquilt.clipboard = text;
+        await navigator.clipboard?.writeText(text).catch(() => {});
+        if (what === 'cut') { backToField(); document.execCommand('delete'); }
+        toast(what === 'cut' ? 'Texte coupé' : 'Texte copié');
+      }
+      setDirty(true);
+      typed();
+      toggleClip(false);
+    };
     const backToField = () => {
       if (!barField || document.activeElement === barField) return;
       barField.focus({ preventScroll: true });
       if (barRange) { getSelection().removeAllRanges(); getSelection().addRange(barRange); }
     };
     on(bar, 'keydown', (e) => {
-      const buttons = [...bar.querySelectorAll('button')];
+      const buttons = [...bar.querySelectorAll('button')].filter((b) => b.offsetParent);
       const i = buttons.indexOf(document.activeElement);
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); backToField(); }
       else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); buttons[(i + (e.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length].focus(); }
@@ -1080,6 +1113,9 @@
       backToField();
       const sel = getSelection();
       if (e.target.closest('[data-split]')) { if (sel.rangeCount) split(sel.getRangeAt(0)); return; }
+      if (e.target.closest('[data-clip-toggle]')) return toggleClip();
+      const clip = e.target.closest('[data-clip]')?.dataset.clip;
+      if (clip) return clipboard(clip);
       if (e.target.closest('[data-emoji-insert]')) {
         const field = barField;
         if (!field || !sel.rangeCount) return;
@@ -1096,9 +1132,6 @@
         const inside = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement).closest('mark');
         if (inside) unwrapMarks(range);
         else { const m = document.createElement('mark'); m.append(range.extractContents()); range.insertNode(m); sel.removeAllRanges(); sel.selectAllChildren(m); }
-      } else if (what === 'clear') {
-        document.execCommand('removeFormat');
-        unwrapMarks(sel.getRangeAt(0));
       } else document.execCommand(what);
       setDirty(true);
     });

@@ -111,7 +111,7 @@ try {
   })()`);
   ok(await ev(`!document.querySelector('[data-bar]').hidden`), 'clic droit : la barre de mise en forme s’ouvre');
   ok(await ev(`(() => { const r = document.querySelector('[data-bar]').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; })()`), 'barre de mise en forme : tient dans un écran de 375 px');
-  ok(await ev(`[...document.querySelectorAll('[data-bar] button')].every((b) => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })`), 'barre de mise en forme : boutons de 44 px');
+  ok(await ev(`[...document.querySelectorAll('[data-bar] button')].filter((b) => b.offsetParent).every((b) => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })`), 'barre de mise en forme : boutons de 44 px');
   await ev(`document.querySelector('[data-split]').click()`);
   c = await cards();
   ok(c.length === 6 && c.some((x) => x === 'text:Réseau : maison-wifi'), 'scission : la suite part dans un nouveau bloc');
@@ -393,6 +393,24 @@ try {
   ok((await mdNow()) === '- a\n- b\n  - c\n', 'liste : Maj+Tab remonte l’élément, ses enfants le suivent');
   await key('Tab', 'Tab', 9, SHIFT);
   ok(await ev(`!document.activeElement.matches('[data-rich]')`) && (await mdNow()) === '- a\n- b\n  - c\n', 'liste : Maj+Tab au premier niveau rend le focus (pas de piège clavier)');
+
+  // Barre : copier / couper / coller le texte sélectionné, dans un sous-menu
+  const selectIn = (from, to) => ev(`(() => { const f = document.querySelector('[data-bq] [data-rich]'); f.focus(); const t = f.firstChild; const r = document.createRange(); r.setStart(t, ${from}); r.setEnd(t, ${to}); getSelection().removeAllRanges(); getSelection().addRange(r); f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); })()`);
+  await ev(`editor.setMarkdown('Bonjour monde')`);
+  await selectIn(0, 7);
+  ok(await ev(`(() => { const r = document.querySelector('[data-bar]').getBoundingClientRect(); return r.height < 60 && r.right <= innerWidth && document.querySelector('[data-bar-clip]').hidden; })()`), 'barre : une seule ligne à 375 px, sous-menu fermé');
+  await ev(`document.querySelector('[data-clip-toggle]').click()`);
+  ok(await ev(`!document.querySelector('[data-bar-clip]').hidden && document.querySelector('[data-clip-toggle]').getAttribute('aria-expanded') === 'true'`), 'barre : le sous-menu presse-papiers s’ouvre');
+  await ev(`document.querySelector('[data-clip="copy"]').click()`);
+  await sleep(100);
+  ok((await ev(`navigator.clipboard.readText()`)) === 'Bonjour' && await ev(`document.querySelector('[data-bar-clip]').hidden`), 'barre : « Copier » met la sélection dans le presse-papiers');
+  await selectIn(7, 13);
+  await ev(`(() => { document.querySelector('[data-clip-toggle]').click(); document.querySelector('[data-clip="cut"]').click(); })()`);
+  await sleep(100);
+  ok((await ev(`navigator.clipboard.readText()`)) === ' monde' && (await mdNow()) === 'Bonjour\n', 'barre : « Couper » retire le texte et le garde');
+  await ev(`(() => { const f = document.querySelector('[data-bq] [data-rich]'); getSelection().collapse(f.firstChild, 0); f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); document.querySelector('[data-clip-toggle]').click(); document.querySelector('[data-clip="paste"]').click(); })()`);
+  await sleep(150);
+  ok((await mdNow()) === ' mondeBonjour\n', 'barre : « Coller » insère au curseur');
 
   // ---- Phase 6 : emoji ----
   ok(fs.statSync(path.join(DIR, '..', 'emoji.json')).size < 150 * 1024, 'emoji.json : moins de 150 ko');
