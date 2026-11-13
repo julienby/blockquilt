@@ -20,6 +20,7 @@
     sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
     chevron_left: '<path d="m15 6-6 6 6 6"/>',
     chevron_down: '<path d="m6 9 6 6 6-6"/>',
+    chevron_up: '<path d="m18 15-6-6-6 6"/>',
     chevron_right: '<path d="m9 18 6-6-6-6"/>',
     arrow_up: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
     arrow_down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
@@ -101,7 +102,7 @@
       read: (card, b) => { b.html = card.querySelector('[data-html]').value; },
       onInput: (card, ui) => { card.querySelector('[data-html-preview]').innerHTML = Blocks.sanitize(card.querySelector('[data-html]').value, ui.media); },
     });
-    Object.assign(Blocks.types.hr, { edit: () => '<hr class="my-3 border-t-2 border-stone-300">', read: () => {} });
+    Object.assign(Blocks.types.hr, { fullscreen: false, edit: () => '<hr class="my-3 border-t-2 border-stone-300">', read: () => {} });
     Object.assign(Blocks.types.code, {
       edit: (b) => `<input data-lang value="${attr(b.lang)}" placeholder="langage (js, html, sh…)" aria-label="Langage du code" class="mb-1 h-9 w-full bg-transparent font-mono text-xs focus:outline-none">
           <textarea data-code rows="${Math.min(16, Math.max(3, b.code.split('\n').length))}" spellcheck="false" aria-label="Code" class="w-full rounded-xl border border-slate-300 bg-white p-3 font-mono text-[13px] leading-5">${esc(b.code)}</textarea>`,
@@ -310,17 +311,27 @@
             ${ic('chevron_down', 'pointer-events-none absolute right-2 size-3 opacity-70')}</label>`
         : `<span class="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold ${t.tone.badge}">${ic(t.icon, 'size-3.5')}${esc(t.label)}</span>`;
     };
-    const card = (b) => `<article data-id="${b.id}" aria-label="${attr(def(b).label)}" class="bq-card rounded-2xl border ${def(b).tone.card} px-3 pb-3">
-        <div class="-mr-2 flex h-11 items-center gap-0.5">${badge(b)}<span class="flex-1"></span>
-          <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-btn cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
-          <button type="button" data-menu aria-label="Actions du bloc" aria-haspopup="dialog" class="bq-btn text-stone-500">${ic('more')}</button></div>
-        <div data-card-body>${editorOf(b).edit(b, ui)}</div></article>`;
+    // Carte : à gauche le type (liste de conversion), à droite du type trois boutons ronds (menu, agrandir, supprimer) ;
+    // colonne de droite : monter, poignée, descendre. Une action = un seul endroit.
+    const round = (data, icon, label, cls = 'text-stone-600') => `<button type="button" ${data} aria-label="${label}" title="${label}" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
+        <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white/70 transition-colors group-hover:bg-white group-active:bg-stone-100 ${cls}">${ic(icon, 'size-4')}</span></button>`;
+    const card = (b, i) => `<article data-id="${b.id}" aria-label="${attr(def(b).label)}" class="bq-card flex rounded-2xl border ${def(b).tone.card}">
+        <div class="min-w-0 flex-1 pb-3 pl-3 pr-1">
+          <div class="flex h-11 items-center">${badge(b)}<span class="flex-1"></span>
+            ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
+            ${def(b).fullscreen === false ? '' : round('data-expand', 'maximize', 'Plein écran')}
+            ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>
+          <div data-card-body>${editorOf(b).edit(b, ui)}</div></div>
+        <div data-rail class="flex w-11 shrink-0 select-none flex-col items-center justify-between border-l border-black/5 py-1">
+          <button type="button" data-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="Monter ce bloc" class="bq-rail">${ic('chevron_up', 'size-4')}</button>
+          <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-rail cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
+          <button type="button" data-move="1" ${i === blocks.length - 1 ? 'disabled' : ''} aria-label="Descendre ce bloc" class="bq-rail">${ic('chevron_down', 'size-4')}</button></div></article>`;
 
     // Bloc HTML désactivé (option `html` absente) : édité comme texte source, sans aperçu.
     const editorOf = (b) => (def(b).edit && (b.type !== 'html' || o.html) ? def(b) : Blocks.fallbackEditor);
     const render = () => (preview ? renderPreview() : renderEdit());
     const renderEdit = () => {
-      canvas.innerHTML = `<div class="relative mx-auto max-w-3xl">${blocks.map((b, i) => (i ? gap(i) : '') + card(b)).join('')}
+      canvas.innerHTML = `<div class="relative mx-auto max-w-3xl">${blocks.map((b, i) => (i ? gap(i) : '') + card(b, i)).join('')}
         <button type="button" data-insert="end" class="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
       canvas.querySelectorAll('.bq-edit').forEach(clean);
     };
@@ -430,11 +441,13 @@
       focusCard(b.id);
       return b;
     };
-    const move = (id, to) => {
+    // Après un déplacement, le focus reste sur le bouton utilisé (chevron ou poignée) de la carte déplacée.
+    const move = (id, to, focus = '[data-grip]') => {
       const i = blocks.findIndex((b) => b.id === id);
       if (i < 0 || to < 0 || to >= blocks.length || to === i) return;
       change(() => blocks.splice(to, 0, ...blocks.splice(i, 1)));
-      canvas.querySelector(`[data-id="${id}"] [data-grip]`)?.focus({ preventScroll: true });
+      const cardEl = canvas.querySelector(`[data-id="${id}"]`);
+      (cardEl?.querySelector(`${focus}:not(:disabled)`) || cardEl?.querySelector('[data-grip]'))?.focus({ preventScroll: true });
       canvas.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest' });
     };
     const merge = (index) => {
@@ -545,46 +558,37 @@
       menuId = id;
       const i = blocks.findIndex((b) => b.id === id);
       const b = blocks[i];
-      const t = def(b);
-      sheets.menu.querySelector('h2').textContent = t.label;
-      $('[data-menu-list]', sheets.menu).innerHTML = (t.convertible ? `<p class="px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">Changer de type</p>
-          <div class="mb-2 flex flex-wrap gap-1 px-2">${Blocks.TEXT_KEYS.filter((k) => k !== b.type).map((k) => `<button type="button" data-to="${k}" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-2.5 text-xs font-bold ${Blocks.types[k].tone.badge}">${ic(Blocks.types[k].icon, 'size-3.5')}${esc(Blocks.types[k].short)}</button>`).join('')}</div>` : '')
-        + (i > 0 ? item('data-act="up"', 'arrow_up', 'Monter') : '')
-        + (i < blocks.length - 1 ? item('data-act="down"', 'arrow_down', 'Descendre') : '')
-        + item('data-act="duplicate"', 'duplicate', 'Dupliquer')
+      sheets.menu.querySelector('h2').textContent = def(b).label;
+      // Le type, l'ordre, le plein écran et la suppression ont leur bouton sur la carte : ils ne sont pas répétés ici.
+      $('[data-menu-list]', sheets.menu).innerHTML = item('data-act="duplicate"', 'duplicate', 'Dupliquer')
         + item('data-act="copy"', 'copy', 'Copier')
-        + item('data-act="cut"', 'cut', 'Couper')
+        + item('data-act="paste-above"', 'paste', 'Coller au-dessus')
         + item('data-act="paste"', 'paste', 'Coller dessous')
-        + item('data-act="full"', 'maximize', 'Plein écran')
-        + (o.aiUrl ? item('data-act="ai"', 'wand', 'IA sur ce bloc', 'text-amber-800') : '')
-        + item('data-act="delete"', 'trash', 'Supprimer…', 'text-red-700 hover:bg-red-50');
+        + (o.aiUrl ? item('data-act="ai"', 'wand', 'IA sur ce bloc', 'text-amber-800') : '');
       openSheet('menu', from);
     };
     on(sheets.menu, 'click', (e) => {
-      const to = e.target.closest('[data-to]');
       const act = e.target.closest('[data-act]')?.dataset.act;
-      if (!to && !act) return;
+      if (!act) return;
       sheets.menu.close();
       const id = menuId;
       const i = blocks.findIndex((b) => b.id === id);
       if (i < 0) return;
-      if (to) return convert(id, to.dataset.to);
-      if (act === 'up') move(id, i - 1);
-      else if (act === 'down') move(id, i + 1);
-      else if (act === 'duplicate') { const copy = { ...structuredClone(blocks[i]), id: newId() }; change(() => blocks.splice(i + 1, 0, copy)); toast('Bloc dupliqué'); }
-      else if (act === 'copy' || act === 'cut') {
-        copyText(Blocks.toMarkdown(blocks[i]));
-        if (act === 'cut') change(() => blocks.splice(i, 1));
-        toast(act === 'cut' ? 'Bloc coupé' : 'Bloc copié');
-      } else if (act === 'paste') pasteBelow(id);
-      else if (act === 'full') openBlockFull(id);
+      if (act === 'duplicate') { const copy = { ...structuredClone(blocks[i]), id: newId() }; change(() => blocks.splice(i + 1, 0, copy)); toast('Bloc dupliqué'); }
+      else if (act === 'copy') { copyText(Blocks.toMarkdown(blocks[i])); toast('Bloc copié'); }
+      else if (act === 'paste' || act === 'paste-above') paste(id, act === 'paste' ? 1 : 0);
       else if (act === 'ai') openAi(id);
-      else if (act === 'delete') {
-        const preview = Blocks.stripTags(Blocks.toMarkdown(blocks[i])).replace(/\n/g, ' • ').trim();
+    });
+    const askDelete = (id) => {
+      syncFromDom();
+      menuId = id;
+      const b = blocks.find((x) => x.id === id);
+      if (b) {
+        const preview = Blocks.stripTags(Blocks.toMarkdown(b)).replace(/\n/g, ' • ').trim();
         $('[data-del-preview]', sheets.delete).textContent = preview ? `« ${preview.slice(0, 160)}${preview.length > 160 ? '…' : ''} »` : '(Bloc vide)';
         openSheet('delete');
       }
-    });
+    };
     on(sheets.delete, 'click', (e) => {
       if (!e.target.closest('[data-del-confirm]')) return;
       sheets.delete.close();
@@ -669,7 +673,7 @@
       Blockquilt.clipboard = text;
       navigator.clipboard?.writeText(text).catch(() => {});
     };
-    const pasteBelow = async (id) => {
+    const paste = async (id, offset) => {
       let text = '';
       try { text = await navigator.clipboard.readText(); } catch { /* refusé : copie interne */ }
       if (!text.trim()) text = Blockquilt.clipboard || '';
@@ -677,7 +681,7 @@
       if (!parsed.length) return toast('Presse-papiers vide');
       const i = blocks.findIndex((b) => b.id === id);
       const fresh = parsed.map((b) => ({ id: newId(), ...b }));
-      change(() => blocks.splice(i + 1, 0, ...fresh));
+      change(() => blocks.splice(i + offset, 0, ...fresh));
       toast(fresh.length > 1 ? `${fresh.length} blocs collés` : 'Bloc collé');
     };
 
@@ -906,6 +910,12 @@
       if (el.closest('[data-insert]')) { const v = el.closest('[data-insert]').dataset.insert; return openAdd(v === 'end' ? null : Number(v)); }
       if (el.closest('[data-merge]')) return merge(Number(el.closest('[data-merge]').dataset.merge));
       if (el.closest('[data-menu]')) return openMenu(id, el.closest('[data-menu]'));
+      if (el.closest('[data-expand]')) return openBlockFull(id);
+      if (el.closest('[data-delete]')) return askDelete(id);
+      if (el.closest('[data-move]')) {
+        const step = el.closest('[data-move]').dataset.move;
+        return move(id, blocks.findIndex((b) => b.id === id) + Number(step), `[data-move="${step}"]`);
+      }
       if (el.closest('[data-callout-icon]')) { syncFromDom(); return openIcon(id); }
       if (el.closest('[data-car-act], [data-car-add]')) return carousel(el, id);
       if (el.closest('[data-save]')) return save();

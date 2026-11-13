@@ -166,8 +166,9 @@ try {
     const h2 = [...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'h2');
     const cr = h2.getBoundingClientRect();
     const tr = h2.querySelector('[data-body]').getBoundingClientRect();
+    // Cible de 44 × 44 px ; colonne monter / poignée / descendre : 44 × 32 px (trois boutons empilés dans une carte de titre).
     const small = [...document.querySelectorAll('[data-bq] button, [data-bq] a')].filter((b) => b.offsetParent && !b.closest('dialog'))
-      .filter((b) => { const r = b.getBoundingClientRect(); return r.width < 44 || r.height < 44; }).map((b) => b.getAttribute('aria-label') || b.textContent.trim());
+      .filter((b) => { const r = b.getBoundingClientRect(); return r.width < 44 || r.height < (b.closest('[data-rail]') ? 32 : 44); }).map((b) => b.getAttribute('aria-label') || b.textContent.trim());
     return { scroll: document.documentElement.scrollWidth <= innerWidth, head: document.querySelector('[data-head]').getBoundingClientRect().height, top: tr.top - cr.top, bottom: cr.bottom - tr.bottom, small };
   })()`);
   for (const width of [375, 1280]) {
@@ -177,7 +178,7 @@ try {
     ok(l.scroll, `${width} px : aucune barre de défilement horizontale`);
     ok(l.head <= 64, `${width} px : en-tête sur une ligne (${l.head} px)`);
     ok(l.bottom <= l.top + 4, `${width} px : carte H2 sans vide en bas (haut ${l.top}, bas ${l.bottom})`);
-    if (width === 375) ok(l.small.length === 0, `375 px : chaque bouton mesure au moins 44 × 44 px ${l.small.join(', ')}`);
+    if (width === 375) ok(l.small.length === 0, `375 px : chaque bouton mesure au moins 44 × 44 px (44 × 32 dans la colonne de droite) ${l.small.join(', ')}`);
     await ev(`document.querySelector('[data-insert="end"]').click()`);
     ok(await ev(`(() => { const d = document.querySelector('[data-sheet="add"]'); const n = d.querySelector('.grid').children.length; const cols = getComputedStyle(d.querySelector('.grid')).gridTemplateColumns.split(' ').length; d.close(); return n > 0 && cols === ${width < 640 ? 2 : 3}; })()`), `${width} px : menu d’ajout en ${width < 640 ? 2 : 3} colonnes`);
   }
@@ -228,8 +229,19 @@ try {
   const count0 = (await cards()).length;
   await ev(`document.querySelectorAll('[data-bq] [data-id] [data-menu]')[1].click()`);
   ok(await ev(`!!document.querySelector('[data-sheet="menu"][open]')`), 'menu du bloc : s’ouvre depuis « ⋯ »');
-  ok(await ev(`['copy', 'cut', 'paste', 'full', 'delete', 'up', 'down', 'duplicate'].every((a) => document.querySelector('[data-sheet="menu"] [data-act="' + a + '"]'))`), 'menu du bloc : monter, descendre, dupliquer, copier, couper, coller, plein écran, supprimer');
-  await ev(`document.querySelector('[data-sheet="menu"] [data-act="delete"]').click()`);
+  ok(await ev(`[...document.querySelectorAll('[data-sheet="menu"] [data-act]')].map((b) => b.dataset.act).join() === 'duplicate,copy,paste-above,paste,ai'`), 'menu du bloc : dupliquer, copier, coller au-dessus, coller dessous, IA — rien d’autre');
+  await ev(`document.querySelector('[data-sheet="menu"]').close()`);
+  ok(await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].every((c) => c.querySelector('[data-menu]') && c.querySelector('[data-delete]') && c.querySelectorAll('[data-rail] button').length === 3)`), 'carte : menu, agrandir, supprimer à droite du type ; monter, poignée, descendre dans la colonne de droite');
+  ok(await ev(`(() => { const r = [...document.querySelectorAll('[data-bq] [data-rail]')]; return r[0].querySelector('[data-move="-1"]').disabled && r[r.length - 1].querySelector('[data-move="1"]').disabled && !r[1].querySelector('[data-move="-1"]').disabled; })()`), 'colonne de droite : monter désactivé sur le premier bloc, descendre sur le dernier');
+  {
+    const o0 = await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].map((c) => c.dataset.id).join()`);
+    await ev(`document.querySelectorAll('[data-bq] [data-rail]')[0].querySelector('[data-move="1"]').click()`);
+    const o1 = await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].map((c) => c.dataset.id).join()`);
+    ok(o1.split(',')[1] === o0.split(',')[0] && o1.split(',')[0] === o0.split(',')[1] && await ev(`document.activeElement.matches('[data-move="1"]')`), 'chevron bas : le bloc descend d’un cran, le focus reste sur le chevron');
+    await ev(`document.querySelectorAll('[data-bq] [data-rail]')[1].querySelector('[data-move="-1"]').click()`);
+    ok((await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].map((c) => c.dataset.id).join()`)) === o0, 'chevron haut : le bloc remonte');
+  }
+  await ev(`document.querySelectorAll('[data-bq] [data-id] [data-delete]')[1].click()`);
   await ev(`document.querySelector('[data-del-confirm]').click()`);
   const afterDel = await mdNow();
   ok(afterDel !== before && (await cards()).length === count0 - 1, 'suppression : un bloc de moins');
@@ -332,7 +344,7 @@ try {
     ok(full.open && full.inside && full.w === full.W && full.h === full.H, `${width} px : éditeur en plein écran, exactement ${full.W} × ${full.H} (${full.w} × ${full.h})`);
     await key('Escape', 'Escape', 27);
     ok(await ev(`!document.querySelector('[data-editor-full]').open && document.getElementById('editor').firstElementChild.matches('[data-bq]')`), `${width} px : Échap quitte le plein écran, l’éditeur revient à sa place`);
-    await ev(`(() => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === 'text'); c.querySelector('[data-menu]').click(); document.querySelector('[data-sheet="menu"] [data-act="full"]').click(); })()`);
+    await ev(`(() => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === 'text'); c.querySelector('[data-expand]').click(); })()`);
     const bf = await ev(`(() => { const d = document.querySelector('[data-block-full]'); const r = d.getBoundingClientRect(); const f = d.querySelector('[data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, ' Plein${width}'); return { open: d.open, w: r.width, h: r.height, W: innerWidth, H: innerHeight }; })()`);
     ok(bf.open && bf.w === bf.W && bf.h === bf.H, `${width} px : bloc en plein écran, exactement ${bf.W} × ${bf.H} (${bf.w} × ${bf.h})`);
     await key('Escape', 'Escape', 27);
@@ -508,16 +520,14 @@ try {
   await key('Enter', 'Enter', 13);
   ok((await mdNow()).includes('Bonjour ==**monde**==') || (await mdNow()).includes('Bonjour **==monde==**'), 'clavier : surligner depuis la barre');
   ok(await ev(`document.activeElement.matches('[data-rich]')`), 'clavier : retour au texte après la barre');
-  await tabTo('[data-grip]', true);
+  await tabTo('[data-grip]');
   await key('ArrowUp', 'ArrowUp', 38);
   ok(await ev(`Blocks.parse(editor.getMarkdown()).blocks[1].type === 'text' && editor.getMarkdown().split('\\n\\n')[1].startsWith('Bonjour')`), 'clavier : flèche haut sur la poignée remonte le bloc');
-  await tabTo('[data-menu]');
-  await key('Enter', 'Enter', 13);
-  await tabTo('[data-sheet="menu"] [data-act="delete"]');
+  await tabTo('[data-delete]', true);
   await key('Enter', 'Enter', 13);
   await tabTo('[data-del-confirm]');
   await key('Enter', 'Enter', 13);
-  ok(await ev(`!editor.getMarkdown().includes('Bonjour') && document.querySelectorAll('[data-bq] [data-id]').length === 2`), 'clavier : bloc supprimé depuis le menu « ⋯ »');
+  ok(await ev(`!editor.getMarkdown().includes('Bonjour') && document.querySelectorAll('[data-bq] [data-id]').length === 2`), 'clavier : bloc supprimé par son bouton « Supprimer »');
 
   ws.close();
 } catch (error) {
