@@ -34,7 +34,7 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 
 `mount` renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
 
-Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte, sans l'habillage de la carte). C'est un `<dialog>` qui couvre la fenêtre ; quand le navigateur le permet, il passe aussi en plein écran (barre d'adresse masquée). Échap ou « Terminer » quittent les deux.
+Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte, sans l'habillage de la carte). C'est un `<dialog>` qui couvre toute la fenêtre, sans le plein écran du navigateur (pas de message « Pour quitter le plein écran… »). Échap ou l'icône « réduire » le quittent.
 
 | Option | Rôle |
 |---|---|

@@ -420,7 +420,7 @@ try {
   await sleep(150);
   ok((await mdNow()) === ' mondeBonjour\n', 'barre : « Coller » insère au curseur');
 
-  // Evol2 : plein écran déclenché par un vrai clic (geste de l'utilisateur, donc plein écran du navigateur permis)
+  // Plein écran déclenché par un vrai clic (geste de l'utilisateur) : le dialogue couvre la fenêtre, sans plein écran du navigateur (pas de message « Pour quitter… »)
   const realClick = async (selector) => {
     const pt = await ev(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
     await mouse('mousePressed', pt.x, pt.y);
@@ -430,21 +430,21 @@ try {
   await viewport(1280);
   await open();
   await realClick('[data-bq] [data-id] [data-expand]');
-  const real = await ev(`(() => { const d = document.querySelector('[data-block-full]'); const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2); return { open: d.open, fs: document.fullscreenElement === d.querySelector('[data-full-inner]'), hit: d.contains(hit), chrome: !!d.querySelector('.bq-card, [data-rail], [data-convert], [data-delete]'), field: d.contains(document.activeElement) && document.activeElement.matches('[contenteditable], textarea, input') }; })()`);
-  ok(real.open && real.fs && real.hit, `PC : bloc en plein écran visible au premier plan, plein écran du navigateur sur le dialogue (${JSON.stringify(real)})`);
+  const real = await ev(`(() => { const d = document.querySelector('[data-block-full]'); const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2); return { open: d.open, fs: !document.fullscreenElement, w: d.getBoundingClientRect().width === innerWidth && d.getBoundingClientRect().height === innerHeight, hit: d.contains(hit), chrome: !!d.querySelector('.bq-card, [data-rail], [data-convert], [data-delete]'), field: d.contains(document.activeElement) && document.activeElement.matches('[contenteditable], textarea, input') }; })()`);
+  ok(real.open && real.fs && real.w && real.hit, `PC : bloc en plein écran, toute la fenêtre, au premier plan, sans plein écran du navigateur (${JSON.stringify(real)})`);
   ok(!real.chrome && real.field, 'bloc en plein écran : sans habillage de carte, curseur dans le texte');
   await send('Input.insertText', { text: ' (vrai clic)' });
   await key('Escape', 'Escape', 27);
   await sleep(200);
   ok(await ev(`!document.querySelector('[data-block-full]').open && !document.fullscreenElement && editor.getMarkdown().includes(' (vrai clic)') && document.querySelectorAll('[data-bq] [data-id]').length === Blocks.parse(editor.getMarkdown()).blocks.length`), 'bloc en plein écran : Échap ferme tout, le texte est gardé, une seule carte par bloc');
   await realClick('[data-full]');
-  ok(await ev(`(() => { const d = document.querySelector('[data-editor-full]'); return d.open && document.fullscreenElement === d.querySelector('[data-full-inner]') && d.contains(document.elementFromPoint(innerWidth / 2, innerHeight / 2)) && !document.querySelector('[data-head] [data-width]').hidden; })()`), 'PC : éditeur en plein écran au premier plan, bouton de largeur visible');
+  ok(await ev(`(() => { const d = document.querySelector('[data-editor-full]'); return d.open && !document.fullscreenElement && d.contains(document.elementFromPoint(innerWidth / 2, innerHeight / 2)) && !document.querySelector('[data-head] [data-width]').hidden; })()`), 'PC : éditeur en plein écran au premier plan, sans plein écran du navigateur, bouton de largeur visible');
   const widths = [];
   for (let i = 0; i < 3; i++) { await ev(`document.querySelector('[data-head] [data-width]').click()`); widths.push(await ev(`Math.round(document.querySelector('[data-canvas] .bq-column').getBoundingClientRect().width)`)); }
   ok(new Set(widths).size === 3 && widths.includes(640) && widths.some((w) => w > 1200), `plein écran : la largeur du texte fait le tour de trois largeurs (${widths.join(', ')} px)`);
   await ev(`document.querySelector('[data-editor-full]').close()`);
   await sleep(200);
-  ok(await ev(`!document.fullscreenElement && document.querySelector('[data-head] [data-width]').hidden && document.getElementById('editor').firstElementChild.matches('[data-bq]')`), 'plein écran quitté : plein écran du navigateur quitté aussi, éditeur à sa place');
+  ok(await ev(`!document.fullscreenElement && document.querySelector('[data-head] [data-width]').hidden && document.getElementById('editor').firstElementChild.matches('[data-bq]')`), 'plein écran quitté : éditeur à sa place, bouton de largeur masqué');
   ok(await ev(`(() => { const el = document.createElement('div'); el.style.width = '900px'; document.body.append(el); const e = Blockquilt.mount(el, { source: 'Texte', width: '30rem' }); const w = el.querySelector('.bq-column').getBoundingClientRect().width; const app = el.firstElementChild.getBoundingClientRect().width; e.destroy(); el.remove(); return w === 480 && app === 900; })()`), 'option width : largeur du texte réglable, l’éditeur prend la largeur de son conteneur');
   await viewport(375);
 

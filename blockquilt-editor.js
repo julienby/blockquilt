@@ -211,7 +211,7 @@
     const app = element.firstElementChild;
     const editorFull = element.lastElementChild;
     const blockFull = app.querySelector('[data-block-full]');
-    // Chrome refuse le plein écran du navigateur sur un <dialog> : il est demandé sur ce conteneur intérieur, qui défile.
+    // Conteneur intérieur du dialogue plein écran : c'est lui qui défile.
     const inner = (d) => d.querySelector('[data-full-inner]');
     const $ = (s, r = app) => r.querySelector(s);
     const canvas = $('[data-canvas]');
@@ -705,21 +705,14 @@
     };
 
     // ---- Plein écran : un <dialog> modal qui couvre toute la fenêtre (éditeur entier, ou un bloc seul sans son habillage de carte) ----
-    // En plus, le plein écran du navigateur, demandé sur le dialogue lui-même (jamais sur la page : la page passerait au-dessus du dialogue).
-    // Quitter l'un quitte l'autre : Échap, « Terminer », ou la sortie du plein écran du navigateur.
+    // Pas de plein écran du navigateur : il impose son message « Pour quitter le plein écran… », gênant pour écrire.
     const enterFull = (d) => {
       d.showModal();
-      inner(d).requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
       app.querySelectorAll('[data-width]').forEach((w) => { w.hidden = false; });
     };
-    const leaveFull = (d) => {
-      if (document.fullscreenElement === inner(d)) document.exitFullscreen().catch(() => {});
+    const leaveFull = () => {
       app.querySelectorAll('[data-head] [data-width]').forEach((w) => { w.hidden = !editorFull.open; });
     };
-    on(document, 'fullscreenchange', () => {
-      for (const d of [blockFull, editorFull]) if (d.open && d.dataset.fs === '1' && document.fullscreenElement !== inner(d)) d.close();
-      for (const d of [blockFull, editorFull]) d.dataset.fs = document.fullscreenElement === inner(d) ? '1' : '';
-    });
     // Largeur du texte : variable CSS --bq-width (option `width`, 48rem par défaut) ; en plein écran, le bouton fait le tour des trois largeurs.
     const WIDTHS = [['40rem', 'étroite'], ['48rem', 'moyenne'], ['100%', 'pleine']];
     const cycleWidth = () => {
@@ -740,7 +733,7 @@
       element.prepend(app);
       app.querySelector('[data-full]').setAttribute('aria-label', 'Plein écran');
       app.querySelector('[data-full]').innerHTML = ic('maximize');
-      leaveFull(editorFull);
+      leaveFull();
       placeBar();
     });
     // Le bloc est redessiné seul dans le dialogue ; sa carte, restée dans la page, perd data-id le temps de l'édition.
@@ -764,7 +757,7 @@
       hideBar();
       checkpoint(); // lit le bloc dans le dialogue
       $('[data-block-full-body]', blockFull).replaceChildren();
-      leaveFull(blockFull);
+      leaveFull();
       render();
     });
     // Échap pendant un glissement : annule le glissement, ne ferme pas le plein écran.

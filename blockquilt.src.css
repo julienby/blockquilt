@@ -52,7 +52,6 @@ dialog.bq-pop::backdrop { background: transparent; }
 /* Plein écran : un <dialog> modal qui couvre exactement la fenêtre. */
 dialog.bq-full { position: fixed; inset: 0; width: 100dvw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; }
 .bq-full-inner { width: 100%; height: 100%; overflow: auto; overscroll-behavior: contain; background: #fff; }
-.bq-full-inner:fullscreen { width: 100vw; height: 100vh; }
 dialog.bq-full::backdrop { background: #fff; }
 html:has(dialog.bq-full[open]) { overflow: hidden; }
 dialog.bq-full .bq-app { min-height: 100%; }
