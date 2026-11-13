@@ -212,6 +212,19 @@ try {
   ok(await ev(`editor.getMarkdown().startsWith('---\\ntitle: Arrivée\\nicon: 🏡\\n---')`), 'sans titre affiché : le frontmatter (title, icon) est gardé tel quel');
   ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: '---\\ntitle: T\\n---\\n\\nx', title: true }); const ok = el.querySelector('[data-title]').textContent === 'T' && !!el.querySelector('[data-doc-icon]'); el.querySelector('[data-title]').textContent = 'Nouveau'; const md = e.getMarkdown(); e.destroy(); el.remove(); return ok && md.startsWith('---\\ntitle: Nouveau'); })()`), 'option title : titre et icône du document dans l’en-tête, écrits dans le frontmatter');
 
+  // H1 et texte en grand
+  await ev(`document.querySelector('[data-insert="end"]').click()`);
+  ok(await ev(`['h1', 'h2', 'h3', 't1', 't2', 't3'].every((t) => document.querySelector('[data-sheet="add"] [data-pick="' + t + '"]'))`), 'menu d’ajout : H1, H2, H3 et texte en grand T1, T2, T3');
+  await ev(`document.querySelector('[data-sheet="add"] [data-pick="t1"]').click()`);
+  await ev(`document.execCommand('insertText', false, 'Accroche')`);
+  ok(await ev(`editor.getMarkdown().endsWith(':::t1\\nAccroche\\n:::\\n') && document.activeElement.closest('[data-id]').querySelector('[data-convert]').value === 't1'`), 'texte en grand : ajouté, écrit « :::t1 »');
+  await ev(`(() => { editor.setMarkdown('# Grand titre\\n\\n:::t1\\nAccroche\\n:::'); document.querySelector('[data-preview]').click(); })()`);
+  await waitFor(() => ev(`!!document.querySelector('[data-canvas] .bq-t1')`), 'aperçu du texte en grand');
+  const sizes = await ev(`(() => { const h = getComputedStyle(document.querySelector('[data-canvas] h1')); const t = getComputedStyle(document.querySelector('[data-canvas] .bq-t1')); return { h: h.fontSize, t: t.fontSize, h1s: document.querySelectorAll('[data-canvas] h1').length, inT: !!document.querySelector('[data-canvas] .bq-t1 h1, [data-canvas] .bq-t1 h2') }; })()`);
+  ok(sizes.h === sizes.t && sizes.h1s === 1 && !sizes.inT, `aperçu : T1 a la taille du H1 (${sizes.t}) sans être un titre ; un seul <h1>`);
+  await ev(`document.querySelector('[data-preview]').click()`);
+  ok(await ev(`getComputedStyle([...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'h1')).borderTopWidth === '3px'`), 'carte H1 : bordure noire de 3 px');
+
   // ---- Deux éditeurs dans la même page, puis destroy() ----
   await open();
   const two = await ev(`(() => {

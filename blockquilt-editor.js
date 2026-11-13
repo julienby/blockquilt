@@ -5,6 +5,7 @@
   // ---- Icônes (tracés Lucide, licence ISC), en ligne : aucun identifiant dans la page ----
   const ICONS = {
     heading: '<path d="M6 12h12"/><path d="M6 20V4"/><path d="M18 20V4"/>',
+    type: '<path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>',
     align_left: '<path d="M15 12H3"/><path d="M17 18H3"/><path d="M21 6H3"/>',
     sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z"/>',
     triangle_alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
@@ -60,6 +61,8 @@
     const richEdit = (cls, ph) => (b) => editable(`min-h-7 ${cls}`, b.html, ph, 'data-body data-rich aria-label="Texte du bloc"');
     const readHtml = (card, b) => { b.html = card.querySelector('[data-body]').innerHTML; };
     Object.assign(Blocks.types.text, { edit: richEdit('text-[15px] leading-relaxed', 'Écrivez ici…'), read: readHtml });
+    // Texte en grand : la taille d'un titre, la mise en forme d'un texte.
+    for (const k of ['t1', 't2', 't3']) Object.assign(Blocks.types[k], { edit: richEdit(`${Blocks.types[k].size} leading-snug text-stone-900`, 'Texte en grand…'), read: readHtml });
     Object.assign(Blocks.types.quote, { edit: richEdit('text-[15px] italic leading-relaxed', 'Une citation…'), read: readHtml });
     for (const k of Blocks.CALLOUTS) {
       const t = Blocks.types[k];
@@ -71,7 +74,7 @@
         read: (card, b) => { readHtml(card, b); b.title = card.querySelector('[data-callout-title]').value; },
       });
     }
-    for (const [k, cls, ph] of [['h2', 'text-xl font-bold', 'Titre de section'], ['h3', 'text-[17px] font-bold', 'Sous-titre']]) {
+    for (const [k, cls, ph] of [['h1', 'text-2xl font-extrabold', 'Titre principal'], ['h2', 'text-xl font-bold', 'Titre de section'], ['h3', 'text-[17px] font-bold', 'Sous-titre']]) {
       Object.assign(Blocks.types[k], { edit: (b) => editable(`${cls} leading-snug tracking-tight text-stone-900`, b.html, ph, 'data-body data-plain aria-label="Titre"'), read: readHtml });
     }
     Object.assign(Blocks.types.photo, {
