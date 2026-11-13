@@ -875,8 +875,12 @@
       $('[data-emoji-none]', sheets.icon).hidden = typeof target === 'object';
       const search = $('[data-emoji-search]', sheets.icon);
       search.value = '';
+      // Écran tactile : aucun champ ne garde le focus, le clavier se ferme et ne recouvre pas le sélecteur (la recherche reste à un toucher).
+      const touch = matchMedia('(pointer: coarse)').matches;
+      if (touch) document.activeElement?.blur?.();
       openSheet('icon');
-      search.focus({ preventScroll: true });
+      if (touch) sheets.icon.querySelector('h2').focus({ preventScroll: true });
+      else search.focus({ preventScroll: true });
       Blockquilt.emoji(o.emojiUrl).then(() => showEmoji(recent().length ? -1 : 0)).catch(() => {
         $('[data-emoji-grid]', sheets.icon).innerHTML = '<p class="col-span-full p-3 text-sm text-stone-500">Bibliothèque indisponible : collez un emoji ci-dessous.</p>';
       });

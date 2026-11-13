@@ -460,6 +460,16 @@ try {
   await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'tip').querySelector('[data-callout-icon]').click()`);
   await waitFor(() => ev(`document.querySelectorAll('[data-sheet="icon"] [data-emoji-grid] button').length > 50`), 'bibliothèque d’emoji');
   ok(requests.some((u) => u.includes('emoji.json')), 'emoji.json : chargé à la première ouverture du sélecteur');
+  await ev(`document.querySelector('[data-sheet="icon"]').close()`);
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+  await ev(`(() => { const f = [...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'tip'); f.querySelector('[data-rich]').focus(); f.querySelector('[data-callout-icon]').click(); })()`);
+  ok(await ev(`matchMedia('(pointer: coarse)').matches && document.querySelector('[data-sheet="icon"]').open && !document.activeElement.matches('input, textarea, [contenteditable="true"]')`), 'sélecteur d’emoji (tactile) : aucun champ n’a le focus, le clavier se ferme');
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await ev(`document.querySelector('[data-sheet="icon"]').close()`);
+  await viewport(1280);
+  await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'tip').querySelector('[data-callout-icon]').click()`);
+  ok(await ev(`!matchMedia('(pointer: coarse)').matches && document.activeElement.matches('[data-emoji-search]')`), 'sélecteur d’emoji (souris) : la recherche a le focus');
+  await viewport(375);
   ok(await ev(`document.querySelectorAll('[data-sheet="icon"] [data-emoji-tab]').length === 10`), 'sélecteur : onglets « Récents » + 9 catégories');
   await ev(`(() => { const i = document.querySelector('[data-emoji-search]'); i.value = 'clé'; i.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
   ok(await ev(`[...document.querySelectorAll('[data-sheet="icon"] [data-emoji-grid] button')].slice(0, 3).some((b) => b.dataset.iconPick === '🔑')`), 'recherche « clé » : propose 🔑');
