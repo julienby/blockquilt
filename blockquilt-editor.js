@@ -82,15 +82,17 @@
           ${editable('text-sm italic opacity-75', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}</figure>`,
       read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
     });
-    // Carrousel : vignettes en ligne ; légende, ordre et retrait par photo ; ajout de plusieurs fichiers à la fois.
+    // Carrousel : grille de vignettes (2 colonnes au téléphone, 3 à 4 au-delà), comme les éditeurs de publication ;
+    // légende sous chaque photo, ordre par flèches, retrait, tuile « Ajouter » en dernier (plusieurs fichiers à la fois).
     Object.assign(Blocks.types.carousel, {
-      edit: (b, ui) => `<div class="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">${b.items.map((x, i) => `<figure data-car-item="${i}" class="w-40 shrink-0 snap-start rounded-xl border border-stone-200 bg-stone-50 p-1.5">
-          <img src="${attr(Blocks.mediaUrl(x.src, ui.media))}" alt="" class="aspect-[4/3] w-full rounded-lg bg-stone-200 object-cover">
-          <input data-car-alt value="${attr(x.alt)}" placeholder="Légende…" aria-label="Légende de la photo ${i + 1}" class="mt-1 h-9 w-full bg-transparent px-1 text-xs italic focus:outline-none">
-          <div class="flex justify-between"><button type="button" data-car-act="left" ${i === 0 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la gauche" class="bq-btn bq-muted">${ic('chevron_left', 'size-4')}</button>
-            <button type="button" data-car-act="remove" aria-label="Retirer la photo ${i + 1}" class="bq-btn text-red-600">${ic('x', 'size-4')}</button>
-            <button type="button" data-car-act="right" ${i === b.items.length - 1 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la droite" class="bq-btn bq-muted">${ic('chevron_right', 'size-4')}</button></div></figure>`).join('')}
-          <button type="button" data-car-add class="flex min-h-11 w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 text-xs font-bold text-stone-500 hover:border-stone-400">${ic('plus')}Ajouter des photos</button></div>`,
+      edit: (b, ui) => `<div data-car-grid class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">${b.items.map((x, i) => `<figure data-car-item="${i}" class="bq-tone flex min-w-0 flex-col rounded-xl border p-1.5">
+          <div class="relative"><img src="${attr(Blocks.mediaUrl(x.src, ui.media))}" alt="" class="aspect-[4/3] w-full rounded-lg bg-stone-200 object-cover">
+            <span class="absolute left-1 top-1 rounded-full bg-black/60 px-1.5 text-[11px] font-bold text-white">${i + 1}</span></div>
+          <input data-car-alt value="${attr(x.alt)}" placeholder="Légende…" aria-label="Légende de la photo ${i + 1}" class="mt-1 h-9 w-full min-w-0 bg-transparent px-1 text-xs italic focus:outline-none">
+          <div class="flex justify-between"><button type="button" data-car-act="left" ${i === 0 ? 'disabled' : ''} aria-label="Photo ${i + 1} : avancer d’une place" class="bq-btn bq-muted">${ic('chevron_left', 'size-4')}</button>
+            <button type="button" data-car-act="remove" aria-label="Retirer la photo ${i + 1}" class="bq-btn text-red-600">${ic('trash', 'size-4')}</button>
+            <button type="button" data-car-act="right" ${i === b.items.length - 1 ? 'disabled' : ''} aria-label="Photo ${i + 1} : reculer d’une place" class="bq-btn bq-muted">${ic('chevron_right', 'size-4')}</button></div></figure>`).join('')}
+          <button type="button" data-car-add class="flex min-h-32 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-current/20 text-xs font-bold opacity-70 hover:opacity-100">${ic('plus')}Ajouter des photos</button></div>`,
       read: (card, b) => { card.querySelectorAll('[data-car-item]').forEach((el) => { b.items[Number(el.dataset.carItem)].alt = el.querySelector('[data-car-alt]').value; }); },
     });
     Object.assign(Blocks.types.video, {
@@ -628,7 +630,7 @@
       syncFromDom();
       const j = act === 'left' ? i - 1 : i + 1;
       change(() => { if (act === 'remove') b.items.splice(i, 1); else [b.items[i], b.items[j]] = [b.items[j], b.items[i]]; });
-      canvas.querySelector(`[data-id="${id}"] [data-car-item="${act === 'remove' ? Math.max(0, i - 1) : j}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      canvas.querySelector(`[data-id="${id}"] [data-car-item="${act === 'remove' ? Math.max(0, i - 1) : j}"] [data-car-act="${act === 'remove' ? 'remove' : act}"]`)?.focus({ preventScroll: true });
     };
 
     // ---- Menu du bloc « ⋯ » ----

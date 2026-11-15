@@ -563,6 +563,8 @@ try {
   await setFiles('input[data-file]', pngs);
   await waitFor(() => ev(`document.querySelectorAll('[data-bq] [data-car-item]').length === 3`), 'carrousel de 3 photos');
   ok(true, 'envoi de 3 fichiers d’un coup : 3 vignettes dans un carrousel');
+  const grid = await ev(`(() => { const g = document.querySelector('[data-bq] [data-car-grid]'); return { cols: getComputedStyle(g).gridTemplateColumns.split(' ').length, scroll: g.scrollWidth <= g.clientWidth, last: g.lastElementChild.matches('[data-car-add]'), tiles: g.querySelectorAll('[data-car-item]').length }; })()`);
+  ok(grid.cols === 2 && grid.scroll && grid.last && grid.tiles === 3, `carrousel : grille de 2 colonnes à 375 px, sans défilement, tuile « Ajouter » en dernier (${JSON.stringify(grid)})`);
   await ev(`(() => { ['Un', 'Deux', 'Trois'].forEach((t, i) => { const x = document.querySelectorAll('[data-car-alt]')[i]; x.value = t; x.dispatchEvent(new InputEvent('input', { bubbles: true })); }); })()`);
   await ev(`document.querySelector('[data-car-item="0"] [data-car-act="right"]').click()`);
   ok(await ev(`[...document.querySelectorAll('[data-car-alt]')].map((x) => x.value).join() === 'Deux,Un,Trois'`), 'carrousel : photo déplacée vers la droite, légendes suivies');
