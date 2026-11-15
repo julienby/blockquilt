@@ -238,6 +238,32 @@ try {
   ok(await ev(`[...document.querySelectorAll('[data-canvas] pre')].every((p) => p.scrollWidth <= p.clientWidth + 1 && getComputedStyle(p).whiteSpace === 'pre-wrap') && document.querySelector('[data-canvas] pre code').textContent.includes('\\n  indentée')`), 'code et texte source : à la ligne à 375 px, sans défilement horizontal, indentation gardée');
   await ev(`document.querySelector('[data-preview]').click()`);
 
+  // Intégration neutre : l'éditeur reprend la police, l'accent, le fond et la barre de l'application qui l'accueille
+  const themed = await ev(`(async () => {
+    const box = document.createElement('div');
+    box.style.cssText = 'font-family: Georgia, serif; color: rgb(20, 40, 60); --bq-accent: rgb(200, 0, 0); --bq-surface: rgb(250, 245, 230); --bq-sticky-top: 50px; --bq-radius: 4px; width: 600px';
+    document.body.append(box);
+    const e = Blockquilt.mount(box, { source: 'Un texte\\n\\n> [!tip]\\n> Une astuce' });
+    box.querySelector('[data-rich]').focus(); document.execCommand('insertText', false, '!');
+    const app = getComputedStyle(box.firstElementChild);
+    const out = {
+      font: getComputedStyle(box.querySelector('[data-rich]')).fontFamily,
+      text: getComputedStyle(box.querySelector('[data-rich]')).color,
+      bg: app.backgroundColor,
+      top: getComputedStyle(box.querySelector('[data-head]')).top,
+      dot: getComputedStyle(box.querySelector('[data-dot]')).backgroundColor,
+      radius: getComputedStyle(box.querySelector('.bq-card')).borderTopLeftRadius,
+      head: getComputedStyle(box.querySelector('[data-head]')).borderBottomColor,
+    };
+    box.querySelector('[data-preview]').click();
+    await new Promise((r) => setTimeout(r, 50));
+    out.preview = getComputedStyle(box.querySelector('.bq-content p')).fontFamily + ' / ' + getComputedStyle(box.querySelector('.bq-content p')).color;
+    e.destroy(); box.remove();
+    return out;
+  })()`);
+  ok(themed.font.startsWith('Georgia') && themed.text === 'rgb(20, 40, 60)' && themed.preview === 'Georgia, serif / rgb(20, 40, 60)', `intégration : police et couleur du texte de la page reprises, en édition et en aperçu (${themed.font}, ${themed.text})`);
+  ok(themed.dot === 'rgb(200, 0, 0)' && themed.bg === 'rgb(250, 245, 230)' && themed.top === '50px' && themed.radius === '4px', `intégration : --bq-accent, --bq-surface, --bq-sticky-top, --bq-radius (${JSON.stringify(themed)})`);
+
   // ---- Deux éditeurs dans la même page, puis destroy() ----
   await open();
   const two = await ev(`(() => {

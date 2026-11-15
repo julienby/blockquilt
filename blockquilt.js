@@ -432,12 +432,14 @@ const Blocks = {
   const body = (html) => Blocks.htmlToMd(html, true);
   const quoted = (x) => x.split('\n').map((l) => (l ? '> ' + l : '>')).join('\n');
   const lead = /^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)/;
+  // Classes de la carte et du badge dans l'éditeur. bq-tone / bq-badge : neutres, tirés de la couleur du texte de la page
+  // (blockquilt.css) ; les encadrés, la vidéo, le code et le HTML gardent une teinte qui porte leur sens.
   const tone = (card, badge) => ({ card, badge });
 
   // Bordure noire : 3 px pour H1, 2 px pour H2, 1 px pour H3 — la page se lit par sections.
   const heading = (type, level, label, border) => Blocks.register(type, {
     label, short: label.replace('Titre ', ''), icon: 'heading', convertible: true, single: true,
-    tone: tone(`bg-white ${border} text-stone-900`, 'bg-stone-100 text-stone-700 border-stone-200/90'),
+    tone: tone(`bq-tone bq-tone-strong ${border}`, 'bq-badge'),
     match: (t) => { const m = new RegExp(`^#{${level}} (.+)$`).exec(t); return m ? { html: Blocks.esc(Blocks.plain(m[1])) } : null; },
     toMarkdown: (b) => { const x = Blocks.htmlToMd(Blocks.esc(Blocks.stripTags(b.html))).replace(/\n+/g, ' ').trim(); return x ? '#'.repeat(level) + ' ' + x : ''; },
     toHtml: (b, ctx) => {
@@ -458,7 +460,7 @@ const Blocks = {
   for (const [n, cls] of [[1, 'text-2xl font-extrabold'], [2, 'text-xl font-bold'], [3, 'text-[17px] font-bold']]) {
     Blocks.register('t' + n, {
       label: `Texte T${n} (taille H${n})`, short: 'T' + n, icon: 'type', convertible: true, size: cls,
-      tone: tone('bg-white border-dashed border-stone-400 text-stone-900', 'bg-stone-100 text-stone-700 border-stone-300'),
+      tone: tone('bq-tone bq-tone-dashed border-dashed', 'bq-badge'),
       match: (t) => {
         const m = new RegExp(`^:::t${n}\n([\\s\\S]+)\n:::$`).exec(t);
         if (!m || m[1].split('\n').some((l) => lead.test(l))) return null;
@@ -472,7 +474,7 @@ const Blocks = {
 
   Blocks.register('text', {
     label: 'Texte', short: 'Texte', icon: 'align_left', convertible: true,
-    tone: tone('bg-[#FAF8F5] border-stone-200/90 text-stone-800', 'bg-stone-200/80 text-stone-800 border-stone-300/80'),
+    tone: tone('bq-tone', 'bq-badge'),
     match: (t) => {
       const lines = t.split('\n');
       if (lines.some((l) => lead.test(l)) || Blocks.PHOTO.test(t) || Blocks.VIDEO.test(t)) return null;
@@ -486,7 +488,7 @@ const Blocks = {
 
   Blocks.register('quote', {
     label: 'Citation', short: 'Citation', icon: 'quote', convertible: true,
-    tone: tone('bg-white border-stone-200/90 border-l-4 border-l-stone-400 text-stone-700', 'bg-stone-100 text-stone-700 border-stone-200'),
+    tone: tone('bq-tone bq-tone-quote border-l-4', 'bq-badge'),
     match: (t) => {
       const lines = t.split('\n');
       if (!lines.every((l) => l.startsWith('>')) || /^> ?\[!/.test(t)) return null;
@@ -530,7 +532,7 @@ const Blocks = {
 
   Blocks.register('photo', {
     label: 'Photo', short: 'Photo', icon: 'image', group: 'media',
-    tone: tone('bg-white border-stone-200/90 text-stone-800', 'bg-stone-100 text-stone-700 border-stone-200'),
+    tone: tone('bq-tone', 'bq-badge'),
     match: (t) => { const m = Blocks.PHOTO.exec(t); return m ? { src: m[2], alt: Blocks.plain(m[1]) } : null; },
     toMarkdown: (b) => (b.src ? `![${Blocks.htmlToMd(Blocks.esc(b.alt)).replace(/\n/g, ' ')}](${b.src})` : ''),
     toHtml: (b, ctx) => `<figure><img src="${Blocks.attr(Blocks.mediaUrl(b.src, ctx.media))}" alt="${Blocks.attr(b.alt)}" loading="lazy">${b.alt ? `<figcaption>${Blocks.esc(b.alt)}</figcaption>` : ''}</figure>`,
@@ -540,7 +542,7 @@ const Blocks = {
   // Carrousel : `:::carousel`, une photo par ligne, `:::`. Rendu : une photo à la fois (scroll-snap), flèches et puces avec blockquilt-content.js.
   Blocks.register('carousel', {
     label: 'Carrousel', short: 'Carrousel', icon: 'images', group: 'media',
-    tone: tone('bg-white border-stone-200/90 text-stone-800', 'bg-violet-100 text-violet-900 border-violet-200'),
+    tone: tone('bq-tone', 'bq-badge'),
     match: (t) => {
       const lines = t.split('\n');
       if (lines[0] !== ':::carousel' || lines[lines.length - 1] !== ':::' || lines.length < 3) return null;
@@ -589,7 +591,7 @@ const Blocks = {
 
   Blocks.register('hr', {
     label: 'Ligne horizontale', short: 'Ligne', icon: 'minus', group: 'structure',
-    tone: tone('bg-white border-stone-200/90 text-stone-500', 'bg-stone-100 text-stone-700 border-stone-200'),
+    tone: tone('bq-tone', 'bq-badge'),
     match: (t) => (t === '---' ? {} : null),
     toMarkdown: () => '---',
     toHtml: () => '<hr>',
@@ -613,7 +615,7 @@ const Blocks = {
   // Repli : tout ce que l'éditeur ne sait pas refaire à l'identique reste du texte tel quel, affiché sans être interprété.
   Blocks.register('raw', {
     label: 'Texte source', short: 'Source', icon: 'sliders', group: 'none',
-    tone: tone('bg-white border-dashed border-stone-300 text-stone-800', 'bg-stone-100 text-stone-700 border-stone-200'),
+    tone: tone('bq-tone bq-tone-dashed border-dashed', 'bq-badge'),
     toMarkdown: (b) => b.md ?? '',
     toHtml: (b) => `<pre class="bq-raw">${Blocks.esc(b.md ?? '')}</pre>`,
     blank: () => ({ md: '' }),

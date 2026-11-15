@@ -52,6 +52,27 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 | `width` | Largeur maximale du texte (CSS, `48rem` par défaut ; `100%` pour toute la largeur). L'éditeur prend la largeur de l'élément qui le contient : il s'intègre dans n'importe quelle mise en page. Aussi réglable en CSS : `--bq-width`. En plein écran, un bouton fait le tour de trois largeurs. |
 | `emojiUrl` | Adresse de `emoji.json` (par défaut, à côté de `blockquilt-editor.js`). Chargé au premier usage du sélecteur. |
 
+### Apparence
+
+L'éditeur est neutre : il reprend la police et la couleur du texte de la page qui l'accueille, son fond est la couleur de fond du système (`Canvas`), ses lignes et ses fonds de carte sont tirés de la couleur du texte (lisibles sur fond clair comme sombre). Seuls les encadrés (info, astuce…), la vidéo, le code et le HTML gardent une teinte qui porte leur sens. Tout se règle par variables CSS, sur l'élément de l'éditeur ou n'importe quel parent :
+
+| Variable | Rôle | Par défaut |
+|---|---|---|
+| `--bq-font` | Police | héritée |
+| `--bq-text` | Couleur du texte | héritée |
+| `--bq-surface` | Fond de l'éditeur, de l'en-tête et des feuilles | `Canvas` |
+| `--bq-border` | Lignes et bordures neutres | texte à 14 % |
+| `--bq-accent` | Couleur d'accent (enregistrer, focus, liens du rendu) | bleu `#0284c7` |
+| `--bq-radius` | Arrondi des cartes | `1rem` |
+| `--bq-width` | Largeur maximale de la colonne de texte (aussi option `width`) | `48rem` |
+| `--bq-sticky-top` | Décalage de l'en-tête collant, sous la barre de l'application | `0px` |
+
+```css
+.mon-app .editeur { --bq-accent: #7c3aed; --bq-radius: 0.5rem; --bq-sticky-top: 64px; }
+```
+
+Le rendu publié (`blockquilt-content.css`) suit la même règle ; ses variables sont décrites en tête du fichier.
+
 ### Échanges avec le serveur
 
 Tous en `POST multipart/form-data`, avec les champs de `fields`. Les fins de ligne de `text` arrivent en `\r\n` : les remettre en `\n` (voir `dev/server.js`).

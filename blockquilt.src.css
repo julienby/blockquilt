@@ -13,10 +13,31 @@
 
 /* Bouton à icône : cible tactile de 44 px. */
 @layer components {
-  .bq-rail { @apply inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-20; }
+  .bq-rail { @apply inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-20; color: color-mix(in srgb, currentColor 65%, transparent); }
   .bq-btn { @apply inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-30; }
 }
-.bq-app :focus-visible { outline: 2px solid #0284c7; outline-offset: 2px; }
+/* Intégration neutre : l'éditeur reprend la police et la couleur du texte de la page. Tout se règle par variables CSS,
+   posées sur l'élément de l'éditeur ou n'importe quel parent :
+   --bq-font, --bq-text (hérités), --bq-surface (fond : Canvas, la couleur de fond du système), --bq-border, --bq-accent,
+   --bq-radius (cartes), --bq-width (colonne de texte), --bq-sticky-top (décalage de l'en-tête collant sous la barre de l'application). */
+.bq-app { font-family: var(--bq-font, inherit); color: var(--bq-text, inherit); background: var(--bq-surface, Canvas); }
+.bq-head { top: var(--bq-sticky-top, 0px); background: color-mix(in srgb, var(--bq-surface, Canvas) 94%, transparent); border-color: var(--bq-border, color-mix(in srgb, currentColor 12%, transparent)); backdrop-filter: blur(12px); }
+.bq-full-inner { --bq-sticky-top: 0px; }
+.bq-sheet { background: var(--bq-surface, Canvas); color: var(--bq-text, CanvasText); }
+.bq-card, .bq-add { border-radius: var(--bq-radius, 1rem); }
+/* Cartes et badges neutres : fond, bordure et texte tirés de la couleur du texte (lisibles sur fond clair ou sombre). */
+.bq-tone { background: color-mix(in srgb, currentColor 3%, var(--bq-surface, Canvas)); border-color: var(--bq-border, color-mix(in srgb, currentColor 14%, transparent)); }
+.bq-tone-strong { border-color: currentColor; }
+.bq-tone-dashed { border-color: color-mix(in srgb, currentColor 35%, transparent); }
+.bq-tone-quote { border-left-color: color-mix(in srgb, currentColor 40%, transparent); }
+/* Éléments d'interface neutres : icônes atténuées, boutons ronds, pastilles « Insérer / Fusionner ». */
+.bq-muted { color: color-mix(in srgb, currentColor 72%, transparent); }
+.bq-round { background: color-mix(in srgb, currentColor 4%, var(--bq-surface, Canvas)); border-color: color-mix(in srgb, currentColor 14%, transparent); }
+.group:hover .bq-round { background: color-mix(in srgb, currentColor 10%, var(--bq-surface, Canvas)); }
+.bq-pill { background: var(--bq-surface, Canvas); border-color: color-mix(in srgb, currentColor 14%, transparent); color: color-mix(in srgb, currentColor 65%, transparent); }
+.group:hover .bq-pill { color: inherit; border-color: color-mix(in srgb, currentColor 35%, transparent); }
+.bq-badge { background: color-mix(in srgb, currentColor 7%, var(--bq-surface, Canvas)); border-color: color-mix(in srgb, currentColor 16%, transparent); }
+.bq-app :focus-visible { outline: 2px solid var(--bq-accent, #0284c7); outline-offset: 2px; }
 .bq-app [tabindex="-1"]:focus-visible { outline: none; }
 .bq-bar .bq-btn:hover { background: rgb(255 255 255 / 0.1); }
 .bq-bar .bq-btn:active { background: rgb(255 255 255 / 0.2); }
@@ -27,11 +48,11 @@
 .bq-edit:empty::before { content: attr(data-placeholder); color: #a8a29e; pointer-events: none; display: block; }
 .bq-edit ul { list-style: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
 .bq-edit ol { list-style: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
-.bq-edit mark { background-color: #fde68a; padding: 0.05rem 0.28rem; border-radius: 0.3rem; color: inherit; }
+.bq-edit mark { background-color: #fde68a; padding: 0.05rem 0.28rem; border-radius: 0.3rem; color: #1c1917; }
 .bq-edit code { font-family: ui-monospace, monospace; font-size: 0.9em; background: rgb(0 0 0 / 0.06); padding: 0.05rem 0.3rem; border-radius: 0.3rem; }
 
 .bq-card { transition: box-shadow 0.2s ease, opacity 0.15s ease; }
-.bq-card:focus-within { box-shadow: 0 0 0 2px rgb(2 132 199 / 0.35); }
+.bq-card:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb, var(--bq-accent, #0284c7) 35%, transparent); }
 
 /* Menu flottant (grand écran) : la feuille devient un petit menu posé près du bouton. */
 dialog.bq-pop { position: fixed; margin: 0; width: 18rem; max-height: min(32rem, calc(100dvh - 1rem)); border-radius: 1rem; padding: 0.5rem; }
@@ -51,8 +72,8 @@ dialog.bq-pop::backdrop { background: transparent; }
 
 /* Plein écran : un <dialog> modal qui couvre exactement la fenêtre. */
 dialog.bq-full { position: fixed; inset: 0; width: 100dvw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; }
-.bq-full-inner { width: 100%; height: 100%; overflow: auto; overscroll-behavior: contain; background: #fff; }
-dialog.bq-full::backdrop { background: #fff; }
+.bq-full-inner { width: 100%; height: 100%; overflow: auto; overscroll-behavior: contain; background: var(--bq-surface, Canvas); }
+dialog.bq-full::backdrop { background: Canvas; }
 html:has(dialog.bq-full[open]) { overflow: hidden; }
 dialog.bq-full .bq-app { min-height: 100%; }
 /* Bloc seul en plein écran : pas d'habillage de carte, une surface d'écriture. */

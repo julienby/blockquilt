@@ -36,7 +36,7 @@ Le détail est dans `git log` et `DECISIONS.md`.
 Chaque tâche : test, `check` vert, commit, ligne dans `DECISIONS.md`.
 
 - [x] **E1 Titres centrés.** Dans une carte H1, H2, H3 ou T1–T3, le texte est centré verticalement dans la hauteur donnée par la colonne de droite (aujourd'hui collé sous le badge). Vérifier : écart haut ≈ écart bas (± 4 px) entre le texte et la zone sous le badge.
-- [ ] **E2 Intégration neutre.** L'éditeur prend l'apparence de l'application qui l'accueille.
+- [x] **E2 Intégration neutre.** L'éditeur prend l'apparence de l'application qui l'accueille.
   - Police héritée de la page (`font-family: inherit`) ; Plus Jakarta Sans seulement pour la démo.
   - Couleurs et formes en variables CSS documentées (`--bq-accent`, `--bq-surface`, `--bq-border`, `--bq-radius`…), valeurs par défaut sobres.
   - Pas de fond ni d'ombre imposés autour de l'éditeur ; décalage de l'en-tête collant réglable (`--bq-sticky-top`) pour une application qui a déjà sa barre.

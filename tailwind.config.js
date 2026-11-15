@@ -2,8 +2,14 @@ module.exports = {
   content: ['./index.html', './blockquilt.js', './blockquilt-editor.js'],
   theme: {
     extend: {
-      // Bleu du logo (#075985) décliné en gamme et deux polices hébergées (assets/fonts).
-      colors: { brand: { 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e' } },
+      // Couleur d'accent de l'éditeur : variable CSS --bq-accent (bleu par défaut), nuances calculées par color-mix.
+      colors: { brand: {
+        50: 'color-mix(in srgb, var(--bq-accent, #0284c7) 8%, transparent)',
+        100: 'color-mix(in srgb, var(--bq-accent, #0284c7) 16%, transparent)',
+        500: 'var(--bq-accent, #0284c7)',
+        600: 'var(--bq-accent, #0284c7)',
+        700: 'color-mix(in srgb, var(--bq-accent, #0284c7) 82%, black)',
+      } },
       fontFamily: {
         jakarta: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         news: ['Newsreader', 'ui-serif', 'Georgia', 'serif'],

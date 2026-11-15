@@ -62,7 +62,7 @@
     const readHtml = (card, b) => { b.html = card.querySelector('[data-body]').innerHTML; };
     Object.assign(Blocks.types.text, { edit: richEdit('text-[15px] leading-relaxed', 'Écrivez ici…'), read: readHtml });
     // Texte en grand : la taille d'un titre, la mise en forme d'un texte.
-    for (const k of ['t1', 't2', 't3']) Object.assign(Blocks.types[k], { edit: richEdit(`${Blocks.types[k].size} leading-snug text-stone-900`, 'Texte en grand…'), read: readHtml });
+    for (const k of ['t1', 't2', 't3']) Object.assign(Blocks.types[k], { edit: richEdit(`${Blocks.types[k].size} leading-snug`, 'Texte en grand…'), read: readHtml });
     Object.assign(Blocks.types.quote, { edit: richEdit('text-[15px] italic leading-relaxed', 'Une citation…'), read: readHtml });
     for (const k of Blocks.CALLOUTS) {
       const t = Blocks.types[k];
@@ -75,11 +75,11 @@
       });
     }
     for (const [k, cls, ph] of [['h1', 'text-2xl font-extrabold', 'Titre principal'], ['h2', 'text-xl font-bold', 'Titre de section'], ['h3', 'text-[17px] font-bold', 'Sous-titre']]) {
-      Object.assign(Blocks.types[k], { edit: (b) => editable(`${cls} leading-snug tracking-tight text-stone-900`, b.html, ph, 'data-body data-plain aria-label="Titre"'), read: readHtml });
+      Object.assign(Blocks.types[k], { edit: (b) => editable(`${cls} leading-snug tracking-tight`, b.html, ph, 'data-body data-plain aria-label="Titre"'), read: readHtml });
     }
     Object.assign(Blocks.types.photo, {
       edit: (b, ui) => `<figure class="space-y-2">${b.src ? `<img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="max-h-72 w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">` : ''}
-          ${editable('text-sm italic text-stone-600', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}</figure>`,
+          ${editable('text-sm italic opacity-75', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}</figure>`,
       read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
     });
     // Carrousel : vignettes en ligne ; légende, ordre et retrait par photo ; ajout de plusieurs fichiers à la fois.
@@ -87,14 +87,14 @@
       edit: (b, ui) => `<div class="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">${b.items.map((x, i) => `<figure data-car-item="${i}" class="w-40 shrink-0 snap-start rounded-xl border border-stone-200 bg-stone-50 p-1.5">
           <img src="${attr(Blocks.mediaUrl(x.src, ui.media))}" alt="" class="aspect-[4/3] w-full rounded-lg bg-stone-200 object-cover">
           <input data-car-alt value="${attr(x.alt)}" placeholder="Légende…" aria-label="Légende de la photo ${i + 1}" class="mt-1 h-9 w-full bg-transparent px-1 text-xs italic focus:outline-none">
-          <div class="flex justify-between"><button type="button" data-car-act="left" ${i === 0 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la gauche" class="bq-btn text-stone-500">${ic('chevron_left', 'size-4')}</button>
+          <div class="flex justify-between"><button type="button" data-car-act="left" ${i === 0 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la gauche" class="bq-btn bq-muted">${ic('chevron_left', 'size-4')}</button>
             <button type="button" data-car-act="remove" aria-label="Retirer la photo ${i + 1}" class="bq-btn text-red-600">${ic('x', 'size-4')}</button>
-            <button type="button" data-car-act="right" ${i === b.items.length - 1 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la droite" class="bq-btn text-stone-500">${ic('chevron_right', 'size-4')}</button></div></figure>`).join('')}
+            <button type="button" data-car-act="right" ${i === b.items.length - 1 ? 'disabled' : ''} aria-label="Photo ${i + 1} : vers la droite" class="bq-btn bq-muted">${ic('chevron_right', 'size-4')}</button></div></figure>`).join('')}
           <button type="button" data-car-add class="flex min-h-11 w-28 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 text-xs font-bold text-stone-500 hover:border-stone-400">${ic('plus')}Ajouter des photos</button></div>`,
       read: (card, b) => { card.querySelectorAll('[data-car-item]').forEach((el) => { b.items[Number(el.dataset.carItem)].alt = el.querySelector('[data-car-alt]').value; }); },
     });
     Object.assign(Blocks.types.video, {
-      edit: (b) => `<input data-url type="url" value="${attr(b.url)}" class="h-11 w-full rounded-xl border border-rose-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo YouTube ou Vimeo">`,
+      edit: (b) => `<input data-url type="url" value="${attr(b.url)}" class="h-11 w-full rounded-xl border border-rose-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo YouTube ou Vimeo">`,
       read: (card, b) => { b.url = card.querySelector('[data-url]').value.trim(); },
     });
     // Bloc HTML : le code, ou son aperçu filtré (bouton œil à côté du type, `tools`). La carte porte data-view="preview" en aperçu.
@@ -126,12 +126,12 @@
   }
 
   const GROUPS = { text: 'Texte', media: 'Médias', structure: 'Structure' };
-  const sheetCls = 'bq-sheet m-0 mt-auto max-h-[88dvh] w-full max-w-full overflow-auto rounded-t-3xl bg-white p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-stone-900 shadow-xl backdrop:bg-black/40 sm:m-auto sm:max-w-lg sm:rounded-3xl';
+  const sheetCls = 'bq-sheet m-0 mt-auto max-h-[88dvh] w-full max-w-full overflow-auto rounded-t-3xl p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-stone-900 shadow-xl backdrop:bg-black/40 sm:m-auto sm:max-w-lg sm:rounded-3xl';
   // Feuille avec une ligne de titre (contenu à expliquer), ou menu d'actions sans titre (`menu`) : chaque ligne se suffit.
   const menu = (name, label, inner) => `<dialog data-sheet="${name}" autofocus aria-label="${attr(label)}" class="${sheetCls} !pt-2 outline-none">${inner}</dialog>`;
   const sheet = (name, label, inner) => `<dialog data-sheet="${name}" aria-label="${attr(label)}" class="${sheetCls}">
       <div class="-mx-1 -mt-1 mb-2 flex items-center gap-2"><h2 tabindex="-1" autofocus class="min-w-0 flex-1 truncate px-1 text-base font-bold outline-none">${esc(label)}</h2>
-        <button type="button" data-close aria-label="Fermer" class="bq-btn text-stone-500">${ic('x')}</button></div>${inner}</dialog>`;
+        <button type="button" data-close aria-label="Fermer" class="bq-btn bq-muted">${ic('x')}</button></div>${inner}</dialog>`;
   const item = (data, icon, label, cls = '') => `<button type="button" ${data} class="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium hover:bg-stone-100 active:bg-stone-200 ${cls}">${ic(icon)}<span class="min-w-0 flex-1 truncate">${label}</span></button>`;
 
   /** Monte un éditeur dans `element`. Renvoie { getMarkdown(), setMarkdown(md), destroy() }. */
@@ -142,22 +142,22 @@
     const timers = new Set();
     const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); return t; };
 
-    element.innerHTML = `<div data-bq class="bq-app flex min-h-full w-full flex-col bg-white font-jakarta text-stone-800"${o.width ? ` style="--bq-width: ${attr(o.width)}"` : ''}>
-      <header data-head class="sticky top-0 z-20 flex min-h-14 items-center gap-0.5 border-b border-stone-200/80 bg-white/95 px-1.5 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-3">
-        ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn text-stone-500">${ic('chevron_left')}</a>` : ''}
+    element.innerHTML = `<div data-bq class="bq-app flex min-h-full w-full flex-col"${o.width ? ` style="--bq-width: ${attr(o.width)}"` : ''}>
+      <header data-head class="bq-head sticky z-20 flex min-h-14 items-center gap-0.5 border-b px-1.5 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-3">
+        ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn bq-muted">${ic('chevron_left')}</a>` : ''}
         ${o.title ? `<button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
         <div data-title contenteditable="true" role="textbox" aria-label="Titre du document" data-placeholder="Sans titre" spellcheck="false" class="bq-edit min-w-0 flex-1 truncate px-1 text-base font-extrabold leading-snug text-stone-900 sm:text-lg"></div>`
           : '<span class="flex-1"></span>'}
-        <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn text-stone-600">${ic('undo')}</button>
-        <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('redo')}</button>
-        <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn text-stone-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
+        <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn bq-muted">${ic('undo')}</button>
+        <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn bq-muted hidden sm:inline-flex">${ic('redo')}</button>
+        <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
         ${o.aiUrl ? `<button type="button" data-ai aria-label="Assistant IA" title="Assistant IA" class="bq-btn hidden text-amber-600 sm:inline-flex">${ic('wand')}</button>` : ''}
         <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative text-stone-400">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
-        <button type="button" data-width hidden aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn text-stone-600 max-sm:hidden">${ic('width')}</button>
-        <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('maximize')}</button>
-        <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn text-stone-600 sm:hidden">${ic('more')}</button>
+        <button type="button" data-width hidden aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn bq-muted max-sm:hidden">${ic('width')}</button>
+        <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn bq-muted hidden sm:inline-flex">${ic('maximize')}</button>
+        <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn bq-muted sm:hidden">${ic('more')}</button>
       </header>
-      <div data-canvas class="flex-1 bg-stone-50/60 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
+      <div data-canvas class="flex-1 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
       <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 text-white shadow-2xl">
         <div data-bar-clip hidden role="group" aria-label="Presse-papiers" class="flex basis-full justify-center gap-1 border-b border-white/15 py-1">
           <button type="button" data-clip="copy" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('copy', 'size-4')}Copier</button>
@@ -202,15 +202,15 @@
         <div data-emoji-grid class="mt-1 grid h-[min(19rem,42dvh)] grid-cols-7 content-start overflow-y-auto sm:grid-cols-9"></div>
         <div class="mt-3 flex gap-2"><input data-icon-input aria-label="Votre emoji" placeholder="Ou collez un emoji" class="h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-xl"><button type="button" data-icon-use class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Utiliser</button></div>
         <button type="button" data-icon-pick="" data-emoji-none class="mt-2 min-h-11 rounded-xl px-3 font-medium text-brand-700 hover:bg-brand-50">Aucune icône</button>`)}
-      <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full bg-white"><div data-full-inner class="bq-full-inner">
-        <div class="sticky top-0 z-10 flex min-h-14 items-center gap-1 border-b border-stone-200/80 bg-white/95 px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
+      <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full"><div data-full-inner class="bq-full-inner">
+        <div class="bq-head sticky z-10 flex min-h-14 items-center gap-1 border-b px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
           <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-500"></span>
-          <button type="button" data-width aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn hidden text-stone-600 sm:inline-flex">${ic('width')}</button>
+          <button type="button" data-width aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn bq-muted hidden sm:inline-flex">${ic('width')}</button>
           <button type="button" data-block-full-close aria-label="Quitter le plein écran" title="Quitter le plein écran" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
             <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white text-stone-700 group-hover:bg-stone-100">${ic('minimize', 'size-4')}</span></button></div>
         <div data-block-full-body class="bq-column px-4 py-6 sm:px-8"></div></div>
     </div>
-    <dialog data-editor-full aria-label="Éditeur en plein écran" class="bq-full bg-white"><div data-full-inner class="bq-full-inner"></div></dialog>`;
+    <dialog data-editor-full aria-label="Éditeur en plein écran" class="bq-full"><div data-full-inner class="bq-full-inner"></div></dialog>`;
 
     const app = element.firstElementChild;
     const editorFull = element.lastElementChild;
@@ -313,7 +313,7 @@
     const markdown = () => { syncFromDom(); return Blocks.serialize(docMeta(), blocks); };
 
     // ---- Dessin ----
-    const pill = 'inline-flex h-7 items-center gap-1 rounded-full border border-stone-200/90 bg-white px-2.5 text-[11px] font-bold text-stone-500 shadow-sm group-hover:border-stone-400 group-hover:text-stone-800';
+    const pill = 'bq-pill inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] font-bold shadow-sm';
     const gap = (index) => {
       const canMerge = index > 0 && index < blocks.length && Blocks.merge(blocks[index - 1], blocks[index]) !== null;
       // Intervalle aéré : la pastille de 28 px est à 12 px de chaque carte (cible tactile de 44 px + 4 px de marge).
@@ -333,11 +333,11 @@
     // Carte : à gauche le type (liste de conversion), à droite du type trois boutons ronds (menu, agrandir, supprimer) ;
     // colonne de droite : monter, poignée, descendre. Une action = un seul endroit.
     // Le contenu est centré verticalement sous le badge : un titre court occupe harmonieusement la hauteur donnée par la colonne.
-    const round = (data, icon, label, cls = 'text-stone-600') => `<button type="button" ${data} aria-label="${label}" title="${label}" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
-        <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white/70 transition-colors group-hover:bg-white group-active:bg-stone-100 ${cls}">${ic(icon, 'size-4')}</span></button>`;
+    const round = (data, icon, label, cls = 'bq-muted') => `<button type="button" ${data} aria-label="${label}" title="${label}" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
+        <span class="bq-round flex size-8 items-center justify-center rounded-full border transition-colors ${cls}">${ic(icon, 'size-4')}</span></button>`;
     // Outils propres à un type (ex. œil du bloc HTML), à côté du type ; `views` garde l'affichage choisi par bloc (code / aperçu).
     const views = new Map();
-    const card = (b, i) => `<article data-id="${b.id}" data-view="${views.get(b.id) || 'edit'}" aria-label="${attr(def(b).label)}" class="bq-card flex rounded-2xl border ${def(b).tone.card}">
+    const card = (b, i) => `<article data-id="${b.id}" data-view="${views.get(b.id) || 'edit'}" aria-label="${attr(def(b).label)}" class="bq-card flex border ${def(b).tone.card}">
         <div class="flex min-w-0 flex-1 flex-col pb-3 pl-3 pr-1">
           <div class="flex h-11 items-center">${badge(b)}${editorOf(b) === def(b) && def(b).tools ? def(b).tools(b, views.get(b.id)) : ''}<span class="flex-1"></span>
             ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
@@ -354,7 +354,7 @@
     const render = () => (preview ? renderPreview() : renderEdit());
     const renderEdit = () => {
       canvas.innerHTML = `<div class="bq-column relative">${blocks.map((b, i) => gap(i) + card(b, i)).join('')}
-        <button type="button" data-insert="end" class="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-stone-300 bg-white/70 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
+        <button type="button" data-insert="end" class="bq-add mt-3 flex min-h-12 w-full items-center justify-center gap-2 border border-dashed border-stone-300 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
       canvas.querySelectorAll('.bq-edit').forEach(clean);
     };
     const clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };
@@ -365,7 +365,7 @@
       try {
         const html = o.previewUrl ? await (await fetch(o.previewUrl, { method: 'POST', body: form({ text }), signal: ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
         if (preview) {
-          canvas.innerHTML = `<div class="bq-column rounded-2xl bg-white p-4 sm:p-8">${html}</div>`;
+          canvas.innerHTML = `<div class="bq-column p-1 sm:p-4">${html}</div>`;
           window.BlockquiltContent?.enhance(canvas); // flèches et puces des carrousels, si blockquilt-content.js est chargé
         }
       } catch {

@@ -1,19 +1,9 @@
 /* blockquilt — rendu publié (Blocks.toHtml). Feuille écrite à la main, sans Tailwind.
-   Tout est sous .bq-content ; les couleurs sont des variables CSS (--bq-…), à redéfinir au besoin. */
+   Tout est sous .bq-content. Neutre par défaut : police et couleur héritées de la page, lignes et fonds tirés de currentColor.
+   Variables à poser sur .bq-content ou sur n'importe quel parent : --bq-text, --bq-accent (liens), --bq-border, --bq-radius,
+   --bq-mark, --bq-code-bg, --bq-muted, et pour chaque encadré --bq-<type>-bg, --bq-<type>-line, --bq-<type>-text. */
 .bq-content {
-  --bq-text: #1c1917;
-  --bq-muted: #57534e;
-  --bq-line: #e7e5e4;
-  --bq-link: #0369a1;
-  --bq-mark: #fde68a;
-  --bq-code-bg: #f1f5f9;
-  --bq-radius: 0.9rem;
-  --bq-info-bg: #f0f9ff;  --bq-info-line: #7dd3fc;  --bq-info-text: #0c4a6e;
-  --bq-tip-bg: #eef6f0;   --bq-tip-line: #6ee7b7;   --bq-tip-text: #064e3b;
-  --bq-success-bg: #f7fee7; --bq-success-line: #a3e635; --bq-success-text: #365314;
-  --bq-warning-bg: #fdf6e9; --bq-warning-line: #fcd34d; --bq-warning-text: #78350f;
-  --bq-danger-bg: #fff1f2;  --bq-danger-line: #fda4af;  --bq-danger-text: #881337;
-  color: var(--bq-text);
+  color: var(--bq-text, inherit);
   line-height: 1.7;
   overflow-wrap: break-word;
 }
@@ -31,45 +21,45 @@
 .bq-content .bq-t3 { font-size: 1.1rem; line-height: 1.3; font-weight: 700; }
 .bq-content ul { list-style: disc; padding-left: 1.5rem; }
 .bq-content ol { list-style: decimal; padding-left: 1.5rem; }
-.bq-content a { color: var(--bq-link); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
-.bq-content mark { background: var(--bq-mark); color: inherit; padding: 0.05em 0.25em; border-radius: 0.3em; }
-.bq-content code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: var(--bq-code-bg); padding: 0.1em 0.35em; border-radius: 0.35em; }
+.bq-content a { color: var(--bq-accent, #0369a1); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.bq-content mark { background: var(--bq-mark, #fde68a); color: var(--bq-mark-text, #1c1917); padding: 0.05em 0.25em; border-radius: 0.3em; }
+.bq-content code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: var(--bq-code-bg, color-mix(in srgb, currentColor 7%, transparent)); padding: 0.1em 0.35em; border-radius: 0.35em; }
 /* Code : les longues lignes vont à la ligne (pas de défilement horizontal, lisible au téléphone) ; l'indentation est gardée. */
-.bq-content pre { margin: 1rem 0; padding: 0.9rem 1rem; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bq-code-bg); border-radius: var(--bq-radius); font-size: 0.85rem; line-height: 1.55; tab-size: 2; }
+.bq-content pre { margin: 1rem 0; padding: 0.9rem 1rem; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bq-code-bg, color-mix(in srgb, currentColor 7%, transparent)); border-radius: var(--bq-radius, 0.9rem); font-size: 0.85rem; line-height: 1.55; tab-size: 2; }
 .bq-content pre code { background: none; padding: 0; font-size: inherit; }
-.bq-content pre.bq-raw { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px dashed var(--bq-line); background: none; }
-.bq-content hr { border: 0; border-top: 1px solid var(--bq-line); margin: 2rem 0; }
-.bq-content blockquote { margin: 1rem 0; padding: 0.1rem 0 0.1rem 1rem; border-left: 3px solid var(--bq-line); color: var(--bq-muted); font-style: italic; }
+.bq-content pre.bq-raw { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px dashed var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); background: none; }
+.bq-content hr { border: 0; border-top: 1px solid var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); margin: 2rem 0; }
+.bq-content blockquote { margin: 1rem 0; padding: 0.1rem 0 0.1rem 1rem; border-left: 3px solid var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); color: var(--bq-muted, color-mix(in srgb, currentColor 68%, transparent)); font-style: italic; }
 .bq-content figure { margin: 1.25rem 0; }
-.bq-content figure img { display: block; width: 100%; height: auto; border-radius: var(--bq-radius); }
-.bq-content figcaption { margin-top: 0.4rem; font-size: 0.85rem; color: var(--bq-muted); text-align: center; }
-.bq-content .bq-video { aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--bq-radius); background: #e7e5e4; }
+.bq-content figure img { display: block; width: 100%; height: auto; border-radius: var(--bq-radius, 0.9rem); }
+.bq-content figcaption { margin-top: 0.4rem; font-size: 0.85rem; color: var(--bq-muted, color-mix(in srgb, currentColor 68%, transparent)); text-align: center; }
+.bq-content .bq-video { aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--bq-radius, 0.9rem); background: #e7e5e4; }
 .bq-content .bq-video iframe { width: 100%; height: 100%; border: 0; display: block; }
 
 /* Encadrés : <aside class="bq-callout bq-callout-tip" role="note"> */
-.bq-content .bq-callout { margin: 1rem 0; padding: 0.85rem 1rem; border: 1px solid var(--bq-line); border-radius: var(--bq-radius); }
+.bq-content .bq-callout { margin: 1rem 0; padding: 0.85rem 1rem; border: 1px solid var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); border-radius: var(--bq-radius, 0.9rem); }
 .bq-content .bq-callout > :first-child { margin-top: 0; }
 .bq-content .bq-callout > :last-child { margin-bottom: 0; }
 .bq-content .bq-callout-title { font-weight: 700; }
 .bq-content .bq-callout p, .bq-content .bq-callout ul, .bq-content .bq-callout ol { margin: 0.35rem 0; }
-.bq-content .bq-callout-info { background: var(--bq-info-bg); border-color: var(--bq-info-line); color: var(--bq-info-text); }
-.bq-content .bq-callout-tip { background: var(--bq-tip-bg); border-color: var(--bq-tip-line); color: var(--bq-tip-text); }
-.bq-content .bq-callout-success { background: var(--bq-success-bg); border-color: var(--bq-success-line); color: var(--bq-success-text); }
-.bq-content .bq-callout-warning { background: var(--bq-warning-bg); border-color: var(--bq-warning-line); color: var(--bq-warning-text); }
-.bq-content .bq-callout-danger { background: var(--bq-danger-bg); border-color: var(--bq-danger-line); color: var(--bq-danger-text); }
+.bq-content .bq-callout-info { background: var(--bq-info-bg, #f0f9ff); border-color: var(--bq-info-line, #7dd3fc); color: var(--bq-info-text, #0c4a6e); }
+.bq-content .bq-callout-tip { background: var(--bq-tip-bg, #eef6f0); border-color: var(--bq-tip-line, #6ee7b7); color: var(--bq-tip-text, #064e3b); }
+.bq-content .bq-callout-success { background: var(--bq-success-bg, #f7fee7); border-color: var(--bq-success-line, #a3e635); color: var(--bq-success-text, #365314); }
+.bq-content .bq-callout-warning { background: var(--bq-warning-bg, #fdf6e9); border-color: var(--bq-warning-line, #fcd34d); color: var(--bq-warning-text, #78350f); }
+.bq-content .bq-callout-danger { background: var(--bq-danger-bg, #fff1f2); border-color: var(--bq-danger-line, #fda4af); color: var(--bq-danger-text, #881337); }
 
 /* Carrousel : une photo à la fois (scroll-snap). Avec blockquilt-content.js : flèches sur les côtés, puces dessous, sans barre de défilement. */
 .bq-content .bq-carousel { position: relative; margin: 1.25rem 0; }
-.bq-content .bq-carousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; border-radius: var(--bq-radius); scrollbar-width: thin; }
+.bq-content .bq-carousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; border-radius: var(--bq-radius, 0.9rem); scrollbar-width: thin; }
 .bq-content .bq-carousel.is-ready .bq-carousel-track { scrollbar-width: none; }
 .bq-content .bq-carousel.is-ready .bq-carousel-track::-webkit-scrollbar { display: none; }
-.bq-content .bq-carousel-track:focus-visible { outline: 2px solid var(--bq-link); outline-offset: 2px; }
+.bq-content .bq-carousel-track:focus-visible { outline: 2px solid var(--bq-accent, #0369a1); outline-offset: 2px; }
 .bq-content .bq-carousel-track > figure { flex: 0 0 100%; margin: 0; scroll-snap-align: start; }
 .bq-content .bq-carousel-track img { aspect-ratio: 4 / 3; object-fit: cover; }
 .bq-content .bq-carousel-prev, .bq-content .bq-carousel-next {
   position: absolute; top: calc((100% - 2.25rem) / 2); transform: translateY(-50%);
   width: 2.75rem; height: 2.75rem; border: 0; border-radius: 50%; cursor: pointer;
-  background: rgb(255 255 255 / 0.9); box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); color: var(--bq-text);
+  background: rgb(255 255 255 / 0.9); box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); color: #1c1917; /* sur la photo : toujours clair et sombre */
 }
 .bq-content .bq-carousel-prev { left: 0.5rem; }
 .bq-content .bq-carousel-next { right: 0.5rem; }
@@ -82,11 +72,11 @@
 .bq-content .bq-carousel-prev:disabled, .bq-content .bq-carousel-next:disabled { opacity: 0; pointer-events: none; }
 .bq-content .bq-carousel-dots { display: flex; justify-content: center; gap: 0.15rem; margin-top: 0.25rem; }
 .bq-content .bq-carousel-dots button { width: 1.75rem; height: 1.75rem; padding: 0; border: 0; background: none; cursor: pointer; }
-.bq-content .bq-carousel-dots button::before { content: ''; display: block; width: 0.5rem; height: 0.5rem; margin: auto; border-radius: 50%; background: var(--bq-line); transition: background 0.2s, transform 0.2s; }
-.bq-content .bq-carousel-dots button[aria-current="true"]::before { background: var(--bq-text); transform: scale(1.2); }
+.bq-content .bq-carousel-dots button::before { content: ''; display: block; width: 0.5rem; height: 0.5rem; margin: auto; border-radius: 50%; background: var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); transition: background 0.2s, transform 0.2s; }
+.bq-content .bq-carousel-dots button[aria-current="true"]::before { background: var(--bq-text, currentColor); transform: scale(1.2); }
 .bq-content [hidden] { display: none !important; }
 
 /* Bloc HTML filtré : le contenu garde ses classes ; seules celles présentes dans le CSS de la page ont un effet. */
 .bq-content .bq-html { margin: 1rem 0; }
 .bq-content .bq-html table { width: 100%; border-collapse: collapse; }
-.bq-content .bq-html th, .bq-content .bq-html td { border: 1px solid var(--bq-line); padding: 0.4rem 0.6rem; text-align: left; }
+.bq-content .bq-html th, .bq-content .bq-html td { border: 1px solid var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); padding: 0.4rem 0.6rem; text-align: left; }
