@@ -197,10 +197,10 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 
 | Fichier | Rôle | Taille (gzip) |
 |---|---|---|
-| `blockquilt.js` | Noyau `Blocks` : format, registre des types, rendu HTML, `lint`, `sanitize`. Sans DOM. | 35 ko (12 ko) |
-| `blockquilt-editor.js` | Écran, module ES : `mount` ; assemble les modules de `editor/`. | 90 ko au total avec `editor/` (27 ko) |
-| `editor/` | Un module par sujet, de 7 à 175 lignes : `document` (état, texte, enregistrement), `render` (cartes), `actions` (structure, menus, copier / coller), `history` (annuler / rétablir), `bar` (mise en forme, listes), `source` (vues), `fullscreen`, `drag`, `media` (photos, carrousel), `emoji`, `ai`, `sheets` (feuilles), `events` (clics, clavier), `template` (HTML), `types` (cartes d'édition des types), `icons`, `shared`. | |
-| `blockquilt.css` | CSS de l'éditeur, généré par Tailwind 3.4.17 (`./build-css`). Ne pas modifier à la main. | 29 ko (7 ko) |
+| `blockquilt.js` | Noyau `Blocks` : format, registre des types, rendu HTML, `lint`, `sanitize`. Sans DOM. | 40 ko (13 ko) |
+| `blockquilt-editor.js` | Écran, module ES : `mount` ; assemble les modules de `editor/`. | 103 ko au total avec `editor/` (30 ko) |
+| `editor/` | Un module par sujet, de 7 à 175 lignes : `document` (état, texte, enregistrement), `render` (cartes), `actions` (structure, menus, copier / coller), `history` (annuler / rétablir), `bar` (mise en forme, listes), `source` (vues), `fullscreen`, `drag`, `media` (photos, carrousel), `emoji`, `ai`, `sheets` (feuilles), `remote` (versions et conflits), `events` (clics, clavier), `template` (HTML), `types` (cartes d'édition des types), `icons`, `shared`. | |
+| `blockquilt.css` | CSS de l'éditeur, généré par Tailwind 3.4.17 (`./build-css`). Ne pas modifier à la main. | 30 ko (7 ko) |
 | `blockquilt-content.css` | CSS du rendu publié, écrit à la main. | 7 ko (2 ko) |
 | `blockquilt-content.js` | Facultatif, pour la page publique : flèches et puces des carrousels. | 2 ko (1 ko) |
 | `emoji.json` | Bibliothèque d'emoji (nom français, mots-clés, catégorie), chargée au premier usage. | 121 ko (37 ko) |
