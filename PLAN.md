@@ -67,23 +67,24 @@ Ordre : E4, E1, E2, E3, E5, E6. L'IA (§5) est mise de côté pour ce round.
   - bloc : remplacer le bloc, insérer au-dessus, insérer dessous, ne rien toucher.
 - **Tout s'essaie dans les démos**, locale et publique (application de référence = `dev/server.js`).
 
-### Le contrat de l'application : un adaptateur de contenus
+### Le contrat de l'application : HTTP hypermédia (un seul contrat, aucun module à réécrire)
 
-Tout ce que blockquilt demande à une application. Deux formes équivalentes : un module Node, ou une API REST (pour PHP ou autre).
+Derrière, ce que l'on veut (PHP, Node, fichiers, base de données). Le Markdown est la représentation du contenu ; la version est l'`ETag`.
 
 ```
-auth(jeton)                                  → personne | null
-list(personne)                               → [{ id, title, updatedAt }]    seulement ce qu'elle peut voir
-read(personne, id)                           → { markdown, version }
-write(personne, id, markdown, { ifVersion, by }) → { version }               refus : droits (403), conflit (409)
+GET  /contents         Accept: text/html → liste de liens (htmx) · application/json → [{ id, title, updatedAt, href }]
+GET  /contents/{id}    Accept: text/markdown → le texte (+ ETag) · text/html → le rendu (Blocks.toHtml)
+PUT  /contents/{id}    Content-Type: text/markdown, If-Match: <ETag lu>, Authorization: Bearer <jeton>
+                       → 204 + nouvel ETag · 412 contenu changé entre-temps · 403 pas le droit · 401 jeton inconnu
 ```
 
-En REST : `GET /contents`, `GET /contents/:id`, `PUT /contents/:id` avec `Authorization: Bearer <jeton>`, `If-Match: <version>`, et l'auteur (`by`) noté par l'application.
+- L'application seule interprète le jeton (qui, quels contenus) et note l'auteur de chaque version (le jeton dit qui écrit).
+- Le serveur MCP, le relais IA et l'éditeur ne sont que des clients de ces adresses. Les blocs (place + empreinte) sont calculés côté client par `Blocks` : l'application n'a pas à connaître les blocs.
 
 ### Étapes
 
 - [ ] **I1 Noyau** (fonctions pures, tests Node) : `Blocks.address(md)` → blocs numérotés avec leur empreinte ; `Blocks.replaceBlock`, `Blocks.insertBlocks` (au-dessus, dessous) avec contrôle d'empreinte ; `Blocks.combine(md, fragment, mode)` pour `replace | prepend | append`.
-- [ ] **I2 Application de référence** (démo) : plusieurs contenus en fichiers `.md`, deux utilisateurs et leurs jetons (user1 → guides 1A, 1B ; user2 → guide 2A), API REST de l'adaptateur (versions, `If-Match`, auteur), page de démo avec le choix du contenu.
+- [ ] **I2 Application de référence** (démo) : plusieurs contenus en fichiers `.md`, deux utilisateurs et leurs jetons (user1 → guides 1A, 1B ; user2 → guide 2A), le contrat HTTP ci-dessus (Markdown, HTML, `ETag`, `If-Match`, auteur), page de démo avec le choix du contenu.
 - [ ] **I3 Serveur MCP générique** (Node, sans dépendance) : outils `get_format`, `list_contents`, `read_content` (blocs numérotés, empreintes), `replace_block`, `insert_blocks`, `write_content` (`replace | prepend | append`, version attendue), `lint`. En stdio (Claude Code) et en HTTP (`/mcp` dans la démo, pour un client distant). Un « skill » `SKILL.md` (FORMAT.md + règles d'écriture). Essai : user1 voit 1A et 1B mais pas 2A, une écriture sur une empreinte périmée est refusée, l'éditeur relit ce que l'IA a écrit.
 - [ ] **I4 Modes d'application dans l'éditeur** : après la proposition de l'IA, « Remplacer », « Ajouter au début », « Ajouter à la fin », « Copier » (ne rien toucher) ; pour un bloc, « Remplacer », « Au-dessus », « Dessous », « Copier ». Toujours annulable.
 - [ ] **I5 Relais IA** compatible OpenAI (OpenRouter) : module Node réutilisable, plusieurs usages (`traduire`, `réécrire`… chacun son modèle et sa consigne), consigne système `FORMAT.md` ; contrat HTTP documenté pour le réécrire ailleurs. L'éditeur propose les usages fournis par l'application. Démo : réponse fixe par défaut, vrai modèle si une clé est donnée.
