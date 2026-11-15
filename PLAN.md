@@ -41,7 +41,7 @@ Chaque tâche : test, `check` vert, commit, ligne dans `DECISIONS.md`.
   - Couleurs et formes en variables CSS documentées (`--bq-accent`, `--bq-surface`, `--bq-border`, `--bq-radius`…), valeurs par défaut sobres.
   - Pas de fond ni d'ombre imposés autour de l'éditeur ; décalage de l'en-tête collant réglable (`--bq-sticky-top`) pour une application qui a déjà sa barre.
   - Vérifier : monté dans une page à police et couleur d'accent différentes, l'éditeur les reprend.
-- [ ] **E3 Vue « source ».** Un mode à côté de « Édition » et « Aperçu » : le texte Markdown complet dans une zone de texte.
+- [x] **E3 Vue « source ».** Un mode à côté de « Édition » et « Aperçu » : le texte Markdown complet dans une zone de texte.
   - Contrôle `Blocks.lint` en direct, ligne par ligne.
   - Aperçu à côté sur grand écran, bascule source / aperçu sur téléphone.
   - Utilisable en plein écran (espace d'écriture total).

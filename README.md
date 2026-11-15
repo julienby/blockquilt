@@ -35,6 +35,8 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 
 `mount` renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
 
+Trois vues dans l'en-tête : **édition** par blocs, **texte source** (le Markdown complet, contrôlé par `Blocks.lint` et rendu en direct à côté ; en revenant aux blocs, le texte est relu, en une étape annulable) et **aperçu**.
+
 Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte, sans l'habillage de la carte). C'est un `<dialog>` qui couvre toute la fenêtre, sans le plein écran du navigateur (pas de message « Pour quitter le plein écran… »). Échap ou l'icône « réduire » le quittent.
 
 | Option | Rôle |

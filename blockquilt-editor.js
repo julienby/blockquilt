@@ -150,6 +150,7 @@
           : '<span class="flex-1"></span>'}
         <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn bq-muted">${ic('undo')}</button>
         <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn bq-muted hidden sm:inline-flex">${ic('redo')}</button>
+        <button type="button" data-source-mode aria-pressed="false" aria-label="Texte source (Markdown)" title="Texte source (Markdown)" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('code')}</button>
         <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
         ${o.aiUrl ? `<button type="button" data-ai aria-label="Assistant IA" title="Assistant IA" class="bq-btn hidden text-amber-600 sm:inline-flex">${ic('wand')}</button>` : ''}
         <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative text-stone-400">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
@@ -236,7 +237,8 @@
     let icon = '';
     let blocks = [];
     let dirty = false;
-    let preview = false;
+    let mode = 'edit'; // 'edit' (blocs) | 'source' (texte Markdown) | 'preview' (rendu)
+    const editing = () => mode === 'edit';
     let insertAt = null; // null = en bas
     let menuId = null;
     let iconTarget = null; // null = document, sinon id du bloc (encadré)
@@ -304,13 +306,15 @@
     // ---- Écran → modèle (avant tout nouveau dessin) ----
     const cardsIn = () => app.querySelectorAll('[data-id]');
     const syncFromDom = () => {
-      if (preview) return;
+      if (!editing()) return;
       cardsIn().forEach((card) => {
         const b = blocks.find((x) => x.id === card.dataset.id);
         if (b) editorOf(b).read(card, b);
       });
     };
-    const markdown = () => { syncFromDom(); return Blocks.serialize(docMeta(), blocks); };
+    const sourceArea = () => canvas.querySelector('[data-source-text]');
+    // En vue source, le document est le texte de la zone de saisie, tel quel.
+    const markdown = () => { if (mode === 'source' && sourceArea()) return sourceArea().value; syncFromDom(); return Blocks.serialize(docMeta(), blocks); };
 
     // ---- Dessin ----
     const pill = 'bq-pill inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] font-bold shadow-sm';
@@ -351,7 +355,7 @@
 
     // Bloc HTML désactivé (option `html` absente) : édité comme texte source, sans aperçu.
     const editorOf = (b) => (def(b).edit && (b.type !== 'html' || o.html) ? def(b) : Blocks.fallbackEditor);
-    const render = () => (preview ? renderPreview() : renderEdit());
+    const render = () => (mode === 'preview' ? renderPreview() : mode === 'source' ? renderSource() : renderEdit());
     const renderEdit = () => {
       canvas.innerHTML = `<div class="bq-column relative">${blocks.map((b, i) => gap(i) + card(b, i)).join('')}
         <button type="button" data-insert="end" class="bq-add mt-3 flex min-h-12 w-full items-center justify-center gap-2 border border-dashed border-stone-300 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
@@ -364,21 +368,69 @@
       canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
       try {
         const html = o.previewUrl ? await (await fetch(o.previewUrl, { method: 'POST', body: form({ text }), signal: ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
-        if (preview) {
+        if (mode === 'preview') {
           canvas.innerHTML = `<div class="bq-column p-1 sm:p-4">${html}</div>`;
           window.BlockquiltContent?.enhance(canvas); // flèches et puces des carrousels, si blockquilt-content.js est chargé
         }
       } catch {
-        if (preview) canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
+        if (mode === 'preview') canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
       }
     };
-    const setPreview = (value) => {
-      if (value === preview) return;
-      syncFromDom();
-      preview = value;
-      $('[data-preview]').setAttribute('aria-pressed', String(value));
-      titleEl.contentEditable = String(!value);
+    // ---- Vue source : le texte Markdown complet, contrôlé par Blocks.lint et rendu en direct ----
+    // Grand écran : texte et aperçu côte à côte ; téléphone : bascule « Texte / Aperçu ». En sortant, le texte est relu en blocs (une étape annulable).
+    const renderSource = () => {
+      hideBar();
+      canvas.innerHTML = `<div data-source data-pane="text" class="bq-source mx-auto grid gap-3 md:grid-cols-2">
+          <div role="group" aria-label="Affichage" class="flex gap-1 rounded-xl border border-current/10 p-1 md:hidden">
+            <button type="button" data-source-tab="text" aria-pressed="true" class="min-h-11 flex-1 rounded-lg text-sm font-semibold aria-pressed:bg-brand-600 aria-pressed:text-white">Texte</button>
+            <button type="button" data-source-tab="preview" aria-pressed="false" class="min-h-11 flex-1 rounded-lg text-sm font-semibold aria-pressed:bg-brand-600 aria-pressed:text-white">Aperçu</button></div>
+          <div data-source-pane="text" class="flex min-w-0 flex-col gap-2">
+            <textarea data-source-text spellcheck="false" aria-label="Texte source (Markdown)" class="bq-source-text w-full rounded-xl border bg-transparent p-3 font-mono text-[13px] leading-6">${esc(sourceText)}</textarea>
+            <ul data-source-lint aria-live="polite" class="space-y-1 text-xs"></ul></div>
+          <div data-source-pane="preview" aria-label="Aperçu" class="min-w-0 overflow-auto rounded-xl border p-3 sm:p-4" data-source-preview></div></div>`;
+      refreshSource();
+    };
+    let sourceText = '';
+    const refreshSource = () => {
+      const area = sourceArea();
+      if (!area) return;
+      const problems = Blocks.lint(area.value);
+      canvas.querySelector('[data-source-lint]').innerHTML = problems.length
+        ? problems.map((p) => `<li><button type="button" data-source-line="${p.line}" class="w-full rounded-lg bg-red-50 px-2 py-1.5 text-left text-red-800 hover:bg-red-100">Ligne ${p.line} : ${esc(p.message)}</button></li>`).join('')
+        : '<li class="px-2 py-1.5 opacity-60">Aucune alerte : l’éditeur relit tout le texte sans perte.</li>';
+      const pv = canvas.querySelector('[data-source-preview]');
+      pv.innerHTML = Blocks.toHtml(area.value, { media: o.media });
+      window.BlockquiltContent?.enhance(pv);
+    };
+    const goToLine = (n) => {
+      const area = sourceArea();
+      const lines = area.value.split('\n');
+      const start = lines.slice(0, n - 1).reduce((a, l) => a + l.length + 1, 0);
+      area.focus();
+      area.setSelectionRange(start, start + (lines[n - 1] || '').length);
+    };
+    // Relit le texte de la vue source en blocs (titre, icône et autres clés du frontmatter compris).
+    const applySource = () => {
+      const parsed = Blocks.parse(sourceArea()?.value ?? sourceText);
+      meta = parsed.meta;
+      icon = meta.icon || '';
+      titleEl.textContent = meta.title || '';
+      showIcon();
+      blocks = parsed.blocks.map((b) => ({ id: newId(), ...b }));
+      if (!blocks.length) blocks = [{ id: newId(), ...Blocks.blank('text') }];
+    };
+    const setMode = (next) => {
+      if (next === mode) next = 'edit';
+      if (next === mode) return;
+      if (mode === 'source') { checkpoint(); applySource(); }
+      else if (editing()) { syncFromDom(); checkpoint(); }
+      if (next === 'source') sourceText = Blocks.serialize(docMeta(), blocks);
+      mode = next;
+      $('[data-preview]').setAttribute('aria-pressed', String(mode === 'preview'));
+      $('[data-source-mode]').setAttribute('aria-pressed', String(mode === 'source'));
+      titleEl.contentEditable = String(editing());
       render();
+      if (mode === 'source') sourceArea().focus({ preventScroll: true });
     };
     const focusCard = (id) => {
       const el = canvas.querySelector(`[data-id="${id}"]`);
@@ -408,7 +460,7 @@
       app.querySelector('[data-redo]').disabled = !future.length;
     };
     const checkpoint = () => {
-      if (preview) return;
+      if (mode === 'preview') return;
       clearTimeout(checkpoint.timer);
       typing = false;
       const cur = snapshot();
@@ -441,7 +493,7 @@
       updateHistoryButtons();
     };
     const undo = () => {
-      if (preview) return false;
+      if (!editing()) return false;
       if (blockFull.open) blockFull.close();
       checkpoint();
       if (!past.length) return false;
@@ -451,7 +503,7 @@
       return true;
     };
     const redo = () => {
-      if (preview || !future.length) return false;
+      if (!editing() || !future.length) return false;
       if (blockFull.open) blockFull.close();
       past.push(baseline);
       baseline = future.pop();
@@ -810,7 +862,7 @@
     };
     on(app, 'pointerdown', (e) => {
       const grip = e.target.closest('[data-grip]');
-      if (!grip || !canvas.contains(grip) || e.button !== 0 || preview) return;
+      if (!grip || !canvas.contains(grip) || e.button !== 0 || !editing()) return;
       e.preventDefault();
       syncFromDom();
       const cardEl = grip.closest('[data-id]');
@@ -853,6 +905,7 @@
       const k = e.key.toLowerCase();
       if (k === 's') { e.preventDefault(); save(); return; }
       if (k !== 'z' && k !== 'y') return;
+      if (mode === 'source') return; // vue source : la zone de texte garde son propre annuler / rétablir
       // Frappe en cours dans un champ : le navigateur annule sa propre frappe.
       if (typing && inField()) return;
       e.preventDefault();
@@ -992,8 +1045,16 @@
       if (el.closest('[data-ai]')) return openAi(null);
       if (el.closest('[data-more]')) return openSheet('more', el.closest('[data-more]'));
       if (el.closest('[data-block-full-close]')) return blockFull.close();
-      if (el.closest('[data-preview]')) return setPreview(!preview);
-      if (el.closest('[data-doc-icon]')) return preview ? null : openIcon(null);
+      if (el.closest('[data-preview]')) return setMode('preview');
+      if (el.closest('[data-source-mode]')) return setMode('source');
+      if (el.closest('[data-source-tab]')) {
+        const tab = el.closest('[data-source-tab]').dataset.sourceTab;
+        canvas.querySelector('[data-source]').dataset.pane = tab;
+        canvas.querySelectorAll('[data-source-tab]').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.sourceTab === tab)));
+        return;
+      }
+      if (el.closest('[data-source-line]')) return goToLine(Number(el.closest('[data-source-line]').dataset.sourceLine));
+      if (el.closest('[data-doc-icon]')) return editing() ? openIcon(null) : null;
       if (el.closest('[data-back]') && dirty) { e.preventDefault(); return openSheet('leave'); }
     });
     on(sheets.more, 'click', (e) => {
@@ -1013,6 +1074,12 @@
     const inSheet = (t) => !!t.closest?.('[data-sheet]');
     on(app, 'input', (e) => {
       if (inSheet(e.target)) return;
+      if (e.target.matches?.('[data-source-text]')) {
+        setDirty(true);
+        clearTimeout(refreshSource.timer);
+        refreshSource.timer = later(refreshSource, 250);
+        return;
+      }
       setDirty(true);
       typed();
       const c = e.target.closest?.('[data-id]');
@@ -1094,7 +1161,7 @@
       }
     };
     const showBar = (field) => {
-      if (preview || !field || !app.contains(field)) return;
+      if (!editing() || !field || !app.contains(field)) return;
       barField = field;
       bar.hidden = false;
       placeBar();

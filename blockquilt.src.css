@@ -86,3 +86,11 @@ dialog.bq-full .bq-app { min-height: 100%; }
 
 /* Carte à deux affichages (bloc HTML) : le code, ou l'aperçu. */
 [data-id]:not([data-view="preview"]) .bq-view-preview, [data-id][data-view="preview"] .bq-view-code { display: none; }
+
+/* Vue source : texte et aperçu côte à côte (grand écran), l'un ou l'autre au téléphone ; en plein écran, la zone de texte prend toute la hauteur. */
+.bq-source { max-width: calc(var(--bq-width, 48rem) * 2); }
+.bq-source-text, [data-source-preview] { border-color: var(--bq-border, color-mix(in srgb, currentColor 14%, transparent)); min-height: 60dvh; resize: vertical; }
+.bq-full-inner .bq-source-text, .bq-full-inner [data-source-preview] { min-height: calc(100dvh - 10rem); }
+@media (max-width: 767px) {
+  [data-pane="text"] > [data-source-pane="preview"], [data-pane="preview"] > [data-source-pane="text"] { display: none; }
+}

@@ -712,6 +712,44 @@ try {
   await key('Enter', 'Enter', 13);
   ok(await ev(`!editor.getMarkdown().includes('Bonjour') && document.querySelectorAll('[data-bq] [data-id]').length === 2`), 'clavier : bloc supprimé par son bouton « Supprimer »');
 
+
+  // ---- E3 : vue source (à la fin : elle enregistre un autre document) ----
+  // Vue source
+  for (const width of [1280, 375]) {
+    await viewport(width);
+    await open();
+    const before = await mdNow();
+    await ev(`document.querySelector('[data-source-mode]').click()`);
+    const src = await ev(`(() => { const t = document.querySelector('[data-source-text]'); const pv = document.querySelector('[data-source-preview]'); return { same: t.value === editor.getMarkdown(), focus: document.activeElement === t, cards: document.querySelectorAll('[data-canvas] [data-id]').length, side: pv.offsetParent !== null, preview: !!pv.querySelector('article.bq-content'), ok: document.querySelector('[data-source-lint]').textContent.includes('Aucune alerte') }; })()`);
+    ok(src.same && src.focus && src.cards === 0 && src.preview && src.ok, `${width} px : vue source, le texte Markdown complet, sans alerte`);
+    ok(src.side === (width >= 768), `${width} px : aperçu ${width >= 768 ? 'à côté du texte' : 'derrière la bascule « Aperçu »'}`);
+    if (width < 768) {
+      await ev(`document.querySelector('[data-source-tab="preview"]').click()`);
+      ok(await ev(`document.querySelector('[data-source-preview]').offsetParent !== null && document.querySelector('[data-source-text]').offsetParent === null`), '375 px : la bascule montre l’aperçu');
+      await ev(`document.querySelector('[data-source-tab="text"]').click()`);
+    }
+    await ev(`(() => { const t = document.querySelector('[data-source-text]'); t.value = t.value + '\\n> [!astuce]\\n> Encadré inconnu\\n\\n## Ajouté à la main\\n'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+    await waitFor(() => ev(`document.querySelector('[data-source-lint]').textContent.includes('encadré inconnu')`), 'alerte lint en direct');
+    ok(await ev(`document.querySelector('[data-source-preview]').textContent.includes('Ajouté à la main')`), `${width} px : alerte lint et aperçu mis à jour en direct`);
+    await ev(`document.querySelector('[data-source-line]').click()`);
+    ok(await ev(`(() => { const t = document.querySelector('[data-source-text]'); return document.activeElement === t && t.value.slice(t.selectionStart, t.selectionEnd) === '> [!astuce]'; })()`), `${width} px : un clic sur l’alerte sélectionne la ligne`);
+    await ev(`document.querySelector('[data-source-mode]').click()`);
+    ok(await ev(`[...document.querySelectorAll('[data-canvas] [data-id] [data-body]')].some((b) => b.textContent === 'Ajouté à la main') && editor.getMarkdown().includes('## Ajouté à la main')`), `${width} px : retour en édition, le texte est relu en blocs`);
+    await ev(`document.activeElement.blur()`);
+    await key('z', 'KeyZ', 90, CTRL);
+    ok((await mdNow()) === before, `${width} px : Ctrl+Z annule toute la modification faite en vue source, en une fois`);
+  }
+  await ev(`(() => { document.querySelector('[data-source-mode]').click(); const t = document.querySelector('[data-source-text]'); t.value = 'Enregistré depuis la vue source\\n'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+  await key('s', 'KeyS', 83, CTRL);
+  await saved((x) => x === 'Enregistré depuis la vue source\n', 'Ctrl+S en vue source');
+  ok(true, 'vue source : Ctrl+S enregistre le texte tel quel');
+  await viewport(1280);
+  await ev(`document.querySelector('[data-full]').click()`);
+  ok(await ev(`document.querySelector('[data-source-text]').getBoundingClientRect().height >= innerHeight - 170`), 'vue source en plein écran : la zone de texte prend toute la hauteur');
+  await ev(`document.querySelector('[data-editor-full]').close()`);
+  await sleep(100);
+  await ev(`document.querySelector('[data-source-mode]').click()`);
+  await viewport(375);
   ws.close();
 } catch (error) {
   ok(false, error.message);
