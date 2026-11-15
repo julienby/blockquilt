@@ -225,6 +225,12 @@ try {
   await ev(`document.querySelector('[data-preview]').click()`);
   ok(await ev(`getComputedStyle([...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'h1')).borderTopWidth === '3px'`), 'carte H1 : bordure noire de 3 px');
 
+  // Code lisible : les longues lignes vont à la ligne dans l'aperçu
+  await ev(`(() => { editor.setMarkdown('\x60\x60\x60js\\nconst uneTresLongueVariable = appelerUneFonction(avecUnPremierArgument, avecUnDeuxiemeArgument, etUnTroisieme);\\n  indentée();\\n\x60\x60\x60\\n\\n| tableau | source |\\n|---|---|\\n| une cellule avec beaucoup de texte qui dépasse largement la largeur d’un téléphone | b |'); document.querySelector('[data-preview]').click(); })()`);
+  await waitFor(() => ev(`!!document.querySelector('[data-canvas] pre code')`), 'aperçu du code');
+  ok(await ev(`[...document.querySelectorAll('[data-canvas] pre')].every((p) => p.scrollWidth <= p.clientWidth + 1 && getComputedStyle(p).whiteSpace === 'pre-wrap') && document.querySelector('[data-canvas] pre code').textContent.includes('\\n  indentée')`), 'code et texte source : à la ligne à 375 px, sans défilement horizontal, indentation gardée');
+  await ev(`document.querySelector('[data-preview]').click()`);
+
   // ---- Deux éditeurs dans la même page, puis destroy() ----
   await open();
   const two = await ev(`(() => {

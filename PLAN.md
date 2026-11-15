@@ -46,14 +46,13 @@ Chaque tâche : test, `check` vert, commit, ligne dans `DECISIONS.md`.
   - Aperçu à côté sur grand écran, bascule source / aperçu sur téléphone.
   - Utilisable en plein écran (espace d'écriture total).
   - Retour en édition : le texte est relu en blocs, en une étape annulable (Ctrl+Z).
-- [ ] **E4 Code lisible.** En aperçu et dans le rendu publié, un bloc de code va à la ligne (`white-space: pre-wrap`) au lieu d'un défilement horizontal ; même chose pour un bloc « texte source ».
+- [x] **E4 Code lisible.** En aperçu et dans le rendu publié, un bloc de code va à la ligne (`white-space: pre-wrap`) au lieu d'un défilement horizontal ; même chose pour un bloc « texte source ».
 - [ ] **E5 Carrousel, édition.** La bande de vignettes défilante est remplacée par une grille (2 colonnes à 375 px, 3 à 4 au-delà) : légende sous chaque photo, déplacement par glisser ou par flèches, retrait, tuile « + Ajouter » en dernier. C'est l'approche courante des éditeurs de publication (Instagram, LinkedIn, WordPress Galerie).
 - [ ] **E6 Modularité.** `blockquilt-editor.js` (83 ko, environ 1 200 lignes) est découpé en modules ES natifs, toujours sans build : `editor/history.js`, `editor/drag.js`, `editor/fullscreen.js`, `editor/emoji.js`, `editor/ai.js`, `editor/bar.js`, `editor/cards.js`. Intégration : `<script type="module" src="blockquilt-editor.js">`. Le noyau `blockquilt.js` reste un seul fichier utilisable sous Node. Seulement si le code devient plus simple à lire et à maintenir.
-- [ ] **E7 Brouillon local (à décider).** Pratique courante (brouillons de commentaires GitHub, formulaires longs) : si la page se ferme avec des modifications non enregistrées, le texte est gardé dans le navigateur ; à la réouverture, une barre discrète propose « Reprendre le brouillon du … » ou « Ignorer ». Rien d'autre à apprendre. Coût : ~40 lignes. À faire seulement si Julien le valide.
 
-Ordre proposé : E4, E1 (petites), E2, E3, E5, E6, E7 si validée. L'IA (§5) avant ou après E6 selon la discussion.
+Ordre : E4, E1, E2, E3, E5, E6. L'IA (§5) est mise de côté pour ce round.
 
-## 5. IA — proposition à discuter (rien n'est implémenté)
+## 5. IA — proposition à discuter (mise de côté pour ce round, rien n'est implémenté)
 
 Deux niveaux (document entier, bloc) et deux accès :
 
@@ -97,6 +96,8 @@ Même échange pour toutes (`scope`, `instruction`, `text`, `block` → `{ markd
 - I4 : versions et « modifié par… » dans l'éditeur.
 
 ## 6. Idées gardées pour plus tard
+
+- Brouillon local : texte non enregistré gardé dans le navigateur, « Reprendre le brouillon / Ignorer » à la réouverture (~40 lignes).
 
 - Raccourcis de frappe Markdown (`## `, `- `, `> `, `---` en début de bloc) : pas convaincant pour le moment.
 - Coller plusieurs paragraphes dans un champ → plusieurs blocs.

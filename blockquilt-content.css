@@ -34,7 +34,8 @@
 .bq-content a { color: var(--bq-link); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
 .bq-content mark { background: var(--bq-mark); color: inherit; padding: 0.05em 0.25em; border-radius: 0.3em; }
 .bq-content code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: var(--bq-code-bg); padding: 0.1em 0.35em; border-radius: 0.35em; }
-.bq-content pre { margin: 1rem 0; padding: 0.9rem 1rem; overflow-x: auto; background: var(--bq-code-bg); border-radius: var(--bq-radius); font-size: 0.85rem; line-height: 1.55; }
+/* Code : les longues lignes vont à la ligne (pas de défilement horizontal, lisible au téléphone) ; l'indentation est gardée. */
+.bq-content pre { margin: 1rem 0; padding: 0.9rem 1rem; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bq-code-bg); border-radius: var(--bq-radius); font-size: 0.85rem; line-height: 1.55; tab-size: 2; }
 .bq-content pre code { background: none; padding: 0; font-size: inherit; }
 .bq-content pre.bq-raw { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px dashed var(--bq-line); background: none; }
 .bq-content hr { border: 0; border-top: 1px solid var(--bq-line); margin: 2rem 0; }
