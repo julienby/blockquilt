@@ -18,4 +18,4 @@ services:
     profiles: [check]
     volumes:
       - .:/app:ro
-    command: sh -c "node tests/blocks_test.cjs && node dev/check.mjs"
+    command: sh -c "node tests/blocks_test.cjs && node tests/contents_test.mjs && node dev/check.mjs"

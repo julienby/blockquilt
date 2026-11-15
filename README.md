@@ -16,6 +16,8 @@ docker compose run --rm check     # tests Node + parcours dans Chromium ; code d
 
 La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, les photos dans `dev/data/media/`. Pour repartir du document de démo, supprimer `dev/data/`. Sans Docker : `node dev/server.js` (Node 22), puis `node tests/blocks_test.cjs`.
 
+`/app` est une **application de démo** : deux utilisateurs, chacun ses contenus (user1 : guides 1A et 1B ; user2 : guide 2A), édités par l'éditeur et exposés par le contrat ci-dessous (« Contenus d'une application »).
+
 ## Intégrer
 
 ```html
@@ -120,6 +122,18 @@ Sur la page publique, `blockquilt-content.js` (facultatif, sans dépendance) don
 
 Le HTML produit est sémantique (`<h2 id>`, `<aside role="note">`, `<figure>`, `<blockquote>`, `<pre><code class="language-js">`…) et porte des classes `bq-*`, sans Tailwind. La feuille `blockquilt-content.css` (écrite à la main, couleurs en variables CSS `--bq-…`) suffit à l'afficher. Tout le texte est échappé ; le bloc HTML passe par `Blocks.sanitize` (liste blanche, voir `DECISIONS.md`).
 
+## Contenus d'une application (pour les IA et les autres outils)
+
+blockquilt ne stocke rien et ne connaît pas les utilisateurs : c'est l'application qui le fait. Pour qu'une IA (serveur MCP), un script ou htmx travaille sur ses contenus, l'application expose un seul contrat HTTP, ce qu'elle veut derrière (PHP, Node, fichiers, base de données) :
+
+| Requête | Réponse |
+|---|---|
+| `GET /contents` | Les contenus que le jeton peut voir. `Accept: application/json` → `[{ id, title, updatedAt, updatedBy, etag, href }]` ; sinon HTML (liste de liens, fragment `<ul>` si `HX-Request`). |
+| `GET /contents/{id}` | `Accept: text/markdown` → le texte, avec `ETag` (sa version) ; `text/html` → le rendu (`Blocks.toHtml`, fragment si `HX-Request`) ; `application/json` → infos + `markdown`. `If-None-Match` → 304. |
+| `PUT /contents/{id}` | Corps `text/markdown`, `If-Match: <ETag lu>` obligatoire (`*` pour écraser). `204` + nouvel `ETag` ; `412` le contenu a changé depuis la lecture (rien n'est écrit) ; `428` sans `If-Match` ; `403` pas le droit ; `401` jeton inconnu. `X-Via: Claude` (facultatif) : par quoi passe la personne. |
+
+Le jeton (`Authorization: Bearer …`, ou la session de l'application pour le navigateur) dit **qui** écrit ; l'application seule décide de ce qu'il peut voir et modifier, et note l'auteur de chaque version. Les blocs se désignent côté client par leur place et leur empreinte (`Blocks.address`) : l'application n'a pas à les connaître. Implémentation de référence : `dev/app.js`.
+
 ## Ajouter un type de bloc
 
 Un appel à `Blocks.register`, après `blockquilt.js`. `match` lit le texte du bloc (ou renvoie `null`), `toMarkdown` le réécrit : un bloc n'est reconnu que si l'écriture redonne exactement le texte lu. `edit` et `read` sont facultatifs : sans eux, le bloc s'édite comme texte source.
@@ -163,6 +177,8 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 | `fonts/` | Plus Jakarta Sans et Newsreader, hébergées (SIL OFL 1.1). | |
 | `tests/blocks_test.cjs`, `tests/fixtures/` | Tests Node du noyau : un fichier par type, aller-retour exact. | |
 | `dev/server.js` | Serveur de démo et de test, Node seul. | |
+| `dev/app.js`, `dev/contents/` | Application de référence : utilisateurs, jetons, contenus en `.md`, contrat `/contents`, page `/app`. | |
+| `tests/contents_test.mjs` | Tests du contrat HTTP (droits, ETag / If-Match, auteur). | |
 | `dev/check.mjs`, `dev/Dockerfile.check` | Parcours complet dans Chromium headless piloté en CDP (375 px et 1280 px). | |
 | `dev/build-emoji.mjs` | Fabrique `emoji.json` depuis Unicode et CLDR (lancé une fois). | |
 | `dev/shot.mjs` | Capture d'écran de la démo (outil de développement). | |

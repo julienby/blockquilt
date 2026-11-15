@@ -1,5 +1,5 @@
 // Serveur de démo et de test, Node seul (aucune dépendance).
-// Sert les fichiers du projet et imite les trois échanges que blockquilt.js attend d'un serveur.
+// Sert les fichiers du projet, imite les échanges que l'éditeur attend d'un serveur (api/…) et l'application de référence (dev/app.js).
 // PORT (8080) et DATA_DIR (dev/data) se règlent par l'environnement.
 'use strict';
 const http = require('node:http');
@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const Blocks = require('../blockquilt.js');
+const application = require('./app.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -14,6 +15,8 @@ const DATA = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
 const DOC = path.join(DATA, 'document.md');
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
+// Application de référence : contenus, utilisateurs, jetons, contrat HTTP (/contents) et sa page (/app).
+const reference = application(DATA);
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.md': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml' };
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -103,6 +106,8 @@ const server = http.createServer(async (req, res) => {
   try {
     const route = routes[`${req.method} ${url.pathname}`];
     if (route) return await route(req, res);
+    if (await reference.contents(req, res, url.pathname)) return;
+    if (req.method === 'GET' && url.pathname === '/app') return reference.app(req, res, url, fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'));
     if (req.method !== 'GET') return send(res, 405, 'text/plain', 'Méthode refusée');
     if (url.pathname === '/') return send(res, 200, TYPES['.html'], page());
     const media = /^\/media\/([a-f0-9]{12})$/.exec(url.pathname);

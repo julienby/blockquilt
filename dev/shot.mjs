@@ -1,4 +1,5 @@
 // Captures d'écran de la démo (outil de développement) : node dev/shot.mjs <sortie> [largeur] [script JS à exécuter avant]
+// SHOT_PATH=app?login=demo-user1 : une autre page que la démo.
 // docker compose run --rm -v /tmp/bq:/shots check node dev/shot.mjs /shots/a.png 375
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -23,7 +24,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: Number(width), height: Number(width) < 640 ? 800 : 900, deviceScaleFactor: 1, mobile: Number(width) < 640 });
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await send('Page.enable');
-  await send('Page.navigate', { url: 'http://127.0.0.1:8098/' });
+  await send('Page.navigate', { url: 'http://127.0.0.1:8098/' + (process.env.SHOT_PATH || '') });
   await sleep(1200);
   if (script) { const r = await send('Runtime.evaluate', { expression: script, awaitPromise: true, returnByValue: true }); console.log(r.result.exceptionDetails ? r.result.exceptionDetails.exception?.description : JSON.stringify(r.result.result.value)); await sleep(600); }
   const shot = await send('Page.captureScreenshot', { format: 'png' });

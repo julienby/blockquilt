@@ -797,6 +797,26 @@ try {
   await sleep(100);
   await ev(`document.querySelector('[data-source-mode]').click()`);
   await viewport(375);
+
+  // ---- Application de référence (/app) : l'éditeur enregistre par PUT + If-Match ; une écriture d'ailleurs n'est jamais écrasée ----
+  await send('Page.navigate', { url: BASE + '/app?login=demo-user1' });
+  await waitFor(() => ev(`location.pathname === '/app' && document.readyState === 'complete' && document.querySelectorAll('[data-bq] [data-id]').length > 0`), 'application de démo');
+  ok(await ev(`document.querySelector('[data-app]').textContent.includes('user1') && document.querySelector('[data-bq] [data-body]').textContent === 'Arrivée'`), 'app : user1 connecté, guide 1A ouvert dans l’éditeur');
+  const guide = path.join(data, 'contents', 'guide-1a.md');
+  await ev(`(() => { const b = document.querySelector('[data-bq] [data-body]'); b.textContent = 'Arrivée au gîte'; b.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+  await key('s', 'KeyS', 83, CTRL);
+  await waitFor(async () => fs.readFileSync(guide, 'utf8').includes('# Arrivée au gîte'), 'enregistrement du guide');
+  ok(JSON.parse(fs.readFileSync(path.join(data, 'contents', 'guide-1a.json'), 'utf8')).by === 'user1', 'app : Ctrl+S enregistre le guide par PUT, auteur user1');
+  // Une IA écrit entre-temps (jeton de user1, via Claude) : l'enregistrement suivant de l'éditeur est refusé.
+  const cur = await (await fetch(BASE + '/contents/guide-1a', { headers: { Authorization: 'Bearer demo-user1', Accept: 'text/markdown' } }));
+  const curMd = await cur.text();
+  const ext = await fetch(BASE + '/contents/guide-1a', { method: 'PUT', headers: { Authorization: 'Bearer demo-user1', 'If-Match': cur.headers.get('etag'), 'X-Via': 'Claude', 'Content-Type': 'text/markdown' }, body: curMd + '\nÉcrit par l’IA.\n' });
+  ok(ext.status === 204, 'app : une IA écrit le guide avec l’ETag qu’elle a lu');
+  await ev(`(() => { const b = document.querySelector('[data-bq] [data-body]'); b.textContent = 'Arrivée (éditeur)'; b.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+  await key('s', 'KeyS', 83, CTRL);
+  await waitFor(() => ev(`document.querySelector('[data-toast]').textContent.includes('Modifié ailleurs')`), 'refus du conflit');
+  const kept = fs.readFileSync(guide, 'utf8');
+  ok(kept.includes('Écrit par l’IA.') && !kept.includes('Arrivée (éditeur)') && await ev(`editor.getMarkdown().includes('Arrivée (éditeur)')`), 'app : conflit (412) — le texte de l’IA n’est pas écrasé, celui de l’éditeur reste à l’écran');
   ws.close();
 } catch (error) {
   ok(false, error.message);
