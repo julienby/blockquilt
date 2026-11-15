@@ -11,7 +11,7 @@
 
 ```sh
 docker compose up                 # démo sur http://localhost:8080/
-docker compose run --rm check     # tests Node (noyau, contrat, MCP) + parcours dans Chromium ; code de sortie ≠ 0 si rouge
+docker compose run --rm check     # tests Node (noyau, contrat, MCP, relais IA) + parcours dans Chromium ; code de sortie ≠ 0 si rouge
 ```
 
 La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, les photos dans `dev/data/media/`. Pour repartir du document de démo, supprimer `dev/data/`. Sans Docker : `node dev/server.js` (Node 22), puis `node tests/blocks_test.cjs`.
@@ -86,9 +86,9 @@ Tous en `POST multipart/form-data`, avec les champs de `fields`. Les fins de lig
 | Enregistrer (`saveUrl`) | `text` | Code 2xx. Sinon JSON `{ "error": "…" }`, affiché. |
 | Photo (`uploadUrl`) | `photo` (fichier) | JSON `{ "id": "…" }` (le texte écrit `media/<id>`) ou `{ "src": "https://…" }`. |
 | Aperçu (`previewUrl`) | `text` | Fragment HTML. |
-| IA (`aiUrl`) | `scope` (`document` ou `block`), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`) | JSON `{ "markdown": "…" }`. L'éditeur passe la réponse par `Blocks.lint` et la montre à côté de l'actuel ; puis, au choix et annulable : document — remplacer, ajouter au début, à la fin ; bloc — remplacer, insérer au-dessus, dessous ; ou « Copier seulement » (rien ne change). |
+| IA (`aiUrl`) | `GET` → `{ uses: [{ id, label, scopes }] }`, les boutons de la feuille IA (facultatif : sans réponse, des boutons intégrés). `POST` : `scope` (`document` ou `block`), `use` (l'usage choisi, facultatif), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`) | JSON `{ "markdown": "…" }`. L'éditeur passe la réponse par `Blocks.lint` et la montre à côté de l'actuel ; puis, au choix et annulable : document — remplacer, ajouter au début, à la fin ; bloc — remplacer, insérer au-dessus, dessous ; ou « Copier seulement » (rien ne change). |
 
-L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le service désigné par `aiUrl` qui le fait. Le serveur de démo répond par une transformation fixe (texte en majuscules), ou appelle Claude si `ANTHROPIC_API_KEY` est définie (`AI_MODEL` pour choisir le modèle), avec `FORMAT.md` en consigne système.
+L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le service désigné par `aiUrl` qui le fait. Un relais prêt à monter est fourni (« Relais IA » plus bas) ; la démo l'utilise, avec une transformation fixe (texte en majuscules) tant qu'aucune clé `AI_KEY` n'est donnée.
 
 ### Au clavier
 
@@ -133,6 +133,24 @@ blockquilt ne stocke rien et ne connaît pas les utilisateurs : c'est l'applicat
 | `PUT /contents/{id}` | Corps `text/markdown`, `If-Match: <ETag lu>` obligatoire (`*` pour écraser). `204` + nouvel `ETag` ; `412` le contenu a changé depuis la lecture (rien n'est écrit) ; `428` sans `If-Match` ; `403` pas le droit ; `401` jeton inconnu. `X-Via: Claude` (facultatif) : par quoi passe la personne. |
 
 Le jeton (`Authorization: Bearer …`, ou la session de l'application pour le navigateur) dit **qui** écrit ; l'application seule décide de ce qu'il peut voir et modifier, et note l'auteur de chaque version. Les blocs se désignent côté client par leur place et leur empreinte (`Blocks.address`) : l'application n'a pas à les connaître. Implémentation de référence : `dev/app.js`.
+
+### Relais IA (l'IA dans l'éditeur)
+
+`ai/blockquilt-ai.js` (Node 22, sans dépendance) est le service derrière `aiUrl` : il appelle un modèle par une API compatible OpenAI (OpenRouter, OpenAI, Mistral, Anthropic, Ollama…) avec `FORMAT.md` en consigne système. La clé reste sur le serveur ; chaque application installe le sien et le protège comme ses autres routes. Les **usages** (boutons de la feuille IA) sont à elle : chacun son libellé, sa consigne, son modèle et sa portée.
+
+```js
+const { createAi } = require('./ai/blockquilt-ai.js');
+const ai = createAi({
+  baseUrl: 'https://openrouter.ai/api/v1', apiKey: process.env.AI_KEY, model: 'anthropic/claude-sonnet-4.5',
+  uses: [
+    { id: 'corriger', label: 'Corriger', instruction: 'Corrige l’orthographe…' },
+    { id: 'resumer', label: 'Résumer', instruction: 'Résume…', model: 'mistralai/mistral-small', scopes: ['document'] },
+  ],
+});
+app.all('/api/ai', ai.handler);   // GET : usages ; POST : { markdown }
+```
+
+Le contrat (en tête du fichier) se réécrit en quelques lignes ailleurs, en PHP par exemple. La démo utilise ce relais : `AI_KEY=… docker compose up` pour un vrai modèle (`AI_MODEL`, `AI_BASE_URL` pour en changer) ; sans clé, elle met le texte en majuscules.
 
 ### Serveur MCP (Claude Code, ChatGPT…)
 
@@ -194,6 +212,7 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 | `tests/contents_test.mjs` | Tests du contrat HTTP (droits, ETag / If-Match, auteur). | |
 | `mcp/blockquilt-mcp.js`, `mcp/SKILL.md` | Serveur MCP générique (stdio et HTTP) et son skill. | |
 | `tests/mcp_test.mjs` | Tests du serveur MCP sur l'application de référence (HTTP et stdio). | |
+| `ai/blockquilt-ai.js`, `tests/ai_test.mjs` | Relais IA compatible OpenAI et ses tests (faux fournisseur). | |
 | `dev/check.mjs`, `dev/Dockerfile.check` | Parcours complet dans Chromium headless piloté en CDP (375 px et 1280 px). | |
 | `dev/build-emoji.mjs` | Fabrique `emoji.json` depuis Unicode et CLDR (lancé une fois). | |
 | `dev/shot.mjs` | Capture d'écran de la démo (outil de développement). | |

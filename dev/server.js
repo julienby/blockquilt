@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const Blocks = require('../blockquilt.js');
 const application = require('./app.js');
 const { httpHandler } = require('../mcp/blockquilt-mcp.js');
+const { createAi } = require('../ai/blockquilt-ai.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -38,47 +39,32 @@ const page = () => {
   return html.replace(/(<textarea id="source" hidden>)[\s\S]*?(<\/textarea>)/, (_, open, close) => open + esc(fs.readFileSync(DOC, 'utf8')) + close);
 };
 
-// IA de démo : transformation fixe et prévisible (texte en majuscules), sauf si ANTHROPIC_API_KEY donne accès à un vrai modèle.
-// La consigne système est FORMAT.md : le modèle répond dans le format que l'éditeur relit sans perte.
+// IA : le relais générique (ai/blockquilt-ai.js), compatible OpenAI. Avec AI_KEY (ou OPENROUTER_API_KEY), un vrai modèle
+// (AI_BASE_URL, OpenRouter par défaut ; AI_MODEL) ; sans clé, une transformation fixe et prévisible (texte en majuscules).
 const shout = (markdown) => {
   const up = (html) => html.replace(/(^|>)([^<]+)/g, (_, a, t) => a + Blocks.esc(Blocks.unesc(t).toUpperCase()));
   const { meta, blocks } = Blocks.parse(markdown);
   return Blocks.serialize(meta, blocks.map((b) => ({ ...b, ...(b.html !== undefined && b.type !== 'html' ? { html: up(b.html) } : {}), ...(b.title ? { title: b.title.toUpperCase() } : {}) })));
 };
-const model = async (scope, instruction, text, block) => {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({
-      model: process.env.AI_MODEL || 'claude-sonnet-4-5',
-      max_tokens: 4000,
-      system: 'Tu modifies un document au format blockquilt. Réponds uniquement avec le Markdown demandé, sans explication ni bloc de code autour.\n\n' + fs.readFileSync(path.join(ROOT, 'FORMAT.md'), 'utf8'),
-      messages: [{ role: 'user', content: scope === 'block'
-        ? `Document complet, pour le contexte :\n\n${text}\n\n---\n\nBloc à modifier :\n\n${block}\n\nConsigne : ${instruction}\n\nRéponds avec le ou les blocs qui remplacent ce bloc.`
-        : `Document :\n\n${text}\n\nConsigne : ${instruction}\n\nRéponds avec le document complet, frontmatter compris.` }],
-    }),
-  });
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.error?.message || 'Modèle indisponible');
-  return j.content.map((c) => c.text || '').join('').trim().replace(/^```(?:markdown)?\n([\s\S]*)\n```$/, '$1') + '\n';
-};
+const ai = createAi({
+  baseUrl: process.env.AI_BASE_URL || 'https://openrouter.ai/api/v1',
+  apiKey: process.env.AI_KEY || process.env.OPENROUTER_API_KEY,
+  model: process.env.AI_MODEL || 'anthropic/claude-sonnet-4.5',
+  headers: { 'X-Title': 'blockquilt (démo)' },
+  uses: [
+    { id: 'corriger', label: 'Corriger', instruction: 'Corrige l’orthographe et la grammaire, sans changer le sens ni la structure.' },
+    { id: 'raccourcir', label: 'Raccourcir', instruction: 'Raccourcis le texte en gardant l’essentiel.' },
+    { id: 'etapes', label: 'En étapes', instruction: 'Réécris sous forme d’étapes numérotées.' },
+    { id: 'traduire', label: 'En anglais', instruction: 'Traduis en anglais, en gardant la structure et les emoji.' },
+  ],
+  // Démo : « non fermé » dans la consigne donne une réponse fautive, pour essayer les alertes.
+  fallback: ({ scope, instruction, text, block }) => shout(scope === 'block' ? block : text) + (/non fermé/i.test(instruction) ? '\n:::html\n<p>bloc sans fin</p>\n' : ''),
+});
 
 const routes = {
-  // IA : champs scope (document | block), instruction, text, block ; réponse JSON { markdown }.
-  'POST /api/ai': async (req, res) => {
-    const data = await form(req);
-    const get = (k) => String(data.get(k) ?? '').replace(/\r\n/g, '\n');
-    const scope = get('scope') === 'block' ? 'block' : 'document';
-    const instruction = get('instruction');
-    const source = scope === 'block' ? get('block') : get('text');
-    try {
-      if (process.env.ANTHROPIC_API_KEY) return json(res, 200, { markdown: await model(scope, instruction, get('text'), get('block')) });
-      // Démo : « non fermé » dans la consigne donne une réponse fautive, pour essayer les alertes.
-      json(res, 200, { markdown: shout(source) + (/non fermé/i.test(instruction) ? '\n:::html\n<p>bloc sans fin</p>\n' : '') });
-    } catch (error) {
-      json(res, 502, { error: error.message });
-    }
-  },
+  // IA : GET → usages proposés ; POST → { markdown } (contrat dans ai/blockquilt-ai.js).
+  'GET /api/ai': (req, res) => ai.handler(req, res),
+  'POST /api/ai': (req, res) => ai.handler(req, res),
   // Enregistrer : le Markdown complet (champ `text`), réponse JSON { ok: true }.
   'POST /api/save': async (req, res) => {
     const data = await form(req);

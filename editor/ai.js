@@ -1,5 +1,7 @@
 // Assistant IA : `aiUrl` désigne le service ; l'éditeur n'appelle aucun modèle lui-même et ne contient aucune clé.
-// Envoi : scope (document | block), instruction, text (document), block (Markdown du bloc). Réponse : { markdown }.
+// GET aiUrl → { uses: [{ id, label, scopes }] } : les usages de l'application (modèle et consigne restent chez elle) ;
+// sans réponse, les boutons intégrés (consignes écrites). Envoi (POST) : scope (document | block), use, instruction,
+// text (document), block (Markdown du bloc). Réponse : { markdown }. Relais prêt à monter : ai/blockquilt-ai.js.
 // La réponse passe par Blocks.lint et s'affiche à côté de l'actuel ; puis, au choix (toujours annulable) :
 // document : remplacer, ajouter au début, à la fin ; bloc : remplacer, insérer au-dessus, dessous ; ou copier sans rien changer.
 import { esc, shared } from './shared.js';
@@ -10,6 +12,10 @@ export function installAi(ed) {
   ed.openAi = () => {};
   if (!sheet) return; // sans aiUrl, aucun bouton IA
   let ai = null; // { id, markdown }
+  const useCls = 'min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950 hover:bg-amber-100';
+  let uses = null; // promesse : usages de l'application, ou null (boutons intégrés)
+  const loadUses = () => (uses ??= fetch(o.aiUrl, { headers: { Accept: 'application/json' }, signal: ed.ac.signal })
+    .then((r) => (r.ok ? r.json() : null)).then((j) => (Array.isArray(j?.uses) && j.uses.length ? j.uses : null)).catch(() => null));
 
   ed.openAi = (id) => {
     ed.syncFromDom();
@@ -22,10 +28,17 @@ export function installAi(ed) {
     $('[data-ai-result]', sheet).hidden = true;
     $('[data-ai-instruction]', sheet).value = '';
     ed.openSheet('ai');
+    loadUses().then((list) => {
+      if (!list || !ai || ai.id !== id) return;
+      const scope = b ? 'block' : 'document';
+      $('[data-ai-uses]', sheet).innerHTML = list.filter((u) => !u.scopes || u.scopes.includes(scope))
+        .map((u) => `<button type="button" data-ai-use="${esc(u.id).replace(/"/g, '&quot;')}" class="${useCls}">${esc(u.label)}</button>`).join('');
+    });
   };
-  const run = async () => {
+  // use : identifiant d'un usage de l'application (la consigne écrite, facultative, le précise).
+  const run = async (use = '') => {
     const instruction = $('[data-ai-instruction]', sheet).value.trim();
-    if (!instruction) return ed.toast('Écrivez une consigne');
+    if (!instruction && !use) return ed.toast('Écrivez une consigne');
     const text = ed.markdown();
     const b = ai.id && ed.blocks.find((x) => x.id === ai.id);
     if (ai.id && !b) return sheet.close();
@@ -33,7 +46,7 @@ export function installAi(ed) {
     button.disabled = true;
     button.querySelector('span').textContent = 'L’IA travaille…';
     try {
-      const r = await fetch(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}) }), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
+      const r = await fetch(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}) }), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || typeof j.markdown !== 'string') throw new Error(j.error || 'Pas de réponse de l’IA');
       ai.markdown = j.markdown.replace(/\r\n/g, '\n');
@@ -73,6 +86,8 @@ export function installAi(ed) {
   ed.on(sheet, 'click', (e) => {
     const preset = e.target.closest('[data-ai-preset]');
     if (preset) { $('[data-ai-instruction]', sheet).value = preset.dataset.aiPreset; return run(); }
+    const use = e.target.closest('[data-ai-use]');
+    if (use) return run(use.dataset.aiUse);
     if (e.target.closest('[data-ai-run]')) return run();
     if (e.target.closest('[data-ai-ignore]')) return sheet.close();
     if (e.target.closest('[data-ai-copy]')) {

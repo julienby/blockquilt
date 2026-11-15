@@ -667,7 +667,9 @@ try {
   await ev(`document.querySelectorAll('[data-bq] [data-id]')[${tipIndex}].querySelector('[data-menu]').click()`);
   await ev(`document.querySelector('[data-sheet="menu"] [data-act="ai"]').click()`);
   ok(await ev(`document.querySelector('[data-sheet="ai"]').open && document.querySelector('[data-ai-scope]').textContent.includes('Astuce')`), 'IA sur un bloc : ouverte depuis le menu « ⋯ »');
-  await ev(`document.querySelector('[data-ai-preset]').click()`);
+  await waitFor(() => ev(`!!document.querySelector('[data-ai-use]')`), 'usages de l’application');
+  ok(await ev(`[...document.querySelectorAll('[data-ai-uses] button')].map((b) => b.textContent).join() === 'Corriger,Raccourcir,En étapes,En anglais' && !document.querySelector('[data-ai-preset]')`), 'IA : les usages viennent de l’application (GET aiUrl)');
+  await ev(`document.querySelector('[data-ai-use="corriger"]').click()`);
   await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden`), 'réponse de l’IA');
   ok(await ev(`document.querySelector('[data-ai-before]').textContent.includes('Garez-vous') && document.querySelector('[data-ai-after]').textContent.includes('GAREZ-VOUS') && document.querySelector('[data-ai-lint]').hidden`), 'IA : aperçu avant / après, sans alerte');
   await ev(`document.querySelector('[data-ai-apply]').click()`);
@@ -741,6 +743,15 @@ try {
   ok(await ev(`[...document.querySelectorAll('[data-ai-apply]')].every((b) => !b.disabled)`), 'IA : appliquer seulement après confirmation');
   await ev(`document.querySelector('[data-ai-ignore]').click()`);
   ok((await mdNow()) === docMid, 'IA : « Ignorer » ne change rien');
+  ok(await ev(`(async () => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Un texte.', aiUrl: 'api/inexistant' });
+    el.querySelector('[data-more]').click(); el.querySelector('[data-more-act="ai"]').click();
+    await new Promise((r) => setTimeout(r, 300));
+    const out = el.querySelectorAll('[data-ai-preset]').length === 4 && !el.querySelector('[data-ai-use]');
+    el.querySelector('[data-sheet="ai"]').close(); e.destroy(); el.remove();
+    return out;
+  })()`), 'IA : sans usages de l’application, les boutons intégrés restent');
   ok(await ev(`(() => {
     const el = document.createElement('div'); document.body.append(el);
     const e = Blockquilt.mount(el, { source: 'Texte' });

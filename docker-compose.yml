@@ -7,6 +7,10 @@ services:
     user: "${UID:-1000}:${GID:-1000}"   # les fichiers de dev/data/ restent à toi
     working_dir: /app
     command: node dev/server.js
+    environment:
+      AI_KEY: ${AI_KEY:-}            # clé OpenRouter (ou autre API compatible OpenAI) ; vide = IA de démo (majuscules)
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_MODEL: ${AI_MODEL:-}
     volumes:
       - .:/app
     ports:
@@ -18,4 +22,4 @@ services:
     profiles: [check]
     volumes:
       - .:/app:ro
-    command: sh -c "node tests/blocks_test.cjs && node tests/contents_test.mjs && node tests/mcp_test.mjs && node dev/check.mjs"
+    command: sh -c "node tests/blocks_test.cjs && node tests/contents_test.mjs && node tests/mcp_test.mjs && node tests/ai_test.mjs && node dev/check.mjs"
