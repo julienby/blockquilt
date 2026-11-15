@@ -224,6 +224,13 @@ try {
   ok(sizes.h === sizes.t && sizes.h1s === 1 && !sizes.inT, `aperçu : T1 a la taille du H1 (${sizes.t}) sans être un titre ; un seul <h1>`);
   await ev(`document.querySelector('[data-preview]').click()`);
   ok(await ev(`getComputedStyle([...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'h1')).borderTopWidth === '3px'`), 'carte H1 : bordure noire de 3 px');
+  const centered = await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].filter((c) => ['h1', 't1'].includes(c.querySelector('[data-convert]')?.value)).map((c) => {
+    const head = c.querySelector('[data-convert]').closest('.flex').getBoundingClientRect();
+    const t = c.querySelector('[data-body]').getBoundingClientRect();
+    const box = c.getBoundingClientRect();
+    return [Math.round(t.top - head.bottom), Math.round(box.bottom - 12 - t.bottom)];
+  })`);
+  ok(centered.length === 2 && centered.every(([a, b]) => Math.abs(a - b) <= 4), `cartes de titre : texte centré verticalement sous le badge (${JSON.stringify(centered)})`);
 
   // Code lisible : les longues lignes vont à la ligne dans l'aperçu
   await ev(`(() => { editor.setMarkdown('\x60\x60\x60js\\nconst uneTresLongueVariable = appelerUneFonction(avecUnPremierArgument, avecUnDeuxiemeArgument, etUnTroisieme);\\n  indentée();\\n\x60\x60\x60\\n\\n| tableau | source |\\n|---|---|\\n| une cellule avec beaucoup de texte qui dépasse largement la largeur d’un téléphone | b |'); document.querySelector('[data-preview]').click(); })()`);

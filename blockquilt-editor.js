@@ -332,17 +332,18 @@
     };
     // Carte : à gauche le type (liste de conversion), à droite du type trois boutons ronds (menu, agrandir, supprimer) ;
     // colonne de droite : monter, poignée, descendre. Une action = un seul endroit.
+    // Le contenu est centré verticalement sous le badge : un titre court occupe harmonieusement la hauteur donnée par la colonne.
     const round = (data, icon, label, cls = 'text-stone-600') => `<button type="button" ${data} aria-label="${label}" title="${label}" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
         <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white/70 transition-colors group-hover:bg-white group-active:bg-stone-100 ${cls}">${ic(icon, 'size-4')}</span></button>`;
     // Outils propres à un type (ex. œil du bloc HTML), à côté du type ; `views` garde l'affichage choisi par bloc (code / aperçu).
     const views = new Map();
     const card = (b, i) => `<article data-id="${b.id}" data-view="${views.get(b.id) || 'edit'}" aria-label="${attr(def(b).label)}" class="bq-card flex rounded-2xl border ${def(b).tone.card}">
-        <div class="min-w-0 flex-1 pb-3 pl-3 pr-1">
+        <div class="flex min-w-0 flex-1 flex-col pb-3 pl-3 pr-1">
           <div class="flex h-11 items-center">${badge(b)}${editorOf(b) === def(b) && def(b).tools ? def(b).tools(b, views.get(b.id)) : ''}<span class="flex-1"></span>
             ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
             ${def(b).fullscreen === false ? '' : round('data-expand', 'maximize', 'Plein écran')}
             ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>
-          <div data-card-body>${editorOf(b).edit(b, ui)}</div></div>
+          <div data-card-body class="flex flex-1 flex-col justify-center">${editorOf(b).edit(b, ui)}</div></div>
         <div data-rail class="flex w-11 shrink-0 select-none flex-col items-center justify-between border-l border-black/5 py-1">
           <button type="button" data-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="Monter ce bloc" class="bq-rail">${ic('chevron_up', 'size-4')}</button>
           <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-rail cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
