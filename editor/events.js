@@ -14,11 +14,13 @@ export function installEvents(ed) {
     if (hit('[data-merge]')) return ed.merge(Number(hit('[data-merge]').dataset.merge));
     if (hit('[data-menu]')) return ed.openMenu(id, hit('[data-menu]'));
     if (hit('[data-expand]')) return ed.openBlockFull(id);
+    // Deuxième affichage d'une carte (aperçu du HTML, carrousel replié…) : data-toggle-view porte son nom.
     if (hit('[data-toggle-view]')) {
-      const view = cardEl.dataset.view === 'preview' ? 'edit' : 'preview';
+      const alt = hit('[data-toggle-view]').dataset.toggleView || 'preview';
+      const view = cardEl.dataset.view === alt ? 'edit' : alt;
       ed.views.set(id, view);
       cardEl.dataset.view = view;
-      hit('[data-toggle-view]').setAttribute('aria-pressed', String(view === 'preview'));
+      hit('[data-toggle-view]').setAttribute('aria-pressed', String(view === alt));
       ed.def(ed.blocks.find((b) => b.id === id)).onInput?.(cardEl, ed.ui);
       return;
     }

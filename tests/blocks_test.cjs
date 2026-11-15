@@ -221,4 +221,11 @@ ok(Blocks.blank('demo').type === 'demo' && Blocks.blank('demo').body === '' && !
 ok(Blocks.fromMarkdown(':::autre\nx\n:::').type === 'raw', 'registre : syntaxe inconnue toujours en « raw »');
 delete Blocks.types.demo; Blocks.order.splice(Blocks.order.indexOf('demo'), 1);
 
+// ---- Modules de l'écran : syntaxe valide (une erreur bloquerait tout l'éditeur dans le navigateur) ----
+const { spawnSync } = require('node:child_process');
+for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'editor')).map((x) => 'editor/' + x)]) {
+  const r = spawnSync(process.execPath, ['--input-type=module', '--check'], { input: fs.readFileSync(path.join(ROOT, f)) });
+  ok(r.status === 0, `module ${f} : syntaxe valide${r.status ? ' — ' + String(r.stderr).split('\n').slice(0, 4).join(' ') : ''}`);
+}
+
 process.exit(failed ? 1 : 0);

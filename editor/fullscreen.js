@@ -45,7 +45,7 @@ export function installFullscreen(ed) {
     ed.placeBar();
   });
   // Échap pendant un glissement : annule le glissement, ne ferme pas le plein écran.
-  ed.on(editorFull, 'cancel', (e) => { if (ed.dragging()) e.preventDefault(); });
+  ed.on(editorFull, 'cancel', (e) => { if (ed.dragging() || ed.photoDragging()) e.preventDefault(); });
 
   // ---- Bloc seul : redessiné dans le dialogue ; sa carte, restée dans la page, perd data-id le temps de l'édition ----
   ed.openBlockFull = (id) => {

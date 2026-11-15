@@ -31,17 +31,22 @@ Blocks.editable = editable;
         ${editable('text-sm italic opacity-75', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}</figure>`,
     read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
   });
-  // Carrousel : grille de vignettes (2 colonnes au téléphone, 3 à 4 au-delà), comme les éditeurs de publication ;
-  // légende sous chaque photo, ordre par flèches, retrait, tuile « Ajouter » en dernier (plusieurs fichiers à la fois).
+  // Carrousel : une photo par ligne (poignée pour glisser, vignette, légende, suppression), « Ajouter des photos » dessous.
+  // Replié (bouton à côté du type) : une seule ligne, les miniatures et le nombre de photos.
   Object.assign(Blocks.types.carousel, {
-    edit: (b, ui) => `<div data-car-grid class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">${b.items.map((x, i) => `<figure data-car-item="${i}" class="bq-tone flex min-w-0 flex-col rounded-xl border p-1.5">
-        <div class="relative"><img src="${attr(Blocks.mediaUrl(x.src, ui.media))}" alt="" class="aspect-[4/3] w-full rounded-lg bg-stone-200 object-cover">
-          <span class="absolute left-1 top-1 rounded-full bg-black/60 px-1.5 text-[11px] font-bold text-white">${i + 1}</span></div>
-        <input data-car-alt value="${attr(x.alt)}" placeholder="Légende…" aria-label="Légende de la photo ${i + 1}" class="mt-1 h-9 w-full min-w-0 bg-transparent px-1 text-xs italic focus:outline-none">
-        <div class="flex justify-between"><button type="button" data-car-act="left" ${i === 0 ? 'disabled' : ''} aria-label="Photo ${i + 1} : avancer d’une place" class="bq-btn bq-muted">${ic('chevron_left', 'size-4')}</button>
-          <button type="button" data-car-act="remove" aria-label="Retirer la photo ${i + 1}" class="bq-btn text-red-600">${ic('trash', 'size-4')}</button>
-          <button type="button" data-car-act="right" ${i === b.items.length - 1 ? 'disabled' : ''} aria-label="Photo ${i + 1} : reculer d’une place" class="bq-btn bq-muted">${ic('chevron_right', 'size-4')}</button></div></figure>`).join('')}
-        <button type="button" data-car-add class="flex min-h-32 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-current/20 text-xs font-bold opacity-70 hover:opacity-100">${ic('plus')}Ajouter des photos</button></div>`,
+    tools: (b, view) => `<button type="button" data-toggle-view="collapsed" aria-pressed="${view === 'collapsed'}" aria-label="Replier le carrousel" title="Replier / déplier" class="group ml-1 inline-flex size-11 items-center justify-center rounded-full">
+        <span class="bq-round flex size-8 items-center justify-center rounded-full border bq-muted group-aria-pressed:bg-brand-600 group-aria-pressed:text-white">${ic('fold', 'size-4 group-aria-pressed:hidden')}${ic('unfold', 'hidden size-4 group-aria-pressed:block')}</span></button>`,
+    edit: (b, ui) => `<div class="bq-view-expanded">
+        <ol data-car-list class="relative grid gap-1.5">${b.items.map((x, i) => `<li data-car-item="${i}" class="bq-tone flex min-w-0 items-center gap-2 rounded-xl border py-1 pl-0 pr-0">
+          <button type="button" data-car-grip aria-label="Photo ${i + 1} : déplacer (glisser, ou flèches haut et bas)" class="bq-btn bq-muted cursor-grab touch-none active:cursor-grabbing">${ic('grip', 'size-4')}</button>
+          <img src="${attr(Blocks.mediaUrl(x.src, ui.media))}" alt="" class="h-12 w-16 shrink-0 rounded-lg bg-stone-200 object-cover">
+          <input data-car-alt value="${attr(x.alt)}" placeholder="Légende…" aria-label="Légende de la photo ${i + 1}" class="h-11 min-w-0 flex-1 bg-transparent px-1 text-sm italic focus:outline-none">
+          <button type="button" data-car-act="remove" aria-label="Retirer la photo ${i + 1}" class="bq-btn text-red-600">${ic('trash', 'size-4')}</button></li>`).join('')}</ol>
+        <button type="button" data-car-add class="mt-1.5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-current/20 text-sm font-bold opacity-70 hover:opacity-100">${ic('plus', 'size-4')}Ajouter des photos</button></div>
+      <div class="bq-view-collapsed flex min-h-11 min-w-0 items-center gap-3">
+        <span class="flex shrink-0 -space-x-3">${b.items.slice(0, 5).map((x) => `<img src="${attr(Blocks.mediaUrl(x.src, ui.media))}" alt="" class="size-9 rounded-lg object-cover ring-2 ring-white">`).join('')}</span>
+        <span data-car-count class="shrink-0 text-sm font-bold">${b.items.length} photo${b.items.length > 1 ? 's' : ''}</span>
+        <span class="min-w-0 truncate text-sm italic opacity-60">${esc(b.items.map((x) => x.alt).filter(Boolean).join(' · '))}</span></div>`,
     read: (card, b) => { card.querySelectorAll('[data-car-item]').forEach((el) => { b.items[Number(el.dataset.carItem)].alt = el.querySelector('[data-car-alt]').value; }); },
   });
   Object.assign(Blocks.types.video, {
@@ -50,7 +55,7 @@ Blocks.editable = editable;
   });
   // Bloc HTML : le code, ou son aperçu filtré (bouton œil à côté du type, `tools`). La carte porte data-view="preview" en aperçu.
   Object.assign(Blocks.types.html, {
-    tools: (b, view) => `<button type="button" data-toggle-view aria-pressed="${view === 'preview'}" aria-label="Aperçu du HTML" title="Aperçu du HTML" class="group ml-1 inline-flex size-11 items-center justify-center rounded-full">
+    tools: (b, view) => `<button type="button" data-toggle-view="preview" aria-pressed="${view === 'preview'}" aria-label="Aperçu du HTML" title="Aperçu du HTML" class="group ml-1 inline-flex size-11 items-center justify-center rounded-full">
         <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white/70 text-indigo-700 group-hover:bg-white group-aria-pressed:bg-indigo-600 group-aria-pressed:text-white">${ic('eye', 'size-4')}</span></button>`,
     edit: (b, ui) => `<textarea data-html rows="${Math.min(16, Math.max(4, b.html.split('\n').length))}" spellcheck="false" aria-label="Code HTML" placeholder="<div class=&quot;…&quot;>…</div>" class="bq-view-code w-full rounded-xl border border-indigo-200 bg-white p-3 font-mono text-[13px] leading-5">${esc(b.html)}</textarea>
         <div data-html-preview aria-label="Aperçu filtré" class="bq-view-preview bq-content min-h-16 overflow-auto rounded-xl border border-dashed border-indigo-200 bg-white p-3 text-sm">${Blocks.sanitize(b.html, ui.media)}</div>`,
