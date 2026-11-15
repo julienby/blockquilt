@@ -86,7 +86,7 @@ Tous en `POST multipart/form-data`, avec les champs de `fields`. Les fins de lig
 | Enregistrer (`saveUrl`) | `text` | Code 2xx. Sinon JSON `{ "error": "…" }`, affiché. |
 | Photo (`uploadUrl`) | `photo` (fichier) | JSON `{ "id": "…" }` (le texte écrit `media/<id>`) ou `{ "src": "https://…" }`. |
 | Aperçu (`previewUrl`) | `text` | Fragment HTML. |
-| IA (`aiUrl`) | `scope` (`document` ou `block`), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`) | JSON `{ "markdown": "…" }`. L'éditeur passe la réponse par `Blocks.lint`, montre avant / après, et n'applique qu'après « Appliquer » (annulable). |
+| IA (`aiUrl`) | `scope` (`document` ou `block`), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`) | JSON `{ "markdown": "…" }`. L'éditeur passe la réponse par `Blocks.lint` et la montre à côté de l'actuel ; puis, au choix et annulable : document — remplacer, ajouter au début, à la fin ; bloc — remplacer, insérer au-dessus, dessous ; ou « Copier seulement » (rien ne change). |
 
 L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le service désigné par `aiUrl` qui le fait. Le serveur de démo répond par une transformation fixe (texte en majuscules), ou appelle Claude si `ANTHROPIC_API_KEY` est définie (`AI_MODEL` pour choisir le modèle), avec `FORMAT.md` en consigne système.
 

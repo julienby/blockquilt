@@ -57,12 +57,17 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
     <div data-ai-result hidden>
       <ul data-ai-lint role="alert" class="mb-2 space-y-1 rounded-xl bg-red-50 p-3 text-xs text-red-800"></ul>
       <label data-ai-force-wrap class="mb-2 flex min-h-11 items-center gap-2 text-sm font-semibold text-red-800"><input type="checkbox" data-ai-force class="size-5"> Appliquer malgré les alertes</label>
-      <p class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Avant</p>
+      <p class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Actuel</p>
       <div data-ai-before class="bq-content mt-1 max-h-48 overflow-auto rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm"></div>
-      <p class="mt-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">Après</p>
+      <p class="mt-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">Proposition de l’IA</p>
       <div data-ai-after class="bq-content mt-1 max-h-64 overflow-auto rounded-xl border border-amber-200 bg-white p-3 text-sm"></div>
-      <div class="mt-3 grid grid-cols-2 gap-2"><button type="button" data-ai-ignore class="min-h-11 rounded-xl border border-stone-300 px-4 font-semibold">Ignorer</button>
-        <button type="button" data-ai-apply class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white disabled:opacity-40">Appliquer</button></div></div>`) : ''}
+      <p class="mt-3 text-[11px] font-bold uppercase tracking-wider text-stone-400">Que faire de la proposition ?</p>
+      <div class="mt-1 grid grid-cols-2 gap-2">
+        <button type="button" data-ai-apply="replace" class="col-span-2 min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white disabled:opacity-40">Remplacer le document</button>
+        <button type="button" data-ai-apply="start" class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold disabled:opacity-40">Ajouter au début</button>
+        <button type="button" data-ai-apply="end" class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold disabled:opacity-40">Ajouter à la fin</button>
+        <button type="button" data-ai-copy class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold disabled:opacity-40">Copier seulement</button>
+        <button type="button" data-ai-ignore class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold disabled:opacity-40">Ignorer</button></div></div>`) : ''}
   ${menu('menu', 'Actions du bloc', '<div data-menu-list class="grid gap-0.5"></div>')}
   ${sheet('delete', 'Supprimer ce bloc ?', `<p data-del-preview class="line-clamp-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 text-sm italic text-stone-700"></p>
     <button type="button" data-del-confirm class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 font-semibold text-white hover:bg-red-700">${ic('trash')}Supprimer</button>`)}

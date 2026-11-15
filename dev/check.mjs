@@ -692,13 +692,53 @@ try {
   await ev(`document.activeElement.blur()`);
   await key('z', 'KeyZ', 90, CTRL);
   ok((await mdNow()) === docMid, 'IA sur le document : restauré par Ctrl+Z');
+  // I4 : ce qu'on fait de la proposition — au début, à la fin, au-dessus, dessous, ou copier sans rien changer
+  const aiRun = async (blockIndex) => {
+    if (blockIndex === undefined) { await ev(`document.querySelector('[data-more]').click()`); await ev(`document.querySelector('[data-more-act="ai"]').click()`); }
+    else { await ev(`document.querySelectorAll('[data-bq] [data-id]')[${blockIndex}].querySelector('[data-menu]').click()`); await ev(`document.querySelector('[data-sheet="menu"] [data-act="ai"]').click()`); }
+    await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'Tout en majuscules'; document.querySelector('[data-ai-run]').click(); })()`);
+    await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden && !document.querySelector('[data-ai-run]').disabled`), 'réponse de l’IA');
+  };
+  await aiRun();
+  ok(await ev(`[...document.querySelectorAll('[data-ai-apply]')].map((b) => b.textContent).join('|') === 'Remplacer le document|Ajouter au début|Ajouter à la fin' && !!document.querySelector('[data-ai-copy]')`), 'IA document : remplacer, au début, à la fin, copier');
+  await ev(`document.querySelector('[data-ai-apply="end"]').click()`);
+  {
+    const now = await mdNow();
+    ok(now.startsWith(docMid.trim() + '\n\n') && now.indexOf('NE PAS FUMER') > docMid.length && (now.match(/^title:/gm) || []).length === 1, 'IA document « Ajouter à la fin » : le document gardé, la proposition après, un seul frontmatter');
+  }
+  await ev(`editor.undo()`);
+  await aiRun();
+  await ev(`document.querySelector('[data-ai-apply="start"]').click()`);
+  ok(await ev(`(() => { const m = editor.getMarkdown(); return m.indexOf('NE PAS FUMER') < m.indexOf('Ne pas fumer') && m.indexOf('NE PAS FUMER') > 0; })()`), 'IA document « Ajouter au début » : la proposition avant le texte');
+  await ev(`editor.undo()`);
+  ok((await mdNow()) === docMid, 'IA document : au début / à la fin annulés par Ctrl+Z');
+  const nBlocks = (await cards()).length;
+  const textIndex = (await cards()).findIndex((c) => c.startsWith('text:La clé'));
+  await aiRun(textIndex);
+  ok(await ev(`[...document.querySelectorAll('[data-ai-apply]')].map((b) => b.textContent).join('|') === 'Remplacer le bloc|Insérer au-dessus|Insérer dessous'`), 'IA bloc : remplacer, au-dessus, dessous');
+  await ev(`document.querySelector('[data-ai-apply="end"]').click()`);
+  {
+    const c = await cards();
+    ok(c.length === nBlocks + 1 && c[textIndex] === 'text:La clé est dans la boîte aux lettres.' && c[textIndex + 1] === 'text:LA CLÉ EST DANS LA BOÎTE AUX LETTRES.', 'IA bloc « Insérer dessous » : le bloc gardé, la proposition juste après');
+  }
+  await ev(`editor.undo()`);
+  await aiRun(textIndex);
+  await ev(`document.querySelector('[data-ai-apply="start"]').click()`);
+  {
+    const c = await cards();
+    ok(c.length === nBlocks + 1 && c[textIndex] === 'text:LA CLÉ EST DANS LA BOÎTE AUX LETTRES.' && c[textIndex + 1] === 'text:La clé est dans la boîte aux lettres.', 'IA bloc « Insérer au-dessus »');
+  }
+  await ev(`editor.undo()`);
+  await aiRun(textIndex);
+  await ev(`document.querySelector('[data-ai-copy]').click()`);
+  ok((await mdNow()) === docMid && await ev(`navigator.clipboard.readText().then((t) => t === 'LA CLÉ EST DANS LA BOÎTE AUX LETTRES.\\n')`) && !(await ev(`document.querySelector('[data-sheet="ai"]').open`)), 'IA « Copier, ne rien changer » : proposition au presse-papiers, document intact');
   await ev(`document.querySelector('[data-more]').click()`);
   await ev(`document.querySelector('[data-more-act="ai"]').click()`);
   await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'Réponse avec un bloc non fermé'; document.querySelector('[data-ai-run]').click(); })()`);
   await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden`), 'réponse fautive de l’IA');
-  ok(await ev(`!document.querySelector('[data-ai-lint]').hidden && document.querySelector('[data-ai-lint]').textContent.includes('non fermé') && document.querySelector('[data-ai-apply]').disabled`), 'IA : « ::: » non fermé → alerte lint, « Appliquer » bloqué');
+  ok(await ev(`!document.querySelector('[data-ai-lint]').hidden && document.querySelector('[data-ai-lint]').textContent.includes('non fermé') && [...document.querySelectorAll('[data-ai-apply]')].every((b) => b.disabled) && !document.querySelector('[data-ai-copy]').disabled`), 'IA : « ::: » non fermé → alerte lint, remplacer / ajouter bloqués, copier possible');
   await ev(`(() => { const c = document.querySelector('[data-ai-force]'); c.click(); })()`);
-  ok(await ev(`!document.querySelector('[data-ai-apply]').disabled`), 'IA : appliquer seulement après confirmation');
+  ok(await ev(`[...document.querySelectorAll('[data-ai-apply]')].every((b) => !b.disabled)`), 'IA : appliquer seulement après confirmation');
   await ev(`document.querySelector('[data-ai-ignore]').click()`);
   ok((await mdNow()) === docMid, 'IA : « Ignorer » ne change rien');
   ok(await ev(`(() => {
