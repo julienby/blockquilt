@@ -90,10 +90,10 @@ Blockquilt.mount(document.getElementById('editor'), { source, saveUrl: 'api/save
 :::</textarea>
 
   <script src="blockquilt.js"></script>
-  <script src="blockquilt-editor.js"></script>
   <script src="blockquilt-content.js"></script>
-  <script>
-    window.editor = Blockquilt.mount(document.getElementById('editor'), {
+  <script type="module">
+    import { mount } from './blockquilt-editor.js';
+    window.editor = mount(document.getElementById('editor'), {
       source: document.getElementById('source').value,
       media: 'media/',
       saveUrl: 'api/save',

@@ -73,7 +73,8 @@ ok(Blocks.parse('a\r\n\r\nb').blocks.length === 2, 'fins de ligne \\r\\n');
 const legacy = '## 🏡 Arrivée\n\n> 💡 texte\n\n> 🧭 conseil\n\n:::sensible\nCode : 1234\n:::\n';
 ok(types(legacy) === 'h2,quote,quote,raw', 'ancien format : « ## 🏡 » en H2, « > 💡 » en citation, :::sensible en bloc source');
 ok(Blocks.serialize({}, Blocks.parse(legacy).blocks) === legacy, 'ancien format : réécrit à l’identique');
-const src = fs.readFileSync(path.join(__dirname, '..', 'blockquilt.js'), 'utf8') + fs.readFileSync(path.join(__dirname, '..', 'blockquilt-editor.js'), 'utf8');
+const ROOT = path.join(__dirname, '..');
+const src = ['blockquilt.js', 'blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'editor')).map((f) => 'editor/' + f)].map((f) => fs.readFileSync(path.join(ROOT, f), 'utf8')).join('\n');
 ok(!/sensible|splitHeading|advice|🧭/.test(src), 'ancien format : plus aucun code pour le lire');
 
 // ---- Lecture bloc par bloc ----

@@ -22,18 +22,18 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 <link rel="stylesheet" href="blockquilt.css">          <!-- l'éditeur -->
 <link rel="stylesheet" href="blockquilt-content.css">  <!-- le rendu (aperçu) -->
 <div id="editor"></div>
-<script src="blockquilt.js"></script>
-<script src="blockquilt-editor.js"></script>
-<script src="blockquilt-content.js"></script>   <!-- facultatif : flèches et puces des carrousels dans l'aperçu -->
-<script>
-  const editor = Blockquilt.mount(document.getElementById('editor'), {
+<script src="blockquilt.js"></script>                <!-- le noyau Blocks -->
+<script src="blockquilt-content.js"></script>        <!-- facultatif : flèches et puces des carrousels dans l'aperçu -->
+<script type="module">
+  import { mount } from './blockquilt-editor.js';     // module ES, sans build : il charge editor/*.js
+  const editor = mount(document.getElementById('editor'), {
     source: '---\ntitle: Ma page\n---\n\nBonjour.',
     saveUrl: '/save', uploadUrl: '/upload', fields: { _csrf: '…' },
   });
 </script>
 ```
 
-`mount` renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
+`mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
 
 Trois vues dans l'en-tête : **édition** par blocs, **texte source** (le Markdown complet, contrôlé par `Blocks.lint` et rendu en direct à côté ; en revenant aux blocs, le texte est relu, en une étape annulable) et **aperçu**.
 
@@ -142,7 +142,8 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 | Fichier | Rôle | Taille (gzip) |
 |---|---|---|
 | `blockquilt.js` | Noyau `Blocks` : format, registre des types, rendu HTML, `lint`, `sanitize`. Sans DOM. | 35 ko (12 ko) |
-| `blockquilt-editor.js` | Écran : `Blockquilt.mount`, cartes d'édition, menus, historique, glisser-déposer, plein écran, emoji, IA. | 83 ko (23 ko) |
+| `blockquilt-editor.js` | Écran, module ES : `mount` ; assemble les modules de `editor/`. | 90 ko au total avec `editor/` (27 ko) |
+| `editor/` | Un module par sujet, de 7 à 175 lignes : `document` (état, texte, enregistrement), `render` (cartes), `actions` (structure, menus, copier / coller), `history` (annuler / rétablir), `bar` (mise en forme, listes), `source` (vues), `fullscreen`, `drag`, `media` (photos, carrousel), `emoji`, `ai`, `sheets` (feuilles), `events` (clics, clavier), `template` (HTML), `types` (cartes d'édition des types), `icons`, `shared`. | |
 | `blockquilt.css` | CSS de l'éditeur, généré par Tailwind 3.4.17 (`./build-css`). Ne pas modifier à la main. | 29 ko (7 ko) |
 | `blockquilt-content.css` | CSS du rendu publié, écrit à la main. | 7 ko (2 ko) |
 | `blockquilt-content.js` | Facultatif, pour la page publique : flèches et puces des carrousels. | 2 ko (1 ko) |

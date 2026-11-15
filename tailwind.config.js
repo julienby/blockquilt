@@ -1,5 +1,5 @@
 module.exports = {
-  content: ['./index.html', './blockquilt.js', './blockquilt-editor.js'],
+  content: ['./index.html', './blockquilt.js', './blockquilt-editor.js', './editor/*.js'],
   theme: {
     extend: {
       // Couleur d'accent de l'éditeur : variable CSS --bq-accent (bleu par défaut), nuances calculées par color-mix.
