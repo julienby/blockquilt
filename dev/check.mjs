@@ -587,6 +587,8 @@ try {
   let g2 = await gripAt(2);
   const g0 = await gripAt(0);
   await mouse('mousePressed', g2.x, g2.y);
+  const startLine = await ev(`(() => { const l = document.querySelector('[data-car-list] .bq-drop').getBoundingClientRect(); const r = document.querySelector('[data-car-item="2"]').getBoundingClientRect(); const mid = l.top + l.height / 2; return { mid, top: r.top, bottom: r.bottom }; })()`);
+  ok(startLine.mid >= startLine.top - 8 && startLine.mid <= startLine.bottom + 8, `carrousel : dès la saisie, le trait bleu est contre la photo saisie, pas en haut (${JSON.stringify(startLine)})`);
   for (let y = g2.y; y >= g0.y - 20; y -= 15) await mouse('mouseMoved', g2.x, y);
   ok((await carOrder()) === 'Deux,Un,Trois' && await ev(`document.querySelectorAll('[data-car-list] .bq-drop').length === 1`), 'carrousel : pendant le glissement, ordre inchangé et un trait bleu');
   await mouse('mouseReleased', g2.x, g0.y - 20, 0);
@@ -885,6 +887,7 @@ try {
   await ev(`document.querySelector('[data-remote-show]').click()`);
   await ev(`document.querySelector('[data-remote-keep]').click()`);
   await waitFor(async () => fs.readFileSync(guide, 'utf8').includes('Arrivée (éditeur)'), 'garder la mienne');
+  await waitFor(() => ev(`!document.querySelector('[data-sheet="remote"]').open`), 'réponse après « Garder la mienne »').catch(() => {});
   ok(!fs.readFileSync(guide, 'utf8').includes('Encore') && await ev(`document.querySelector('[data-remote-bar]').hidden && document.querySelector('[data-save] [data-dot]').hidden`), 'app : « Garder la mienne » — votre version remplace l’autre, en connaissance de cause');
   ok(!(await ev(`editor.checkRemote()`)), 'app : revérification sans changement : rien (304)');
   // Sans `source` : l'éditeur lit lui-même le texte et sa version.

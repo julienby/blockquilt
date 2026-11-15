@@ -88,11 +88,12 @@ export function installMedia(ed) {
     const from = Number(row.dataset.carItem);
     drag = { id: grip.closest('[data-id]').dataset.id, from, to: from, row, line };
     grip.setPointerCapture(e.pointerId);
+    place(e.clientY); // le trait part de la photo saisie, pas du haut de la liste
   });
-  ed.on(ed.app, 'pointermove', (e) => {
-    if (!drag) return;
+  // Trait bleu entre les deux lignes les plus proches du pointeur ; drag.to = la place d'arrivée.
+  const place = (y) => {
     const rows = [...drag.row.parentElement.querySelectorAll('[data-car-item]')];
-    let slot = rows.findIndex((r) => { const b = r.getBoundingClientRect(); return e.clientY < b.top + b.height / 2; });
+    let slot = rows.findIndex((r) => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
     if (slot < 0) slot = rows.length;
     const box = drag.row.parentElement.getBoundingClientRect();
     const above = rows[slot - 1]?.getBoundingClientRect();
@@ -100,7 +101,8 @@ export function installMedia(ed) {
     const at = above && below ? (above.bottom + below.top) / 2 : above ? above.bottom + 3 : below.top - 3;
     drag.line.style.top = (at - box.top - 1.5) + 'px';
     drag.to = slot > drag.from ? slot - 1 : slot;
-  });
+  };
+  ed.on(ed.app, 'pointermove', (e) => { if (drag) place(e.clientY); });
   ed.on(ed.app, 'pointerup', () => stop(true));
   ed.on(ed.app, 'pointercancel', () => stop(false));
   ed.on(document, 'keydown', (e) => { if (e.key === 'Escape' && drag) { e.preventDefault(); stop(false); } });
