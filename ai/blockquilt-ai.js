@@ -15,10 +15,13 @@ const FORMAT = fs.readFileSync(path.join(__dirname, '..', 'FORMAT.md'), 'utf8');
 
 /**
  * baseUrl : « https://openrouter.ai/api/v1 » ; apiKey ; model : modèle par défaut ;
- * uses : [{ id, label, instruction, model?, scopes? }] ; headers : en-têtes en plus (OpenRouter : HTTP-Referer, X-Title) ;
+ * uses : [{ id, label, instruction, model?, scopes?, params? }] ; headers : en-têtes en plus (OpenRouter : HTTP-Referer, X-Title) ;
+ * params : champs en plus de la requête au modèle, pour tous les usages (ceux d'un usage passent devant), par exemple
+ *   OpenRouter `{ reasoning: { effort: 'low' } }` : un modèle qui « réfléchit » peut épuiser max_tokens avant de répondre ;
+ * maxTokens : longueur maximale de la réponse (un document entier : 16 000 par défaut) ;
  * fallback({ scope, instruction, text, block, use }) : réponse sans clé (démo, essais).
  */
-function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, fallback = null, maxTokens = 4000 }) {
+function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}, fallback = null, maxTokens = 16000 }) {
   const byId = new Map(uses.map((u) => [u.id, u]));
 
   const prompt = ({ scope, instruction, text, block, use }) => ({
@@ -51,14 +54,20 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, fallback = 
       r = await fetch(baseUrl.replace(/\/$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey, ...headers },
-        body: JSON.stringify({ model: use?.model || model, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+        body: JSON.stringify({ model: use?.model || model, max_tokens: maxTokens, ...params, ...use?.params, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
       });
     } catch (error) {
       throw fail(502, 'Modèle injoignable : ' + error.message);
     }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw fail(502, j.error?.message || `Modèle indisponible (${r.status})`);
-    const out = String(j.choices?.[0]?.message?.content ?? '').trim();
+    const choice = j.choices?.[0];
+    // Réponse coupée par la limite de longueur : jamais renvoyée (on pourrait l'appliquer et perdre la fin du texte).
+    if (choice?.finish_reason === 'length') {
+      throw fail(502, choice.message?.content ? 'Réponse coupée : le modèle a atteint sa longueur maximale. Réessayer, ou choisir un modèle plus court à répondre.'
+        : 'Le modèle a épuisé sa longueur maximale à réfléchir, sans répondre. Réessayer, ou régler sa réflexion (params) ou son modèle.');
+    }
+    const out = String(choice?.message?.content ?? '').trim();
     if (!out) throw fail(502, 'Réponse vide du modèle');
     // Un modèle entoure parfois sa réponse d'un bloc de code : on l'enlève.
     return out.replace(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/, '$1').replace(/\r\n/g, '\n') + '\n';

@@ -19,9 +19,9 @@ await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
 const baseUrl = `http://127.0.0.1:${upstream.address().port}/v1/`;
 const uses = [
   { id: 'corriger', label: 'Corriger', instruction: 'Corrige l’orthographe.' },
-  { id: 'resumer', label: 'Résumer', instruction: 'Résume.', model: 'petit/modele', scopes: ['document'] },
+  { id: 'resumer', label: 'Résumer', instruction: 'Résume.', model: 'petit/modele', scopes: ['document'], params: { reasoning: { effort: 'high' } } },
 ];
-const ai = createAi({ baseUrl, apiKey: 'cle-secrete', model: 'grand/modele', uses, headers: { 'X-Title': 'essai' } });
+const ai = createAi({ baseUrl, apiKey: 'cle-secrete', model: 'grand/modele', uses, headers: { 'X-Title': 'essai' }, params: { reasoning: { effort: 'low' }, temperature: 0.2 } });
 
 // Relais monté sur un serveur, comme dans une application.
 const app = http.createServer((req, res) => ai.handler(req, res));
@@ -37,10 +37,12 @@ try {
   ok(r1.status === 200 && r1.markdown === '> [!tip]\n> Réponse.\n', 'POST : Markdown du modèle, bloc de code autour retiré, fin de ligne');
   ok(last.url === '/v1/chat/completions' && last.auth === 'Bearer cle-secrete' && last.title === 'essai', 'appel compatible OpenAI : /chat/completions, clé côté serveur, en-têtes en plus');
   ok(last.body.model === 'grand/modele' && last.body.messages[0].role === 'system' && last.body.messages[0].content.includes('Tâche : Corrige l’orthographe.') && last.body.messages[0].content.includes('> [!tip]'), 'consigne système : tâche de l’usage + FORMAT.md ; modèle par défaut');
+  ok(last.body.max_tokens === 16000 && last.body.reasoning.effort === 'low' && last.body.temperature === 0.2, 'paramètres en plus (réflexion…) et longueur maximale de 16 000');
   const user = last.body.messages[1].content;
   ok(user.includes('Bloc à modifier :\n\nTexte.') && user.includes('Consigne : plus court') && user.includes('# Doc\n\nTexte.') && user.endsWith('remplacent ce bloc.'), 'message : document pour le contexte, bloc, consigne précisée ; \\r\\n remis en \\n');
   await post({ scope: 'document', use: 'resumer', text: 'Texte.' });
   ok(last.body.model === 'petit/modele' && last.body.messages[1].content.endsWith('frontmatter compris.') && !last.body.messages[1].content.includes('Consigne'), 'usage avec son propre modèle, sur le document');
+  ok(last.body.reasoning.effort === 'high' && last.body.temperature === 0.2, 'paramètres d’un usage : devant ceux de tous les usages');
 
   ok((await post({ scope: 'block', use: 'resumer', text: 'T', block: 'T' })).status === 400, 'usage hors de sa portée : 400');
   ok((await post({ scope: 'document', use: 'inconnu', text: 'T' })).error === 'Usage inconnu : inconnu', 'usage inconnu : 400');
@@ -49,6 +51,11 @@ try {
   answer = { status: 429, body: { error: { message: 'Trop de requêtes' } } };
   const r2 = await post({ scope: 'document', instruction: 'x', text: 'T' });
   ok(r2.status === 502 && r2.error === 'Trop de requêtes', 'erreur du fournisseur : 502 avec son message');
+  answer = { status: 200, body: { choices: [{ finish_reason: 'length', message: { content: '---\ntitle: Guide 1' } }] } };
+  const cut = await post({ scope: 'document', instruction: 'x', text: 'T' });
+  ok(cut.status === 502 && cut.error.startsWith('Réponse coupée') && !cut.markdown, 'réponse coupée par la longueur maximale : refusée, jamais renvoyée');
+  answer = { status: 200, body: { choices: [{ finish_reason: 'length', message: { content: '', reasoning: '…' } }] } };
+  ok((await post({ scope: 'document', instruction: 'x', text: 'T' })).error.includes('à réfléchir, sans répondre'), 'longueur épuisée à réfléchir : message clair');
   answer = { status: 200, body: { choices: [{ message: { content: '  ' } }] } };
   ok((await post({ scope: 'document', instruction: 'x', text: 'T' })).status === 502, 'réponse vide : 502');
   const json = await fetch(APP, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'document', instruction: 'x', text: 'T' }) });

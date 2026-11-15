@@ -16,6 +16,7 @@ services:
       AI_KEY: ${AI_KEY:-}            # clé OpenRouter (ou autre API compatible OpenAI) ; vide = IA de démo (majuscules)
       AI_BASE_URL: ${AI_BASE_URL:-}
       AI_MODEL: ${AI_MODEL:-}
+      AI_REASONING: ${AI_REASONING:-}       # OpenRouter : low (défaut), medium, high, none
     volumes:
       - .:/app:ro
       - ./dev/data-web:/data

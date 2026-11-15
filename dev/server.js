@@ -51,6 +51,8 @@ const ai = createAi({
   apiKey: process.env.AI_KEY || process.env.OPENROUTER_API_KEY,
   model: process.env.AI_MODEL || 'anthropic/claude-sonnet-4.5',
   headers: { 'X-Title': 'blockquilt (démo)' },
+  // OpenRouter : réflexion courte (AI_REASONING : low par défaut, medium, high, ou none pour ne rien demander).
+  params: !/openrouter\.ai/.test(process.env.AI_BASE_URL || 'openrouter.ai') || process.env.AI_REASONING === 'none' ? {} : { reasoning: { effort: process.env.AI_REASONING || 'low' } },
   uses: [
     { id: 'corriger', label: 'Corriger', instruction: 'Corrige l’orthographe et la grammaire, sans changer le sens ni la structure.' },
     { id: 'raccourcir', label: 'Raccourcir', instruction: 'Raccourcis le texte en gardant l’essentiel.' },
