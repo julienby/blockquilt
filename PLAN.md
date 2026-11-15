@@ -52,48 +52,44 @@ Chaque tâche : test, `check` vert, commit, ligne dans `DECISIONS.md`.
 
 Ordre : E4, E1, E2, E3, E5, E6. L'IA (§5) est mise de côté pour ce round.
 
-## 5. IA — proposition à discuter (mise de côté pour ce round, rien n'est implémenté)
+## 5. IA — plan validé (à implémenter après « go »)
 
-Deux niveaux (document entier, bloc) et deux accès :
+### Principes (décidés avec Julien)
 
-**A. L'IA dans l'éditeur (l'éditeur appelle).** Aujourd'hui : une seule adresse `aiUrl`. Proposition : plusieurs IA, chacune pour un usage.
+- **Un éditeur ou un bloc n'existe jamais seul** : il vit dans une application (easyHomeGuide, site du labo, site perso, ytgrabber…). blockquilt fournit le générique ; l'application fournit le stockage, l'identité des contenus, les utilisateurs et les droits.
+- **Désigner** : un contenu par son identifiant applicatif et sa version ; un bloc par **sa place et l'empreinte de son texte** dans cette version (`contenu guide1A, version 17, bloc 3, empreinte 9c1e`). Aucun identifiant dans le texte. Une écriture faite sur une version ou une empreinte périmée est refusée, jamais écrasée (comme `git` et `If-Match`).
+- **Deux mécanismes IA** :
+  - A. **dans l'éditeur** : un relais côté serveur, compatible OpenAI (OpenRouter…), installé par chaque application ; aucun relais central, aucune clé dans le navigateur.
+  - B. **à l'extérieur** : un serveur MCP (et la même chose en API REST) sur les contenus de l'application, pour ChatGPT ou Claude Code.
+- **Droits : jamais dans blockquilt.** Le serveur MCP et le relais transmettent le jeton à l'application, qui dit qui c'est et ce qu'il peut faire (jeton mcp1 → user1 → guides 1A, 1B, 1C ; rien d'autre).
+- **Ce qu'on fait d'un résultat de l'IA**, toujours au choix :
+  - document : remplacer, ajouter au début, ajouter à la fin, ne rien toucher (copier le résultat, continuer à travailler) ;
+  - bloc : remplacer le bloc, insérer au-dessus, insérer dessous, ne rien toucher.
+- **Tout s'essaie dans les démos**, locale et publique (application de référence = `dev/server.js`).
 
-```js
-ai: [
-  { id: 'traduction', label: 'Traduire', url: '/ai/deepl', scopes: ['document', 'block'], presets: ['Anglais', 'Espagnol'] },
-  { id: 'redaction', label: 'Réécrire', url: '/ai/claude', scopes: ['document', 'block'], presets: ['Corriger', 'Raccourcir'] },
-]
+### Le contrat de l'application : un adaptateur de contenus
+
+Tout ce que blockquilt demande à une application. Deux formes équivalentes : un module Node, ou une API REST (pour PHP ou autre).
+
+```
+auth(jeton)                                  → personne | null
+list(personne)                               → [{ id, title, updatedAt }]    seulement ce qu'elle peut voir
+read(personne, id)                           → { markdown, version }
+write(personne, id, markdown, { ifVersion, by }) → { version }               refus : droits (403), conflit (409)
 ```
 
-Même échange pour toutes (`scope`, `instruction`, `text`, `block` → `{ markdown }`). L'éditeur ne voit jamais une clé : chaque adresse est un petit service côté serveur qui garde la clé, vérifie la session (`fields`, jeton CSRF), limite le débit et les usages permis. La réponse passe toujours par `Blocks.lint`, avant / après, « Appliquer » annulable.
+En REST : `GET /contents`, `GET /contents/:id`, `PUT /contents/:id` avec `Authorization: Bearer <jeton>`, `If-Match: <version>`, et l'auteur (`by`) noté par l'application.
 
-**B. L'IA se connecte au document (l'IA écrit, l'éditeur relit).** ChatGPT ou Claude Code travaillent directement sur le contenu ; à l'ouverture dans l'éditeur, tout est propre.
+### Étapes
 
-- **Le savoir-faire** : un « skill » (`FORMAT.md` + règles d'écriture), donné tel quel à l'IA. Base déjà prête : `FORMAT.md`, `Blocks.lint`.
-- **L'accès** : un serveur MCP (et la même chose en API REST) avec des outils simples :
-  - `get_format` ;
-  - `list_documents` ;
-  - `read_document` ;
-  - `write_document`, qui contrôle par `lint` et refuse ou signale ;
-  - `read_block` et `replace_block` (un bloc désigné par sa place et l'empreinte de son texte, pour ne pas écraser un bloc qui a changé entre-temps) ;
-  - `lint`.
-- **La sécurité** :
-  - jeton par document ou par espace, avec des droits (lecture / écriture), une durée et la possibilité de le révoquer ;
-  - chaque écriture crée une version : l'éditeur affiche « modifié par Claude il y a 2 min », montre la différence et permet d'annuler ;
-  - écriture conditionnelle (version attendue, `If-Match`) pour ne pas écraser une édition en cours.
-- **Où ça vit** : l'éditeur reste un composant d'interface générique. Le stockage dépend de chaque application ; blockquilt fournirait un serveur MCP de référence sur un dossier de fichiers `.md` (MCP en JSON-RPC sur stdio, sans dépendance), que chaque application adapte à son stockage.
+- [ ] **I1 Noyau** (fonctions pures, tests Node) : `Blocks.address(md)` → blocs numérotés avec leur empreinte ; `Blocks.replaceBlock`, `Blocks.insertBlocks` (au-dessus, dessous) avec contrôle d'empreinte ; `Blocks.combine(md, fragment, mode)` pour `replace | prepend | append`.
+- [ ] **I2 Application de référence** (démo) : plusieurs contenus en fichiers `.md`, deux utilisateurs et leurs jetons (user1 → guides 1A, 1B ; user2 → guide 2A), API REST de l'adaptateur (versions, `If-Match`, auteur), page de démo avec le choix du contenu.
+- [ ] **I3 Serveur MCP générique** (Node, sans dépendance) : outils `get_format`, `list_contents`, `read_content` (blocs numérotés, empreintes), `replace_block`, `insert_blocks`, `write_content` (`replace | prepend | append`, version attendue), `lint`. En stdio (Claude Code) et en HTTP (`/mcp` dans la démo, pour un client distant). Un « skill » `SKILL.md` (FORMAT.md + règles d'écriture). Essai : user1 voit 1A et 1B mais pas 2A, une écriture sur une empreinte périmée est refusée, l'éditeur relit ce que l'IA a écrit.
+- [ ] **I4 Modes d'application dans l'éditeur** : après la proposition de l'IA, « Remplacer », « Ajouter au début », « Ajouter à la fin », « Copier » (ne rien toucher) ; pour un bloc, « Remplacer », « Au-dessus », « Dessous », « Copier ». Toujours annulable.
+- [ ] **I5 Relais IA** compatible OpenAI (OpenRouter) : module Node réutilisable, plusieurs usages (`traduire`, `réécrire`… chacun son modèle et sa consigne), consigne système `FORMAT.md` ; contrat HTTP documenté pour le réécrire ailleurs. L'éditeur propose les usages fournis par l'application. Démo : réponse fixe par défaut, vrai modèle si une clé est donnée.
+- [ ] **I6 Versions et conflits dans l'éditeur** : enregistrement avec la version lue ; si le contenu a changé (par exemple modifié par une IA), une feuille propose de voir la différence, de prendre l'autre version ou de garder la sienne ; « modifié par … il y a … ».
 
-**Questions à trancher avant d'écrire du code :**
-1. Où sont stockés les documents dans tes applications (fichiers, base de données) ?
-2. Quelles IA veux-tu brancher en premier (traduction, rédaction) ?
-3. Qui se connecte par MCP : toi seul (jeton personnel) ou aussi tes utilisateurs ?
-4. Faut-il un historique des versions visible dans l'éditeur dès la première étape ?
-
-**Étapes possibles :**
-- I1 : le skill, c'est-à-dire `FORMAT.md` + `SKILL.md` pour Claude Code et ChatGPT.
-- I2 : plusieurs IA dans l'éditeur.
-- I3 : serveur MCP de référence sur fichiers.
-- I4 : versions et « modifié par… » dans l'éditeur.
+Hors périmètre : l'édition à plusieurs en temps réel (curseurs partagés).
 
 ## 6. Idées gardées pour plus tard
 
