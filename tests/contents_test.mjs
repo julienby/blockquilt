@@ -57,7 +57,7 @@ try {
   const cookie = login.headers.get('set-cookie').split(';')[0];
   ok(login.status === 303 && cookie === 'bq_token=demo-user2' && login.headers.get('set-cookie').includes('HttpOnly'), 'app : connexion par cookie HttpOnly');
   const page = await (await fetch(BASE + 'app', { headers: { Cookie: cookie } })).text();
-  ok(page.includes('Bienvenue au chalet') && page.includes('onSave: window.bqSave') && page.includes("fetch('contents/guide-2a'"), 'app : le premier contenu de user2 dans l’éditeur, enregistré par PUT');
+  ok(page.includes('Bienvenue au chalet') && page.includes('contentUrl: "contents/guide-2a", version: "\\"'), 'app : le premier contenu de user2 dans l’éditeur, avec son adresse et sa version');
   ok((await (await fetch(BASE + 'app?c=guide-1a', { headers: { Cookie: cookie } })).text()).includes('n\'a pas accès'), 'app : contenu d’un autre refusé');
   ok((await (await fetch(BASE + 'contents', { headers: { Cookie: cookie, Accept: 'application/json' } })).json()).length === 1, 'le cookie vaut jeton pour le navigateur');
 } catch (error) {

@@ -21,10 +21,11 @@ import { installFullscreen } from './editor/fullscreen.js';
 import { installDrag } from './editor/drag.js';
 import { installEmoji, emoji } from './editor/emoji.js';
 import { installAi } from './editor/ai.js';
+import { installRemote } from './editor/remote.js';
 import { installBar } from './editor/bar.js';
 import { installEvents } from './editor/events.js';
 
-/** Monte un éditeur dans `element`. Renvoie { getMarkdown(), setMarkdown(md), save(), undo(), redo(), destroy() }. */
+/** Monte un éditeur dans `element`. Renvoie { getMarkdown(), setMarkdown(md), save(), undo(), redo(), checkRemote(), version, destroy() }. */
 export function mount(element, options = {}) {
   const o = { media: 'media/', fields: {}, source: '', ...options };
   const ac = new AbortController();
@@ -67,7 +68,7 @@ export function mount(element, options = {}) {
   ed.def = (b) => Blocks.def(b.type);
 
   for (const install of [installDocument, installSheets, installRender, installHistory, installActions, installMedia,
-    installSource, installFullscreen, installDrag, installEmoji, installAi, installBar, installEvents]) install(ed);
+    installSource, installFullscreen, installDrag, installEmoji, installAi, installRemote, installBar, installEvents]) install(ed);
 
   ed.load(o.source);
   ed.setDirty(false);
@@ -79,6 +80,8 @@ export function mount(element, options = {}) {
     save: ed.save,
     undo: ed.undo,
     redo: ed.redo,
+    checkRemote: () => ed.checkRemote(),
+    get version() { return ed.version; },
     destroy: () => {
       ac.abort();
       timers.forEach(clearTimeout);

@@ -23,6 +23,8 @@
 .bq-app { font-family: var(--bq-font, inherit); color: var(--bq-text, inherit); background: var(--bq-surface, Canvas); }
 .bq-head { top: var(--bq-sticky-top, 0px); background: color-mix(in srgb, var(--bq-surface, Canvas) 94%, transparent); border-color: var(--bq-border, color-mix(in srgb, currentColor 12%, transparent)); backdrop-filter: blur(12px); }
 .bq-full-inner { --bq-sticky-top: 0px; }
+/* Bandeau « Modifié ailleurs » : collé sous l'en-tête. */
+.bq-remote-bar { top: calc(var(--bq-sticky-top, 0px) + 3.75rem + env(safe-area-inset-top)); }
 .bq-sheet { background: var(--bq-surface, Canvas); color: var(--bq-text, CanvasText); }
 .bq-card, .bq-add { border-radius: var(--bq-radius, 1rem); }
 /* Cartes et badges neutres : fond, bordure et texte tirés de la couleur du texte (lisibles sur fond clair ou sombre). */

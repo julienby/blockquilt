@@ -70,6 +70,7 @@ export function installDocument(ed) {
     saving = (async () => {
       try {
         if (o.onSave) await o.onSave(text);
+        else if (o.contentUrl) await ed.putContent(text);
         else if (o.saveUrl) {
           const r = await fetch(o.saveUrl, { method: 'POST', body: ed.form({ text }), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
           const j = await r.json().catch(() => ({}));

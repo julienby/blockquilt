@@ -865,9 +865,37 @@ try {
   ok(ext.status === 204, 'app : une IA écrit le guide avec l’ETag qu’elle a lu');
   await ev(`(() => { const b = document.querySelector('[data-bq] [data-body]'); b.textContent = 'Arrivée (éditeur)'; b.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
   await key('s', 'KeyS', 83, CTRL);
-  await waitFor(() => ev(`document.querySelector('[data-toast]').textContent.includes('Modifié ailleurs')`), 'refus du conflit');
+  await waitFor(() => ev(`document.querySelector('[data-sheet="remote"]').open`), 'feuille du conflit');
   const kept = fs.readFileSync(guide, 'utf8');
   ok(kept.includes('Écrit par l’IA.') && !kept.includes('Arrivée (éditeur)') && await ev(`editor.getMarkdown().includes('Arrivée (éditeur)')`), 'app : conflit (412) — le texte de l’IA n’est pas écrasé, celui de l’éditeur reste à l’écran');
+  const diff = await ev(`(() => { const s = document.querySelector('[data-sheet="remote"]'); return { who: s.querySelector('[data-remote-who]').textContent, ops: [...s.querySelectorAll('[data-remote-diff] [data-op]')].map((d) => d.dataset.op + d.textContent.slice(2)) }; })()`);
+  ok(diff.who.startsWith('Modifié par user1 (via Claude) à l’instant') && diff.ops.includes('-# Arrivée (éditeur)') && diff.ops.includes('+# Arrivée au gîte') && diff.ops.includes('+Écrit par l’IA.'), `app : conflit — qui, quand, et les lignes qui changent (${JSON.stringify(diff)})`);
+  await ev(`document.querySelector('[data-remote-take]').click()`);
+  ok(await ev(`editor.getMarkdown()`) === fs.readFileSync(guide, 'utf8') && await ev(`document.querySelector('[data-save] [data-dot]').hidden`), 'app : « Prendre l’autre version » — l’écran égale le serveur, rien à enregistrer');
+  await ev(`editor.undo()`);
+  ok(await ev(`editor.getMarkdown().includes('Arrivée (éditeur)')`), 'app : Ctrl+Z rend votre version');
+  // Une autre écriture d'ailleurs, vue par la revérification : bandeau, puis « Garder la mienne ».
+  const put2 = async (md) => { const g = await fetch(BASE + '/contents/guide-1a', { headers: { Authorization: 'Bearer demo-user1', Accept: 'text/markdown' } }); return fetch(BASE + '/contents/guide-1a', { method: 'PUT', headers: { Authorization: 'Bearer demo-user1', 'If-Match': g.headers.get('etag'), 'X-Via': 'Claude', 'Content-Type': 'text/markdown' }, body: md((await g.text())) }); };
+  await put2((t) => t + '\nEncore l’IA.\n');
+  ok(await ev(`editor.checkRemote()`) && await ev(`!document.querySelector('[data-remote-bar]').hidden && document.querySelector('[data-remote-text]').textContent.startsWith('Modifié par user1 (via Claude)')`), 'app : revérification — bandeau « Modifié par … », rien ne change à l’écran');
+  ok(await ev(`editor.getMarkdown().includes('Arrivée (éditeur)') && !editor.getMarkdown().includes('Encore')`), 'app : votre texte reste tant que vous n’avez pas choisi');
+  await ev(`document.querySelector('[data-remote-show]').click()`);
+  await ev(`document.querySelector('[data-remote-later]').click()`);
+  ok(await ev(`!document.querySelector('[data-sheet="remote"]').open && !document.querySelector('[data-remote-bar]').hidden`), 'app : « Plus tard » garde le bandeau');
+  await ev(`document.querySelector('[data-remote-show]').click()`);
+  await ev(`document.querySelector('[data-remote-keep]').click()`);
+  await waitFor(async () => fs.readFileSync(guide, 'utf8').includes('Arrivée (éditeur)'), 'garder la mienne');
+  ok(!fs.readFileSync(guide, 'utf8').includes('Encore') && await ev(`document.querySelector('[data-remote-bar]').hidden && document.querySelector('[data-save] [data-dot]').hidden`), 'app : « Garder la mienne » — votre version remplace l’autre, en connaissance de cause');
+  ok(!(await ev(`editor.checkRemote()`)), 'app : revérification sans changement : rien (304)');
+  // Sans `source` : l'éditeur lit lui-même le texte et sa version.
+  ok(await ev(`(async () => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { contentUrl: 'contents/guide-1b', pollSeconds: 0 });
+    for (let i = 0; i < 40 && !e.version; i++) await new Promise((r) => setTimeout(r, 50));
+    const out = e.getMarkdown().startsWith('---\\ntitle: Guide 1B') && /^"[0-9a-f]{8}"$/.test(e.version) && el.querySelector('[data-save] [data-dot]').hidden;
+    e.destroy(); el.remove();
+    return out;
+  })()`), 'contentUrl sans source : texte et version lus par l’éditeur');
   ws.close();
 } catch (error) {
   ok(false, error.message);

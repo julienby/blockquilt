@@ -126,18 +126,8 @@ module.exports = (DATA) => {
       .replace('<title>blockquilt</title>', '<title>blockquilt — application de démo</title>')
       .replace(/(<textarea id="source" hidden>)[\s\S]*?(<\/textarea>)/, (_, open, close) => open + esc(source) + close)
       .replace('<div id="editor"', `<header data-app class="mx-auto max-w-3xl space-y-1 px-4 py-3 text-sm">${main}</header>\n  <div id="editor"${config ? '' : ' hidden'}`)
-      .replace("saveUrl: 'api/save',", config ? `onSave: window.bqSave,` : "saveUrl: 'api/save',")
-      .replace('<script type="module">', config ? `<script>
-    // Enregistrer = PUT du Markdown avec l'ETag lu ; 412 : quelqu'un (une IA…) a écrit entre-temps, rien n'est écrasé.
-    let etag = ${JSON.stringify(config.etag)};
-    window.bqSave = async (text) => {
-      const r = await fetch('contents/${config.id}', { method: 'PUT', headers: { 'Content-Type': 'text/markdown; charset=utf-8', 'If-Match': etag }, body: text });
-      if (r.status === 412) throw new Error('Modifié ailleurs entre-temps : recharger la page (votre texte n’est pas enregistré)');
-      if (!r.ok) throw new Error((await r.text()).trim() || 'Enregistrement impossible');
-      etag = r.headers.get('ETag');
-    };
-  </script>
-  <script type="module">` : '<script type="module">');
+      // L'éditeur parle lui-même le contrat : lecture de la version (ETag), PUT avec If-Match, conflits.
+      .replace("saveUrl: 'api/save',", config ? `contentUrl: ${JSON.stringify('contents/' + config.id)}, version: ${JSON.stringify(config.etag)},` : "saveUrl: 'api/save',");
     return send(res, 200, { 'Content-Type': 'text/html; charset=utf-8' }, html), true;
   };
 

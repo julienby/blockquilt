@@ -179,6 +179,37 @@ const Blocks = {
     return head + (head && body ? '\n' : '') + (body ? body + '\n' : '');
   },
 
+  /**
+   * Différences ligne à ligne entre deux textes → [{ op: ' ' | '-' | '+', text }] (plus longue sous-suite commune).
+   * Au-delà de `limit` lignes différentes de chaque côté, tout l'ancien est retiré et tout le nouveau ajouté.
+   */
+  diffLines(a, b, limit = 1500) {
+    const x = String(a).replace(/\r\n/g, '\n').split('\n');
+    const y = String(b).replace(/\r\n/g, '\n').split('\n');
+    let s = 0;
+    while (s < x.length && s < y.length && x[s] === y[s]) s++;
+    let e = 0;
+    while (e < x.length - s && e < y.length - s && x[x.length - 1 - e] === y[y.length - 1 - e]) e++;
+    const xs = x.slice(s, x.length - e);
+    const ys = y.slice(s, y.length - e);
+    const mid = [];
+    if (xs.length > limit || ys.length > limit) {
+      mid.push(...xs.map((t) => ({ op: '-', text: t })), ...ys.map((t) => ({ op: '+', text: t })));
+    } else {
+      // Longueurs des sous-suites communes, depuis la fin.
+      const L = Array.from({ length: xs.length + 1 }, () => new Uint32Array(ys.length + 1));
+      for (let i = xs.length - 1; i >= 0; i--) for (let j = ys.length - 1; j >= 0; j--) L[i][j] = xs[i] === ys[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+      let i = 0, j = 0;
+      while (i < xs.length || j < ys.length) {
+        if (i < xs.length && j < ys.length && xs[i] === ys[j]) { mid.push({ op: ' ', text: xs[i] }); i++; j++; }
+        else if (i < xs.length && (j >= ys.length || L[i + 1][j] >= L[i][j + 1])) mid.push({ op: '-', text: xs[i++] });
+        else mid.push({ op: '+', text: ys[j++] });
+      }
+    }
+    const same = (t) => ({ op: ' ', text: t });
+    return [...x.slice(0, s).map(same), ...mid, ...x.slice(x.length - e).map(same)];
+  },
+
   // ---- Texte visible ⇄ Markdown ----
   esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
   attr(s) { return Blocks.esc(s).replace(/"/g, '&quot;'); },

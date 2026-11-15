@@ -257,6 +257,19 @@ delete Blocks.types.demo; Blocks.order.splice(Blocks.order.indexOf('demo'), 1);
   ok(Blocks.combine('---\nmal formé\n---\nTexte.\n', '---\nk: v\n---\nX', 'append') === '---\nmal formé\n---\nTexte.\n\nX\n', 'combine : frontmatter mal formé laissé tel quel, pas de second');
 }
 
+// ---- I6 : différences ligne à ligne ----
+{
+  const show = (d) => d.map((l) => l.op + l.text).join('|');
+  ok(show(Blocks.diffLines('a\nb\nc', 'a\nb\nc')) === ' a| b| c', 'diffLines : textes égaux');
+  ok(show(Blocks.diffLines('a\nb\nc', 'a\nB\nc')) === ' a|-b|+B| c', 'diffLines : une ligne changée, l’ancienne avant la nouvelle');
+  ok(show(Blocks.diffLines('a\nc', 'a\nb\nc')) === ' a|+b| c' && show(Blocks.diffLines('a\nb\nc', 'a\nc')) === ' a|-b| c', 'diffLines : ajout, retrait');
+  const d = Blocks.diffLines('# T\n\nun\ndeux\ntrois\n', '# T\n\nzéro\nun\ntrois\nquatre\n');
+  ok(d.filter((l) => l.op === '+').map((l) => l.text).join() === 'zéro,quatre' && d.filter((l) => l.op === '-').map((l) => l.text).join() === 'deux' && d.filter((l) => l.op === ' ').length === 5, 'diffLines : plus longue sous-suite commune');
+  ok(Blocks.diffLines('a\r\nb', 'a\nb').every((l) => l.op === ' '), 'diffLines : fins de ligne Windows ignorées');
+  const big = Array.from({ length: 30 }, (_, i) => 'l' + i).join('\n');
+  ok(Blocks.diffLines(big, big.replace('l3', 'x'), 0).filter((l) => l.op !== ' ').length === 2, 'diffLines : au-delà de la limite, retrait + ajout en bloc');
+}
+
 // ---- Modules de l'écran : syntaxe valide (une erreur bloquerait tout l'éditeur dans le navigateur) ----
 const { spawnSync } = require('node:child_process');
 for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'editor')).map((x) => 'editor/' + x)]) {

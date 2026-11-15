@@ -35,7 +35,7 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 </script>
 ```
 
-`mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
+`mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), checkRemote(), version, destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
 
 Trois vues dans l'en-tête : **édition** par blocs, **texte source** (le Markdown complet, contrôlé par `Blocks.lint` et rendu en direct à côté ; en revenant aux blocs, le texte est relu, en une étape annulable) et **aperçu**.
 
@@ -45,6 +45,8 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 |---|---|
 | `source` | Texte du document au format blockquilt. |
 | `onSave(markdown)` ou `saveUrl` | Enregistrer : fonction (peut renvoyer une promesse, une erreur levée est affichée) ou adresse. |
+| `contentUrl`, `version` | À la place de `saveUrl` : l'adresse du contenu dans le contrat de l'application (« Contenus d'une application ») et sa version (`ETag`). L'éditeur enregistre par `PUT` + `If-Match` ; si le contenu a changé ailleurs (une IA, un autre onglet), rien n'est écrasé : une feuille montre qui, quand et les lignes qui changent, puis « Prendre l'autre version » (annulable), « Garder la mienne » ou « Plus tard ». Sans `version`, il la lit ; sans `source`, il lit aussi le texte. |
+| `pollSeconds` | Avec `contentUrl` : revérifier toutes les N secondes (30 par défaut, `0` jamais) et au retour sur la page ; un changement d'ailleurs affiche un bandeau « Modifié par … il y a … », sans rien changer à l'écran. `checkRemote()` revérifie à la demande (par exemple sur un événement htmx). |
 | `uploadUrl` | Envoi des photos. Sans elle, pas de photo. |
 | `media` | Adresse des photos : `media/<id>` du texte devient `media + id` à l'écran (`media/` par défaut). |
 | `previewUrl` | Aperçu rendu par le serveur. Sans elle, l'éditeur rend lui-même avec `Blocks.toHtml`. |

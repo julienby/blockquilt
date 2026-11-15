@@ -28,6 +28,9 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
     <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn bq-muted hidden sm:inline-flex">${ic('maximize')}</button>
     <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn bq-muted sm:hidden">${ic('more')}</button>
   </header>
+  ${o.contentUrl ? `<div data-remote-bar hidden role="status" class="bq-remote-bar sticky z-10 mx-3 mt-2 flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 py-0.5 pl-3 pr-1 text-sm text-amber-950 sm:mx-6">
+    <span data-remote-text class="min-w-0 flex-1 truncate font-semibold"></span>
+    <button type="button" data-remote-show class="min-h-11 shrink-0 rounded-xl px-3 font-bold underline">Voir</button></div>` : ''}
   <div data-canvas class="flex-1 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
   <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 text-white shadow-2xl">
     <div data-bar-clip hidden role="group" aria-label="Presse-papiers" class="flex basis-full justify-center gap-1 border-b border-white/15 py-1">
@@ -49,6 +52,13 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
   <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden aria-label="Choisir une photo">
   ${sheet('add', 'Ajouter un bloc', '<div data-add-list></div>')}
   ${menu('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}${o.aiUrl ? item('data-more-act="ai"', 'wand', 'Assistant IA') : ''}</div>`)}
+  ${o.contentUrl ? sheet('remote', 'Modifié ailleurs', `<p data-remote-who class="text-sm"></p>
+      <p class="mt-3 text-[11px] font-bold uppercase tracking-wider text-stone-400">Votre texte → l’autre version</p>
+      <div data-remote-diff class="mt-1 max-h-72 overflow-auto rounded-xl border border-stone-200 py-2 font-mono text-xs leading-relaxed"></div>
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" data-remote-take class="col-span-2 min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Prendre l’autre version</button>
+        <button type="button" data-remote-keep class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold">Garder la mienne</button>
+        <button type="button" data-remote-later class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold">Plus tard</button></div>`) : ''}
   ${o.aiUrl ? sheet('ai', 'Assistant IA', `<div data-ai-form>
       <p data-ai-scope class="mb-2 truncate rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900"></p>
       <div data-ai-uses class="flex flex-wrap gap-1.5">${[['Corriger', 'Corrige l’orthographe et la grammaire, sans changer le sens ni la structure.'], ['Raccourcir', 'Raccourcis le texte en gardant l’essentiel.'], ['En étapes', 'Réécris sous forme d’étapes numérotées.'], ['Traduire', 'Traduis en anglais, en gardant la structure.']].map(([l, t]) => `<button type="button" data-ai-preset="${attr(t)}" class="min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950 hover:bg-amber-100">${l}</button>`).join('')}</div>
