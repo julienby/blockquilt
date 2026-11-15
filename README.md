@@ -118,10 +118,10 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 
 | Fichier | Rôle | Taille (gzip) |
 |---|---|---|
-| `blockquilt.js` | Noyau `Blocks` : format, registre des types, rendu HTML, `lint`, `sanitize`. Sans DOM. | 32 ko (11 ko) |
-| `blockquilt-editor.js` | Écran : `Blockquilt.mount`, cartes d'édition, menus, historique, glisser-déposer, plein écran, emoji, IA. | 72 ko (21 ko) |
-| `blockquilt.css` | CSS de l'éditeur, généré par Tailwind 3.4.17 (`./build-css`). Ne pas modifier à la main. | 26 ko (6 ko) |
-| `blockquilt-content.css` | CSS du rendu publié, écrit à la main. | 5 ko (2 ko) |
+| `blockquilt.js` | Noyau `Blocks` : format, registre des types, rendu HTML, `lint`, `sanitize`. Sans DOM. | 35 ko (12 ko) |
+| `blockquilt-editor.js` | Écran : `Blockquilt.mount`, cartes d'édition, menus, historique, glisser-déposer, plein écran, emoji, IA. | 83 ko (23 ko) |
+| `blockquilt.css` | CSS de l'éditeur, généré par Tailwind 3.4.17 (`./build-css`). Ne pas modifier à la main. | 29 ko (7 ko) |
+| `blockquilt-content.css` | CSS du rendu publié, écrit à la main. | 7 ko (2 ko) |
 | `blockquilt-content.js` | Facultatif, pour la page publique : flèches et puces des carrousels. | 2 ko (1 ko) |
 | `emoji.json` | Bibliothèque d'emoji (nom français, mots-clés, catégorie), chargée au premier usage. | 121 ko (37 ko) |
 | `FORMAT.md` | Le format, pour les humains et les IA. | |
