@@ -11,7 +11,7 @@
 
 ```sh
 docker compose up                 # démo sur http://localhost:8080/
-docker compose run --rm check     # tests Node + parcours dans Chromium ; code de sortie ≠ 0 si rouge
+docker compose run --rm check     # tests Node (noyau, contrat, MCP) + parcours dans Chromium ; code de sortie ≠ 0 si rouge
 ```
 
 La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, les photos dans `dev/data/media/`. Pour repartir du document de démo, supprimer `dev/data/`. Sans Docker : `node dev/server.js` (Node 22), puis `node tests/blocks_test.cjs`.
@@ -134,6 +134,19 @@ blockquilt ne stocke rien et ne connaît pas les utilisateurs : c'est l'applicat
 
 Le jeton (`Authorization: Bearer …`, ou la session de l'application pour le navigateur) dit **qui** écrit ; l'application seule décide de ce qu'il peut voir et modifier, et note l'auteur de chaque version. Les blocs se désignent côté client par leur place et leur empreinte (`Blocks.address`) : l'application n'a pas à les connaître. Implémentation de référence : `dev/app.js`.
 
+### Serveur MCP (Claude Code, ChatGPT…)
+
+`mcp/blockquilt-mcp.js` (Node 22, sans dépendance) donne ces contenus à une IA, par-dessus le contrat ci-dessus et avec le jeton reçu : il ne stocke rien et ne décide d'aucun droit. Outils : `get_format`, `list_contents`, `read_content` (version et blocs numérotés `[n · empreinte · type]`), `edit_block` (`replace`, `before`, `after`, `remove`), `write_content` (`replace` avec la version lue, `prepend`, `append`), `lint`. Tout Markdown est contrôlé par `Blocks.lint` avant écriture ; une écriture sur un contenu changé depuis la lecture est refusée.
+
+```sh
+# En local (stdio) : l'adresse de l'application et le jeton de la personne
+claude mcp add blockquilt -e BQ_URL=http://localhost:8080/ -e BQ_TOKEN=demo-user1 -- node /chemin/blockquilt/mcp/blockquilt-mcp.js
+# En ligne (HTTP) : l'application monte httpHandler, ici la démo publique
+claude mcp add --transport http blockquilt https://web.byjulien.com/blockquilt/mcp --header "Authorization: Bearer demo-user1"
+```
+
+`mcp/SKILL.md` est le skill qui va avec (règles d'écriture, quand utiliser quel outil) : à copier dans `~/.claude/skills/blockquilt/`. Une application monte la version HTTP en quelques lignes : `const { httpHandler } = require('./mcp/blockquilt-mcp.js'); app.post('/mcp', httpHandler({ base: 'https://exemple.org/' }))`.
+
 ## Ajouter un type de bloc
 
 Un appel à `Blocks.register`, après `blockquilt.js`. `match` lit le texte du bloc (ou renvoie `null`), `toMarkdown` le réécrit : un bloc n'est reconnu que si l'écriture redonne exactement le texte lu. `edit` et `read` sont facultatifs : sans eux, le bloc s'édite comme texte source.
@@ -179,6 +192,8 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 | `dev/server.js` | Serveur de démo et de test, Node seul. | |
 | `dev/app.js`, `dev/contents/` | Application de référence : utilisateurs, jetons, contenus en `.md`, contrat `/contents`, page `/app`. | |
 | `tests/contents_test.mjs` | Tests du contrat HTTP (droits, ETag / If-Match, auteur). | |
+| `mcp/blockquilt-mcp.js`, `mcp/SKILL.md` | Serveur MCP générique (stdio et HTTP) et son skill. | |
+| `tests/mcp_test.mjs` | Tests du serveur MCP sur l'application de référence (HTTP et stdio). | |
 | `dev/check.mjs`, `dev/Dockerfile.check` | Parcours complet dans Chromium headless piloté en CDP (375 px et 1280 px). | |
 | `dev/build-emoji.mjs` | Fabrique `emoji.json` depuis Unicode et CLDR (lancé une fois). | |
 | `dev/shot.mjs` | Capture d'écran de la démo (outil de développement). | |

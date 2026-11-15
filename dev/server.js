@@ -8,6 +8,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const Blocks = require('../blockquilt.js');
 const application = require('./app.js');
+const { httpHandler } = require('../mcp/blockquilt-mcp.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 8080);
@@ -17,6 +18,8 @@ const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 // Application de référence : contenus, utilisateurs, jetons, contrat HTTP (/contents) et sa page (/app).
 const reference = application(DATA);
+// Serveur MCP (transport HTTP) : un client du contrat /contents de cette même application, avec le jeton du client MCP.
+const mcp = httpHandler({ base: `http://127.0.0.1:${PORT}/` });
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.md': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml' };
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -107,6 +110,7 @@ const server = http.createServer(async (req, res) => {
     const route = routes[`${req.method} ${url.pathname}`];
     if (route) return await route(req, res);
     if (await reference.contents(req, res, url.pathname)) return;
+    if (url.pathname === '/mcp') return await mcp(req, res);
     if (req.method === 'GET' && url.pathname === '/app') return reference.app(req, res, url, fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'));
     if (req.method !== 'GET') return send(res, 405, 'text/plain', 'Méthode refusée');
     if (url.pathname === '/') return send(res, 200, TYPES['.html'], page());
