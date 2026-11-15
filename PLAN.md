@@ -29,6 +29,8 @@ Le détail est dans `git log` et `DECISIONS.md`.
 
 - **Phases 0 à 10** (plan d'origine) : épuration, registre de blocs, format pivot et HTML sémantique, `Blockquilt.mount`, interactions (annuler, Ctrl+S, barre, menus, glisser-déposer, plein écran), emoji, carrousel, bloc HTML filtré, IA par `aiUrl`, accessibilité et parcours au clavier.
 - **Evol2** : colonne monter / poignée / descendre, boutons ronds menu / plein écran / supprimer, menu « ⋯ » réduit, intervalles aérés, insertion au début, bordures des titres, listes à plusieurs niveaux, presse-papiers dans la barre, œil du bloc HTML, plein écran reconstruit, largeur réglable.
+- **Evol 3** : E1 à E6 (titres centrés, intégration neutre, vue source, code à la ligne, carrousel en lignes repliable, modules ES dans `editor/`).
+- **IA** (§5, I1 à I6) : désignation des blocs, contrat HTTP `/contents`, application de référence `/app`, serveur MCP et skill, choix d'application d'une proposition, relais compatible OpenAI, versions et conflits dans l'éditeur. Essayé avec Claude Code (connexion) et OpenRouter (`glm-5.3-flash`).
 - **Retours suivants** : titre du document facultatif, menus d'actions sans titre, plein écran sans celui du navigateur, icônes « réduire », clavier fermé à l'ouverture du sélecteur d'emoji, carrousel à flèches et puces, blocs H1 et texte en grand T1 / T2 / T3, éditeur sans notion d'« hôte ».
 
 ## 4. Evol 3 — tâches
@@ -52,7 +54,7 @@ Chaque tâche : test, `check` vert, commit, ligne dans `DECISIONS.md`.
 
 Ordre : E4, E1, E2, E3, E5, E6. L'IA (§5) est mise de côté pour ce round.
 
-## 5. IA — plan validé (à implémenter après « go »)
+## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)
 
@@ -100,9 +102,17 @@ Hors périmètre : l'édition à plusieurs en temps réel (curseurs partagés).
 - Coller plusieurs paragraphes dans un champ → plusieurs blocs.
 - Commande `/` dans un bloc vide pour le menu d'ajout.
 - Colonnes : abandonnées pour le moment (`:::columns` reste un bloc source).
+- IA, suites possibles :
+  - photos par MCP (une IA ne peut pas encore envoyer une image : elle n'utilise que des adresses existantes) ;
+  - ChatGPT : son connecteur MCP distant demande une connexion OAuth, la démo n'a que des jetons ;
+  - auteur en HTTP : « via MCP » au lieu du nom du client (pas de session côté serveur) ;
+  - historique des versions côté application (aujourd'hui : la dernière version et son auteur seulement).
+- Intégration réelle dans une application (easyHomeGuide en PHP : le contrat `/contents` et le relais IA à réécrire, le serveur MCP à brancher dessus).
 
 ## 7. Risques
 
 - Barre de mise en forme au-dessus du clavier sur iPhone (`visualViewport`) : à essayer sur un vrai appareil, Chromium ne le reproduit pas.
 - Tests uniquement dans Chromium : à essayer à la main sur Safari (iPhone, Mac) et Firefox.
 - Bloc HTML : un filtre maison ; garder la liste blanche courte, bloc désactivé par défaut (`html: true`).
+- Démo publique ouverte : jetons de démo publics, IA à la charge de la clé OpenRouter → limite de crédit sur la clé.
+- Modèles à réflexion : réglage `params` / `AI_REASONING` ; un autre modèle peut demander un autre réglage.
