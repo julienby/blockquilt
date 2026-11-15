@@ -221,6 +221,42 @@ ok(Blocks.blank('demo').type === 'demo' && Blocks.blank('demo').body === '' && !
 ok(Blocks.fromMarkdown(':::autre\nx\n:::').type === 'raw', 'registre : syntaxe inconnue toujours en « raw »');
 delete Blocks.types.demo; Blocks.order.splice(Blocks.order.indexOf('demo'), 1);
 
+// ---- I1 : désigner un bloc (place + empreinte) et le modifier sans toucher au reste ----
+{
+  const md = '---\ntitle: T\n---\n\n# Titre\n\nUn  paragraphe.\n\n\n\n## Garage\nCollé au titre.\n\n- a\n- b\n';
+  const a = Blocks.address(md);
+  ok(a.meta.title === 'T' && a.blocks.map((b) => `${b.n}:${b.line}:${b.type}`).join() === '1:5:h1,2:7:text,3:11:h2,4:12:text,5:14:text', 'address : blocs numérotés depuis 1, ligne et type');
+  ok(a.blocks.every((b) => /^[0-9a-f]{8}$/.test(b.hash)) && new Set(a.blocks.map((b) => b.hash)).size === 5, 'address : empreintes de 8 caractères, distinctes');
+  ok(Blocks.hash('abc') === Blocks.hash('abc') && Blocks.hash('abc') !== Blocks.hash('abd') && Blocks.hash('é🙂') === Blocks.hash('é🙂'), 'hash : stable, sensible au moindre caractère');
+  const h = (n) => a.blocks[n - 1].hash;
+  const ch = (o) => Blocks.changeBlock(md, o).markdown;
+  ok(ch({ n: 2, hash: h(2), markdown: 'Nouveau.' }) === md.replace('Un  paragraphe.', 'Nouveau.'), 'changeBlock replace : seules les lignes du bloc changent (espaces et lignes vides du reste gardés)');
+  ok(ch({ n: 2, hash: h(2), mode: 'before', markdown: '\n\n> [!tip] Avant\n\n' }) === md.replace('Un  paragraphe.', '> [!tip] Avant\n\nUn  paragraphe.'), 'changeBlock before : inséré au-dessus, fragment nettoyé');
+  ok(ch({ n: 4, hash: h(4), mode: 'after', markdown: 'X\n\nY' }) === md.replace('Collé au titre.\n', 'Collé au titre.\n\nX\n\nY\n'), 'changeBlock after : plusieurs blocs insérés dessous');
+  ok(ch({ n: 3, hash: h(3), markdown: 'Paragraphe' }) === md.replace('## Garage\nCollé', 'Paragraphe\n\nCollé'), 'changeBlock : une ligne vide sépare un titre remplacé de son voisin collé');
+  ok(ch({ n: 4, hash: h(4), mode: 'before', markdown: 'X' }) === md.replace('## Garage\nCollé', '## Garage\n\nX\n\nCollé'), 'changeBlock before sous un titre collé : blocs gardés séparés');
+  ok(ch({ n: 2, hash: h(2), mode: 'remove' }) === md.replace('Un  paragraphe.\n\n\n\n', ''), 'changeBlock remove : le bloc et les lignes vides qui suivent');
+  ok(ch({ n: 5, hash: h(5), mode: 'remove' }) === md.replace('\n\n- a\n- b\n', '\n'), 'changeBlock remove du dernier bloc : texte terminé proprement');
+  ok(ch({ n: 2, hash: h(2), markdown: '  \n' }) === ch({ n: 2, hash: h(2), mode: 'remove' }), 'changeBlock replace par du vide = retrait');
+  ok(Blocks.changeBlock(md, { n: 2, hash: 'deadbeef', markdown: 'X' }).error?.code === 'stale', 'changeBlock : empreinte périmée refusée');
+  ok(Blocks.changeBlock(md, { n: 9, hash: h(2), markdown: 'X' }).error?.code === 'missing', 'changeBlock : bloc inexistant refusé');
+  ok(Blocks.changeBlock(md, { n: 2, hash: h(2), mode: 'after', markdown: '' }).error?.code === 'empty', 'changeBlock : rien à insérer refusé');
+  ok(Blocks.changeBlock(md.replace(/\n/g, '\r\n'), { n: 2, hash: h(2), markdown: 'Nouveau.' }).markdown === md.replace('Un  paragraphe.', 'Nouveau.'), 'changeBlock : fins de ligne Windows acceptées');
+  const one = Blocks.changeBlock('Seul.\n', { n: 1, hash: Blocks.hash('Seul.'), mode: 'remove' }).markdown;
+  ok(one === '', 'changeBlock : retirer l’unique bloc donne un texte vide');
+  const code = '```\na\n\nb\n```\n\nFin.\n';
+  ok(Blocks.changeBlock(code, { n: 1, hash: Blocks.address(code).blocks[0].hash, markdown: 'Code retiré.' }).markdown === 'Code retiré.\n\nFin.\n', 'changeBlock : un bloc de code avec ligne vide est un seul bloc');
+
+  const doc = '---\ntitle: T\n---\n\n# Titre\n\nTexte.\n';
+  ok(Blocks.combine(doc, '\nAjout.\n', 'append') === doc + '\nAjout.\n', 'combine append : à la fin');
+  ok(Blocks.combine(doc, 'Ajout.', 'prepend') === '---\ntitle: T\n---\n\nAjout.\n\n# Titre\n\nTexte.\n', 'combine prepend : au début, sous le frontmatter');
+  ok(Blocks.combine(doc, 'Neuf.', 'replace') === '---\ntitle: T\n---\n\nNeuf.\n', 'combine replace sans frontmatter : celui du contenu est gardé');
+  ok(Blocks.combine(doc, '---\ntitle: Z\n---\nNeuf.', 'replace') === '---\ntitle: Z\n---\n\nNeuf.\n', 'combine replace avec frontmatter : il remplace');
+  ok(Blocks.combine(doc, '---\nlang: fr\ntitle: Z\n---\nAjout.', 'append') === '---\ntitle: T\nlang: fr\n---\n\n# Titre\n\nTexte.\n\nAjout.\n', 'combine append : clés nouvelles ajoutées, celles du contenu inchangées');
+  ok(Blocks.combine('', 'Premier.', 'append') === 'Premier.\n' && Blocks.combine('Texte.\n', '', 'prepend') === 'Texte.\n', 'combine : contenu vide, fragment vide');
+  ok(Blocks.combine('---\nmal formé\n---\nTexte.\n', '---\nk: v\n---\nX', 'append') === '---\nmal formé\n---\nTexte.\n\nX\n', 'combine : frontmatter mal formé laissé tel quel, pas de second');
+}
+
 // ---- Modules de l'écran : syntaxe valide (une erreur bloquerait tout l'éditeur dans le navigateur) ----
 const { spawnSync } = require('node:child_process');
 for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'editor')).map((x) => 'editor/' + x)]) {

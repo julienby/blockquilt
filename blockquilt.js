@@ -104,6 +104,81 @@ const Blocks = {
     return out.sort((a, b) => a.line - b.line);
   },
 
+  // ---- Désigner et modifier un bloc dans le texte (IA, MCP…) : place + empreinte, sans identifiant dans le texte ----
+
+  /** Empreinte courte d'un texte (FNV-1a 32 bits, 8 caractères hexadécimaux). */
+  hash(text) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+    return (h >>> 0).toString(16).padStart(8, '0');
+  },
+
+  /** Texte complet → { meta, blocks: [{ n, line, type, hash, text }] } ; n commence à 1, line = première ligne dans le fichier. */
+  address(markdown) {
+    const fm = Blocks.frontmatter(markdown);
+    const { chunks } = Blocks.split(fm.body, fm.offset);
+    return { meta: fm.meta, blocks: chunks.map((c, i) => ({ n: i + 1, line: c.line, type: Blocks.fromMarkdown(c.text).type, hash: Blocks.hash(c.text), text: c.text })) };
+  },
+
+  /** Fragment (bloc ou blocs) nettoyé : fins de ligne Unix, sans lignes vides autour. */
+  fragment(markdown) { return String(markdown ?? '').replace(/\r\n/g, '\n').replace(/^\s*\n/, '').replace(/\n\s*$/, '').replace(/^\s+$/, ''); },
+
+  /**
+   * Modifier le bloc n s'il a toujours l'empreinte `hash` : mode `replace` | `before` | `after` | `remove`.
+   * Seules les lignes du bloc changent, le reste du texte est gardé à l'identique.
+   * → { markdown } ou { error: { code: 'missing' | 'stale' | 'empty', message } }
+   */
+  changeBlock(markdown, { n, hash, mode = 'replace', markdown: fragment = '' }) {
+    const md = markdown.replace(/\r\n/g, '\n');
+    const block = Blocks.address(md).blocks[n - 1];
+    if (!block) return { error: { code: 'missing', message: `Pas de bloc ${n}` } };
+    if (block.hash !== hash) return { error: { code: 'stale', message: `Le bloc ${n} a changé depuis la lecture (empreinte ${block.hash}, attendue ${hash}) : relire le contenu` } };
+    const frag = Blocks.fragment(fragment);
+    if (!frag && mode !== 'remove' && mode !== 'replace') return { error: { code: 'empty', message: 'Rien à insérer' } };
+    const lines = md.split('\n');
+    const start = block.line - 1;
+    const count = block.text.split('\n').length;
+    const own = lines.slice(start, start + count);
+    if (mode === 'remove' || !frag) {
+      // Retrait : les lignes vides qui suivent partent avec le bloc ; en fin de texte, celles qui le précèdent.
+      let from = start, to = start + count;
+      while (to < lines.length && lines[to].trim() === '') to++;
+      if (to >= lines.length) while (from > 0 && lines[from - 1].trim() === '') from--;
+      lines.splice(from, to - from);
+    } else {
+      const put = mode === 'replace' ? frag.split('\n') : mode === 'before' ? [...frag.split('\n'), '', ...own] : [...own, '', ...frag.split('\n')];
+      // Un titre peut toucher le paragraphe voisin : une ligne vide garde les blocs séparés.
+      if (mode !== 'after' && start > 0 && lines[start - 1].trim() !== '') put.unshift('');
+      if (mode !== 'before' && start + count < lines.length && lines[start + count].trim() !== '') put.push('');
+      lines.splice(start, count, ...put);
+    }
+    let out = lines.join('\n');
+    if (out.trim() === '') out = '';
+    else if (!out.endsWith('\n')) out += '\n';
+    return { markdown: out };
+  },
+
+  /**
+   * Ajouter un texte (de l'IA…) à un contenu : `replace` | `prepend` (au début, sous le frontmatter) | `append` (à la fin).
+   * Frontmatter du fragment : en `replace`, il remplace celui du contenu s'il en a un, sinon celui du contenu est gardé ;
+   * en `prepend` / `append`, ses clés absentes du contenu sont ajoutées, celles du contenu ne changent pas.
+   */
+  combine(markdown, fragment, mode = 'append') {
+    const doc = Blocks.frontmatter(markdown);
+    const add = Blocks.frontmatter(String(fragment ?? ''));
+    const addBody = Blocks.fragment(add.body.join('\n'));
+    const hasAddMeta = Object.keys(add.meta).length > 0;
+    const meta = mode === 'replace' && hasAddMeta ? add.meta : { ...doc.meta };
+    if (mode !== 'replace') for (const k of Object.keys(add.meta)) if (!Object.hasOwn(meta, k)) meta[k] = add.meta[k];
+    const ownBody = Blocks.fragment(doc.body.join('\n'));
+    const parts = mode === 'replace' ? [addBody] : mode === 'prepend' ? [addBody, ownBody] : [ownBody, addBody];
+    const body = parts.filter(Boolean).join('\n\n');
+    const keys = Object.keys(meta);
+    // Frontmatter mal formé : il est resté dans le corps du contenu, on n'en écrit pas d'autre.
+    const head = keys.length && !doc.error ? ['---', ...keys.map((k) => Blocks.metaLine(k, meta[k])), '---'].join('\n') + '\n' : '';
+    return head + (head && body ? '\n' : '') + (body ? body + '\n' : '');
+  },
+
   // ---- Texte visible ⇄ Markdown ----
   esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
   attr(s) { return Blocks.esc(s).replace(/"/g, '&quot;'); },

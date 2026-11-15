@@ -107,6 +107,15 @@ const { meta, blocks } = Blocks.parse(markdown);              // meta.title, met
 const problems = Blocks.lint(markdown);                       // [{ line, message }]
 ```
 
+Modifier un contenu bloc par bloc (pour une IA, un serveur MCP…) sans identifiant dans le texte : un bloc est désigné par sa place et l'empreinte de son texte. Une écriture sur un bloc qui a changé depuis la lecture est refusée, jamais écrasée ; le reste du texte est gardé à l'identique.
+
+```js
+const { blocks } = Blocks.address(markdown);                  // [{ n, line, type, hash, text }], n depuis 1
+const r = Blocks.changeBlock(markdown, { n: 3, hash: blocks[2].hash, mode: 'replace', markdown: '## Garage' });
+// mode : replace | before | after | remove  →  { markdown } ou { error: { code: 'stale' | 'missing' | 'empty', message } }
+Blocks.combine(markdown, texteIA, 'append');                  // replace | prepend | append
+```
+
 Sur la page publique, `blockquilt-content.js` (facultatif, sans dépendance) donne aux carrousels leurs flèches et leurs puces ; sans lui, un carrousel défile au doigt. Pour du contenu ajouté après le chargement : `BlockquiltContent.enhance(élément)`.
 
 Le HTML produit est sémantique (`<h2 id>`, `<aside role="note">`, `<figure>`, `<blockquote>`, `<pre><code class="language-js">`…) et porte des classes `bq-*`, sans Tailwind. La feuille `blockquilt-content.css` (écrite à la main, couleurs en variables CSS `--bq-…`) suffit à l'afficher. Tout le texte est échappé ; le bloc HTML passe par `Blocks.sanitize` (liste blanche, voir `DECISIONS.md`).
