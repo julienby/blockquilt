@@ -618,6 +618,29 @@ try {
   })()`);
   ok(fold.view === 'collapsed' && fold.list && fold.count === '3 photos' && fold.body <= 48 && fold.pressed === 'true', `carrousel replié : une seule ligne, « 3 photos » (${JSON.stringify(fold)})`);
   ok(fold.kept && fold.back, 'carrousel replié : gardé d’un dessin à l’autre et après Ctrl+Z, se déplie au même bouton');
+  // F1 : un carrousel replié le reste quand on le déplace (flèche de la colonne, ou clavier sur la poignée)
+  const moved = await ev(`(async () => {
+    const car = () => document.querySelector('[data-car-count]')?.closest('[data-id]');
+    document.querySelector('[data-car-list]').closest('[data-id]').querySelector('[data-toggle-view="collapsed"]').click();
+    const out = {};
+    car().querySelector('[data-move="1"]:not(:disabled), [data-move="-1"]:not(:disabled)').click();
+    out.afterRail = car().dataset.view;
+    car().querySelector('[data-grip]').focus();
+    car().querySelector('[data-grip]').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    out.afterKey = car().dataset.view;
+    out.listHidden = car().querySelector('[data-car-list]').offsetParent === null;
+    car().querySelector('[data-toggle-view="collapsed"]').click();
+    return out;
+  })()`);
+  ok(moved.afterRail === 'collapsed' && moved.afterKey === 'collapsed' && moved.listHidden, `carrousel replié : reste replié après un déplacement (${JSON.stringify(moved)})`);
+  // F1 : le repli est gardé dans le navigateur (storageKey) et revient après rechargement
+  await ev(`document.querySelector('[data-car-list]').closest('[data-id]').querySelector('[data-toggle-view="collapsed"]').click()`);
+  await ev(`editor.save()`); // l'état suit les blocs : on enregistre pour que le texte relu ait le même ordre
+  await open();
+  const reloaded = await ev(`(() => { const c = document.querySelector('[data-car-count]')?.closest('[data-id]'); return { view: c?.dataset.view, stored: localStorage.getItem('blockquilt.views.demo') }; })()`);
+  ok(reloaded.view === 'collapsed', `repli mémorisé : le carrousel reste replié après rechargement (${JSON.stringify(reloaded)})`);
+  await ev(`document.querySelector('[data-car-count]').closest('[data-id]').querySelector('[data-toggle-view="collapsed"]').click()`);
+  ok(await ev(`!localStorage.getItem('blockquilt.views.demo').includes('collapsed') && !!document.querySelector('[data-car-list]').offsetParent`), 'repli mémorisé : déplié, le choix est gardé aussi');
   await ev(`document.querySelector('[data-car-item="2"] [data-car-act="remove"]').click()`);
   ok(await ev(`document.querySelectorAll('[data-car-item]').length === 2`), 'carrousel : photo retirée');
   await ev(`editor.undo()`);

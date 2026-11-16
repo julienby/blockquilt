@@ -54,6 +54,66 @@ Chaque tâche : test, `check` vert, commit, ligne dans `DECISIONS.md`.
 
 Ordre : E4, E1, E2, E3, E5, E6. L'IA (§5) est mise de côté pour ce round.
 
+## 4b. Evol 4 — tâches (validées avec Julien le 2026-11-16)
+
+Chaque tâche : test, `check` vert, commit, ligne dans `DECISIONS.md`. Source : `AMELIORATIONS.md` > Evol 4.
+
+Principe : le **document est l'unité d'enregistrement**. L'état d'affichage (replié, vue) n'entre jamais dans le Markdown : il vit dans `localStorage`.
+
+- [x] **F1 État d'affichage mémorisé.** `ed.views` est relu et écrit dans `localStorage` (clé `bq:views:<contenu>`, valeur par place + type du bloc). Clé du contenu : option `storageKey`, sinon `contentUrl`. Sans clé : état gardé en session seulement. Le déplacement d'un bloc (monter, descendre, glisser) garde son état. Test : replier un carrousel, le déplacer, enregistrer, recharger → toujours replié.
+- [ ] **F2 Repli automatique des longs blocs.** Option `collapseLines` (défaut 5, `0` = désactivé). Un bloc texte, citation, liste, code ou texte source de plus de N lignes de Markdown est replié au premier affichage : N lignes visibles, fondu, « … +X lignes » et bouton « Déplier ». Un clic sur la zone repliée déplie. Le choix de l'utilisateur (replier / déplier) prime sur le défaut et est gardé par F1. Le carrousel utilise le même mécanisme. Le plein écran d'un bloc l'affiche toujours en entier. Test : bloc de 12 lignes replié à 375 px ; déplié ; reste déplié après rechargement ; `collapseLines: 0` ne replie rien.
+- [ ] **F3 Plein écran d'un bloc : enregistrer et passer au suivant.** Dans l'en-tête du plein écran : « Enregistrer » (enregistre le document ; Ctrl+S reste dans le plein écran), flèches « bloc précédent / suivant » (le plein écran passe au bloc voisin, sans retour à la page). Test : modifier le bloc 2, enregistrer, passer au bloc 3, le contenu enregistré contient la modification.
+- [ ] **F4 Vue source : choix de la visualisation.** Trois états : « Source », « Source + visuel », « Visuel ». Choix gardé dans `localStorage`. Défaut : « Source + visuel » à partir de 1024 px, « Source » en dessous. Test à 375 px et 1280 px.
+- [ ] **F5 Limites du relais IA.** Réglage `limits: { maxChars, perUserDay, globalDay }` (en jetons pour les deux derniers, comptés d'après `usage` de la réponse du modèle). Taille du texte envoyé au-delà de `maxChars` → 413. Quota du jour par jeton d'application dépassé → 429. Plafond global du jour dépassé → 429. Compteurs en mémoire, remis à zéro à minuit. Messages clairs dans l'éditeur. Valeurs de la démo publique basses. Garder aussi une limite de crédit sur la clé OpenRouter.
+
+Ordre : F1, F2, F3, F4, F5. L'IA par opérations (§4c) vient après, avec son propre plan.
+
+## 4c. IA du document par opérations — à valider
+
+Problème : l'IA du document recopie tout le texte, donc « avant / après » n'a pas de sens. Objectif : des modifications **ciblées sur plusieurs blocs**, que Julien accepte **une à une**. Prévisible, simple, précis. Plan à faire relire avant tout code ; implémentation avec le modèle fort.
+
+**Principes**
+- L'IA reçoit le document en **blocs numérotés** (1, 2, 3…), comme le serveur MCP. Elle renvoie des **opérations**, jamais le document.
+- L'IA ne donne **que des numéros**. L'éditeur ajoute l'empreinte du bloc qu'il a envoyé. Une IA ne sait pas recopier une empreinte ; l'éditeur, si.
+- Tous les numéros se rapportent au document **envoyé** (pas au document en cours de modification). Les opérations s'appliquent du bas vers le haut : la numérotation ne bouge pas.
+- Document changé entre l'envoi et l'application → tout est refusé (même règle que `If-Match`).
+- Réponse mal formée → rien n'est appliqué ; message « La réponse de l'IA n'est pas utilisable » et le texte brut reste copiable. Pas de réparation automatique.
+
+**Format de réponse** (texte, pas de JSON : le Markdown n'a pas à être échappé)
+
+```
+@@ remplacer 3
+Texte Markdown du nouveau bloc 3.
+
+@@ après 5
+## Nouveau titre
+
+Un paragraphe ajouté.
+
+@@ avant 1
+...
+
+@@ supprimer 4
+```
+
+- Quatre verbes : `remplacer n`, `avant n`, `après n`, `supprimer n`. Le corps (plusieurs blocs permis) va jusqu'au prochain `@@` ; `supprimer` n'a pas de corps.
+- Un seul `remplacer` ou `supprimer` par numéro ; plusieurs `avant` / `après` permis.
+- Tout corps passe `Blocks.lint` avant d'être proposé.
+
+**Interface**
+- Feuille « Propositions de l'IA » : une ligne par opération (« Remplacer le bloc 3 », « Ajouter après le bloc 5 »), case à cocher, avant → après. Tout est coché au départ.
+- « Appliquer les N choisies » : une seule étape annulable (Ctrl+Z).
+- « Copier la réponse » reste disponible.
+- Le mode actuel (réponse = document entier : remplacer / début / fin) reste pour un usage « réécrire tout », déclaré par l'usage.
+
+**Étapes**
+- [ ] **A1 Noyau** (fonctions pures, tests Node) : `Blocks.parseOps(texte)` (format, verbes, numéros, doublons) ; `Blocks.applyOps(md, ops, choisies)` (refus si document changé, ordre bas → haut, lint). Tests : valides, mal formés, numéro inconnu, doublon, document périmé, sélection partielle.
+- [ ] **A2 Relais** : un usage déclare `output: 'operations'` ; la consigne système contient le format ci-dessus et le document numéroté. Le contrat HTTP du relais est mis à jour. Démo : réponse fixe avec 3 opérations.
+- [ ] **A3 Éditeur** : feuille de choix une à une, application en une étape annulable. Test `dev/check.mjs` à 375 px et 1280 px.
+- [ ] **A4 Essai réel** avec un vrai modèle (OpenRouter). Noter les écarts de format dans `DECISIONS.md` ; durcir la consigne, pas le parseur.
+
+Question ouverte : l'usage document par défaut devient-il « opérations », avec « réécrire tout » en usage à part ?
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

@@ -35,8 +35,10 @@ export function installDocument(ed) {
     ed.icon = meta.icon || '';
     titleEl.textContent = meta.title || '';
     ed.showIcon();
+    const previous = ed.blocks.map((b) => ({ type: b.type, view: ed.views.get(b.id) }));
     ed.blocks = blocks.map((b) => ({ id: ed.newId(), ...b }));
     if (!ed.blocks.length) ed.blocks = [{ id: ed.newId(), ...Blocks.blank('text') }];
+    ed.carryViews(previous);
   };
 
   // ---- Écran → modèle (avant tout nouveau dessin) ----

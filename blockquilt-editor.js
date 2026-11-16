@@ -12,6 +12,7 @@ import { editable } from './editor/types.js';
 import { template } from './editor/template.js';
 import { installDocument } from './editor/document.js';
 import { installSheets } from './editor/sheets.js';
+import { installViews } from './editor/views.js';
 import { installRender } from './editor/render.js';
 import { installHistory } from './editor/history.js';
 import { installActions } from './editor/actions.js';
@@ -67,7 +68,7 @@ export function mount(element, options = {}) {
   ed.newId = () => 'b' + ed.nextId++;
   ed.def = (b) => Blocks.def(b.type);
 
-  for (const install of [installDocument, installSheets, installRender, installHistory, installActions, installMedia,
+  for (const install of [installViews, installDocument, installSheets, installRender, installHistory, installActions, installMedia,
     installSource, installFullscreen, installDrag, installEmoji, installAi, installRemote, installBar, installEvents]) install(ed);
 
   ed.load(o.source);

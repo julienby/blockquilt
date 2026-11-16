@@ -19,6 +19,7 @@ export function installEvents(ed) {
       const alt = hit('[data-toggle-view]').dataset.toggleView || 'preview';
       const view = cardEl.dataset.view === alt ? 'edit' : alt;
       ed.views.set(id, view);
+      ed.persistViews();
       cardEl.dataset.view = view;
       hit('[data-toggle-view]').setAttribute('aria-pressed', String(view === alt));
       ed.def(ed.blocks.find((b) => b.id === id)).onInput?.(cardEl, ed.ui);

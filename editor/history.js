@@ -33,10 +33,7 @@ export function installHistory(ed) {
     updateButtons();
   };
   const restore = (state) => {
-    // Les blocs relus reçoivent de nouveaux identifiants : l'affichage choisi (replié, aperçu…) suit la place et le type.
-    const views = ed.blocks.map((b) => [b.type, ed.views.get(b.id)]);
-    ed.setDoc(Blocks.parse(state.md));
-    ed.blocks.forEach((b, i) => { if (views[i]?.[0] === b.type && views[i][1]) ed.views.set(b.id, views[i][1]); });
+    ed.setDoc(Blocks.parse(state.md)); // l'affichage choisi (replié, aperçu…) suit la place et le type
     ed.activeId = ed.blocks[Math.min(state.active, ed.blocks.length - 1)].id;
     ed.setDirty(true);
     ed.render();

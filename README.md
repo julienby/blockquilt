@@ -46,6 +46,7 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 | `source` | Texte du document au format blockquilt. |
 | `onSave(markdown)` ou `saveUrl` | Enregistrer : fonction (peut renvoyer une promesse, une erreur levée est affichée) ou adresse. |
 | `contentUrl`, `version` | À la place de `saveUrl` : l'adresse du contenu dans le contrat de l'application (« Contenus d'une application ») et sa version (`ETag`). L'éditeur enregistre par `PUT` + `If-Match` ; si le contenu a changé ailleurs (une IA, un autre onglet), rien n'est écrasé : une feuille montre qui, quand et les lignes qui changent, puis « Prendre l'autre version » (annulable), « Garder la mienne » ou « Plus tard ». Sans `version`, il la lit ; sans `source`, il lit aussi le texte. |
+| `storageKey` | Nom du contenu pour garder, dans le navigateur (`localStorage`), l'affichage choisi par bloc (carrousel replié, aperçu du HTML). Par défaut `contentUrl`. Sans l'un ni l'autre, l'affichage est gardé le temps de la session seulement. Jamais écrit dans le Markdown. L'état suit la place et le type du bloc : il est réécrit à chaque dessin. |
 | `pollSeconds` | Avec `contentUrl` : revérifier toutes les N secondes (30 par défaut, `0` jamais) et au retour sur la page ; un changement d'ailleurs affiche un bandeau « Modifié par … il y a … », sans rien changer à l'écran. `checkRemote()` revérifie à la demande (par exemple sur un événement htmx). |
 | `uploadUrl` | Envoi des photos. Sans elle, pas de photo. |
 | `media` | Adresse des photos : `media/<id>` du texte devient `media + id` à l'écran (`media/` par défaut). |
@@ -201,7 +202,7 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 |---|---|---|
 | `blockquilt.js` | Noyau `Blocks` : format, registre des types, rendu HTML, `lint`, `sanitize`. Sans DOM. | 40 ko (13 ko) |
 | `blockquilt-editor.js` | Écran, module ES : `mount` ; assemble les modules de `editor/`. | 103 ko au total avec `editor/` (30 ko) |
-| `editor/` | Un module par sujet, de 7 à 175 lignes : `document` (état, texte, enregistrement), `render` (cartes), `actions` (structure, menus, copier / coller), `history` (annuler / rétablir), `bar` (mise en forme, listes), `source` (vues), `fullscreen`, `drag`, `media` (photos, carrousel), `emoji`, `ai`, `sheets` (feuilles), `remote` (versions et conflits), `events` (clics, clavier), `template` (HTML), `types` (cartes d'édition des types), `icons`, `shared`. | |
+| `editor/` | Un module par sujet, de 7 à 175 lignes : `document` (état, texte, enregistrement), `render` (cartes), `actions` (structure, menus, copier / coller), `history` (annuler / rétablir), `views` (affichage gardé par bloc), `bar` (mise en forme, listes), `source` (vues), `fullscreen`, `drag`, `media` (photos, carrousel), `emoji`, `ai`, `sheets` (feuilles), `remote` (versions et conflits), `events` (clics, clavier), `template` (HTML), `types` (cartes d'édition des types), `icons`, `shared`. | |
 | `blockquilt.css` | CSS de l'éditeur, généré par Tailwind 3.4.17 (`./build-css`). Ne pas modifier à la main. | 30 ko (7 ko) |
 | `blockquilt-content.css` | CSS du rendu publié, écrit à la main. | 7 ko (2 ko) |
 | `blockquilt-content.js` | Facultatif, pour la page publique : flèches et puces des carrousels. | 2 ko (1 ko) |

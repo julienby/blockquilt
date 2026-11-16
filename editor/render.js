@@ -7,8 +7,6 @@ export function installRender(ed) {
 
   // Bloc HTML désactivé (option `html` absente) : édité comme texte source, sans aperçu.
   ed.editorOf = (b) => (ed.def(b).edit && (b.type !== 'html' || o.html) ? ed.def(b) : Blocks.fallbackEditor);
-  // Affichage choisi par bloc (ex. code ou aperçu du bloc HTML) : 'edit' | 'preview'.
-  ed.views = new Map();
 
   const pill = 'bq-pill inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-[11px] font-bold shadow-sm';
   const gap = (index) => {
@@ -67,7 +65,10 @@ export function installRender(ed) {
       if (ed.mode === 'preview') canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
     }
   };
-  ed.render = () => (ed.mode === 'preview' ? renderPreview() : ed.mode === 'source' ? ed.renderSource() : renderEdit());
+  ed.render = () => {
+    ed.persistViews();
+    return ed.mode === 'preview' ? renderPreview() : ed.mode === 'source' ? ed.renderSource() : renderEdit();
+  };
 
   ed.focusCard = (id) => {
     const el = canvas.querySelector(`[data-id="${id}"]`);

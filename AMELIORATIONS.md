@@ -62,3 +62,14 @@ La philosophie : 1 action = 1 possilibité ou 1 seul façon de faire (donc on ne
 Autres reflexions : je ne sais pas si le carousel en mode slider est très ergonomique pour ajouter / retirer des images (limité par l'espace) ... peut être une autre approche standard est possible ?
 Le bloc code en mode visualisation ne revoi pas le code  à la ligne ... je ne sais pas si c'est classique ou pas. bref pas très lilisble une box avec un slider ...
 
+# Evol 4
+- sur un carousel quand je clique sur déplacer le bloc se déplie automtiquement ... il faudrait qu'il reste compact
+- sur l'IA au niveau document, si je dis ajoute un bloc xyz au document ... insérer avant / après n'a pas de sens. il recopie tout le document (tous les blocs)
+L'idée de cette IA document est de pouvoir faire des modifications sur plusieurs blocs en même temps ou d'en créer ou d'en modifier plusieurs ... par contre il faut intervenir sur le document de manière plus chirurgicale et pas juste du copie tout ou remplace tout.
+- oui il faut mettre un controle de token au niveau du proxy propose une solution simple et comprehensible (cette politique pourra évoluer)
+- la vue source en markdown ok mais je veux avoir le choix de ma visualisation (side md et visuel ou que md)
+- l'éditeur est sans état ? quand j'enregistre un collapse d'un carousel il se remet ouvert à chaque fois ... une solution simple ?
+- est il possible de collapse un bloc ... de texte long par exemple. ça permet de maitriser la taille des blocs et de garder une page lisible
+- quand j'ouvre un bloc full screen je veux pouvoir enregistrer ce bloc avant de partir du bloc. J'ai l'impression que c'est dans le flow normal 
+
+Dis moi si des choses te paraissent "trop" pour un éditeur
