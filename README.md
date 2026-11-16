@@ -37,20 +37,21 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 
 `mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), checkRemote(), version, destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
 
-Trois vues dans l'en-tête : **édition** par blocs, **texte source** (le Markdown complet, contrôlé par `Blocks.lint` et rendu en direct à côté ; en revenant aux blocs, le texte est relu, en une étape annulable) et **aperçu**.
+Trois vues dans l'en-tête : **édition** par blocs, **texte source** (le Markdown complet, contrôlé par `Blocks.lint`) et **aperçu**. Le bouton **Visuel à côté** (icône deux colonnes) affiche un visuel à droite du texte, en blocs comme en source ; il est grisé en aperçu. Par défaut, deux panneaux dès 1024 px, un en dessous ; le choix est gardé dans le navigateur. Le visuel est toujours rendu par l'éditeur (`Blocks.toHtml`), même avec `previewUrl`, et ne suit pas le défilement. En revenant aux blocs depuis la source, le texte est relu, en une étape annulable.
 
-Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte, sans l'habillage de la carte). C'est un `<dialog>` qui couvre toute la fenêtre, sans le plein écran du navigateur (pas de message « Pour quitter le plein écran… »). Échap ou l'icône « réduire » le quittent.
+Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte, sans l'habillage de la carte). C'est un `<dialog>` qui couvre toute la fenêtre, sans le plein écran du navigateur (pas de message « Pour quitter le plein écran… »). Échap ou l'icône « réduire » le quittent. Un bloc seul a en en-tête « Enregistrer » (comme Ctrl+S) et les flèches « Bloc précédent » / « Bloc suivant », qui passent au bloc voisin sans fermer. Il montre toujours le bloc en entier, même replié. Il n'a pas de visuel à côté.
 
 | Option | Rôle |
 |---|---|
 | `source` | Texte du document au format blockquilt. |
 | `onSave(markdown)` ou `saveUrl` | Enregistrer : fonction (peut renvoyer une promesse, une erreur levée est affichée) ou adresse. |
 | `contentUrl`, `version` | À la place de `saveUrl` : l'adresse du contenu dans le contrat de l'application (« Contenus d'une application ») et sa version (`ETag`). L'éditeur enregistre par `PUT` + `If-Match` ; si le contenu a changé ailleurs (une IA, un autre onglet), rien n'est écrasé : une feuille montre qui, quand et les lignes qui changent, puis « Prendre l'autre version » (annulable), « Garder la mienne » ou « Plus tard ». Sans `version`, il la lit ; sans `source`, il lit aussi le texte. |
-| `storageKey` | Nom du contenu pour garder, dans le navigateur (`localStorage`), l'affichage choisi par bloc (carrousel replié, aperçu du HTML). Par défaut `contentUrl`. Sans l'un ni l'autre, l'affichage est gardé le temps de la session seulement. Jamais écrit dans le Markdown. L'état suit la place et le type du bloc : il est réécrit à chaque dessin. |
+| `storageKey` | Nom du contenu pour garder, dans le navigateur (`localStorage`), l'affichage choisi par bloc (texte ou carrousel replié, aperçu du HTML). Par défaut `contentUrl`. Sans l'un ni l'autre, l'affichage est gardé le temps de la session seulement. Jamais écrit dans le Markdown. L'état suit la place et le type du bloc : il est réécrit à chaque dessin. |
+| `collapseLines` | Replie au premier affichage un bloc texte, liste, citation, code, texte source ou carrousel de plus de N lignes de Markdown : N lignes visibles, un fondu, « … +X lignes » et « Déplier ». Défaut `5` ; `0` ne replie rien. Les encadrés ne sont pas concernés. Le choix de l'utilisateur prime et est gardé (`storageKey`). Un carrousel replié montre sa ligne de vignettes, avec son propre bouton. |
 | `pollSeconds` | Avec `contentUrl` : revérifier toutes les N secondes (30 par défaut, `0` jamais) et au retour sur la page ; un changement d'ailleurs affiche un bandeau « Modifié par … il y a … », sans rien changer à l'écran. `checkRemote()` revérifie à la demande (par exemple sur un événement htmx). |
 | `uploadUrl` | Envoi des photos. Sans elle, pas de photo. |
 | `media` | Adresse des photos : `media/<id>` du texte devient `media + id` à l'écran (`media/` par défaut). |
-| `previewUrl` | Aperçu rendu par le serveur. Sans elle, l'éditeur rend lui-même avec `Blocks.toHtml`. |
+| `previewUrl` | Aperçu rendu par le serveur. Sans elle, l'éditeur rend lui-même avec `Blocks.toHtml`. Le visuel à côté reste rendu par l'éditeur. |
 | `aiUrl` | Assistant IA. Sans elle, aucun bouton IA. |
 | `title` | `true` pour montrer le titre et l'icône du document dans l'en-tête (frontmatter `title` / `icon`). Absent par défaut : l'éditeur peut ne remplir qu'une partie d'une page ; le frontmatter est alors gardé tel quel. Pour un titre dans le contenu : un bloc H1. |
 | `backUrl` | Bouton retour (avec confirmation si des modifications ne sont pas enregistrées). |
@@ -92,6 +93,16 @@ Tous en `POST multipart/form-data`, avec les champs de `fields`. Les fins de lig
 | IA (`aiUrl`) | `GET` → `{ uses: [{ id, label, scopes }] }`, les boutons de la feuille IA (facultatif : sans réponse, des boutons intégrés). `POST` : `scope` (`document` ou `block`), `use` (l'usage choisi, facultatif), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`) | JSON `{ "markdown": "…" }`. L'éditeur passe la réponse par `Blocks.lint` et la montre à côté de l'actuel ; puis, au choix et annulable : document — remplacer, ajouter au début, à la fin ; bloc — remplacer, insérer au-dessus, dessous ; ou « Copier seulement » (rien ne change). |
 
 L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le service désigné par `aiUrl` qui le fait. Un relais prêt à monter est fourni (« Relais IA » plus bas) ; la démo l'utilise, avec une transformation fixe (texte en majuscules) tant qu'aucune clé `AI_KEY` n'est donnée.
+
+### Préférences dans le navigateur
+
+L'éditeur garde dans `localStorage` seulement des préférences d'affichage. Sans stockage (navigation privée, données bloquées), le choix vaut pour la session :
+
+- `blockquilt.views.<storageKey ou contentUrl>` : affichage par bloc (replié, aperçu). Absente sans `storageKey` ni `contentUrl`. Jamais dans le Markdown.
+- `blockquilt.split` : visuel à côté (`true` ou `false`). Sans choix gardé, deux panneaux dès 1024 px.
+- `blockquilt.emoji` : emoji récents.
+
+L'ancienne clé `blockquilt.sourceLayout` (vue source, avant « Visuel à côté ») n'est plus lue.
 
 ### Au clavier
 
