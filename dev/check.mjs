@@ -679,6 +679,39 @@ try {
     d.close(); e.destroy(); el.remove(); localStorage.removeItem('blockquilt.views.f2'); return r;
   })()`);
   ok(f2full.view === 'edit' && f2full.h > f2.h, `repli auto : le plein écran montre le bloc en entier (${JSON.stringify(f2full)})`);
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    const f3 = await ev(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const el = document.createElement('div'); document.body.append(el);
+      const saved = [];
+      const e = Blockquilt.mount(el, { source: 'Un\\n\\nDeux\\n\\nTrois', onSave: (md) => { saved.push(md); } });
+      const d = el.querySelector('[data-block-full]');
+      const btn = (n) => d.querySelector('[data-full-' + n + ']');
+      const label = () => d.querySelector('[data-block-full-body] [data-rich]').textContent;
+      const typeAtEnd = (t) => { const f = d.querySelector('[data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, t); };
+      el.querySelectorAll('[data-expand]')[1].click();
+      const r = { first: label(), labels: ['save', 'prev', 'next'].map((n) => btn(n).getAttribute('aria-label')) };
+      typeAtEnd(' modifié');
+      btn('save').click(); await wait(50);
+      r.saved = saved.length === 1 && saved[0].includes('Deux modifié');
+      btn('next').click(); await wait(50);
+      r.third = label(); r.open = d.open; r.nextOff = btn('next').disabled;
+      typeAtEnd(' fin');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })); await wait(50);
+      r.ctrlS = saved.length === 2 && saved[1].includes('Deux modifié') && saved[1].includes('Trois fin');
+      btn('prev').click(); await wait(50); btn('prev').click(); await wait(50);
+      r.firstAgain = label(); r.prevOff = btn('prev').disabled;
+      d.close(); await wait(50);
+      r.md = e.getMarkdown(); r.cards = el.querySelectorAll('[data-id]').length;
+      e.destroy(); el.remove(); return r;
+    })()`);
+    ok(f3.first === 'Deux' && f3.labels.every(Boolean), `${width} px : plein écran, Enregistrer et flèches avec aria-label (${JSON.stringify(f3.labels)})`);
+    ok(f3.saved && f3.third === 'Trois' && f3.open, `${width} px : bloc 2 modifié, Enregistrer, puis « suivant » : le contenu enregistré contient la modification, le plein écran reste ouvert`);
+    ok(f3.ctrlS && f3.nextOff, `${width} px : Ctrl+S enregistre dans le plein écran ; flèche « suivant » désactivée au dernier bloc`);
+    ok(f3.firstAgain === 'Un' && f3.prevOff && f3.md === 'Un\n\nDeux modifié\n\nTrois fin\n' && f3.cards === 3, `${width} px : « précédent » jusqu’au premier bloc (flèche désactivée), texte gardé (${JSON.stringify(f3.md)})`);
+  }
+  await viewport(375);
   await ev(`document.querySelector('[data-car-item="2"] [data-car-act="remove"]').click()`);
   ok(await ev(`document.querySelectorAll('[data-car-item]').length === 2`), 'carrousel : photo retirée');
   await ev(`editor.undo()`);

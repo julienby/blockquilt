@@ -91,6 +91,9 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
   <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full"><div data-full-inner class="bq-full-inner">
     <div class="bq-head sticky z-10 flex min-h-14 items-center gap-1 border-b px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-500"></span>
+      <button type="button" data-full-prev aria-label="Bloc précédent" title="Bloc précédent" class="bq-btn bq-muted">${ic('chevron_up')}</button>
+      <button type="button" data-full-next aria-label="Bloc suivant" title="Bloc suivant" class="bq-btn bq-muted">${ic('chevron_down')}</button>
+      <button type="button" data-full-save aria-label="Enregistrer" title="Enregistrer (Ctrl+S)" class="bq-btn bq-muted">${ic('save')}</button>
       <button type="button" data-width aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn bq-muted hidden sm:inline-flex">${ic('width')}</button>
       <button type="button" data-block-full-close aria-label="Quitter le plein écran" title="Quitter le plein écran" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
         <span class="flex size-8 items-center justify-center rounded-full border border-black/10 bg-white text-stone-700 group-hover:bg-stone-100">${ic('minimize', 'size-4')}</span></button></div>

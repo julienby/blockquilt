@@ -40,6 +40,9 @@ export function installEvents(ed) {
     if (hit('[data-width]')) return ed.cycleWidth();
     if (hit('[data-ai]')) return ed.openAi(null);
     if (hit('[data-more]')) return ed.openSheet('more', hit('[data-more]'));
+    if (hit('[data-full-save]')) return ed.save();
+    if (hit('[data-full-prev]')) return ed.stepBlockFull(-1);
+    if (hit('[data-full-next]')) return ed.stepBlockFull(1);
     if (hit('[data-block-full-close]')) return blockFull.close();
     if (hit('[data-preview]')) return ed.setMode('preview');
     if (hit('[data-source-mode]')) return ed.setMode('source');

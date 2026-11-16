@@ -48,10 +48,19 @@ export function installFullscreen(ed) {
   ed.on(editorFull, 'cancel', (e) => { if (ed.dragging() || ed.photoDragging()) e.preventDefault(); });
 
   // ---- Bloc seul : redessiné dans le dialogue ; sa carte, restée dans la page, perd data-id le temps de l'édition ----
+  const canFull = (b) => ed.def(b).fullscreen !== false;
+  const neighbour = (id, step) => {
+    for (let i = ed.blocks.findIndex((b) => b.id === id) + step; ed.blocks[i]; i += step) if (canFull(ed.blocks[i])) return ed.blocks[i];
+  };
+  ed.stepBlockFull = (step) => {
+    const next = neighbour(blockFull.querySelector('[data-id]').dataset.id, step);
+    if (next) ed.openBlockFull(next.id);
+  };
   ed.openBlockFull = (id) => {
+    if (blockFull.open) ed.checkpoint(); // lit le bloc quitté dans le dialogue
     ed.syncFromDom();
     const b = ed.blocks.find((x) => x.id === id);
-    const cardEl = ed.canvas.querySelector(`[data-id="${id}"]`);
+    const cardEl = ed.canvas.querySelector(`[data-id="${id}"], [data-away="${id}"]`);
     if (!b || !cardEl) return;
     cardEl.removeAttribute('data-id');
     cardEl.dataset.away = id;
@@ -61,7 +70,9 @@ export function installFullscreen(ed) {
     $('[data-block-full-body]', blockFull).innerHTML = `<div data-id="${id}" data-view="${view}" class="bq-focus">${tools}${ed.editorOf(b).edit(b, ed.ui)}</div>`;
     blockFull.style.setProperty('--bq-width', app.style.getPropertyValue('--bq-width') || '');
     inner(blockFull).append(ed.bar, ed.toastEl.parentElement); // la barre et les messages doivent être dans la couche du dialogue
-    enter(blockFull);
+    if (!blockFull.open) enter(blockFull);
+    $('[data-full-prev]', blockFull).disabled = !neighbour(id, -1);
+    $('[data-full-next]', blockFull).disabled = !neighbour(id, 1);
     blockFull.querySelector('[contenteditable], textarea, input')?.focus();
   };
   ed.on(blockFull, 'close', () => {
