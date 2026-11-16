@@ -639,6 +639,14 @@ try {
   await open();
   const reloaded = await ev(`(() => { const c = document.querySelector('[data-car-count]')?.closest('[data-id]'); return { view: c?.dataset.view, stored: localStorage.getItem('blockquilt.views.demo') }; })()`);
   ok(reloaded.view === 'collapsed', `repli mémorisé : le carrousel reste replié après rechargement (${JSON.stringify(reloaded)})`);
+  // La copie qui suit le doigt, pendant le glissement par la poignée, reste repliée comme la carte
+  const cg = await ev(`(() => { const g = document.querySelector('[data-car-count]').closest('[data-id]').querySelector('[data-grip]'); g.scrollIntoView({ block: 'center' }); const r = g.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  await mouse('mousePressed', cg.x, cg.y);
+  await mouse('mouseMoved', cg.x, cg.y + 5);
+  const ghost = await ev(`(() => { const g = document.querySelector('.bq-ghost'); return { list: g.querySelector('[data-car-list]').offsetParent === null, count: g.querySelector('[data-car-count]').offsetParent !== null, h: Math.round(g.getBoundingClientRect().height), card: Math.round(document.querySelector('.bq-origin').getBoundingClientRect().height) }; })()`);
+  await key('Escape', 'Escape', 27);
+  await mouse('mouseReleased', cg.x, cg.y + 5, 0);
+  ok(ghost.list && ghost.count && ghost.h <= ghost.card + 2, `glissement : la copie d'un carrousel replié reste repliée (${JSON.stringify(ghost)})`);
   await ev(`document.querySelector('[data-car-count]').closest('[data-id]').querySelector('[data-toggle-view="collapsed"]').click()`);
   ok(await ev(`!localStorage.getItem('blockquilt.views.demo').includes('collapsed') && !!document.querySelector('[data-car-list]').offsetParent`), 'repli mémorisé : déplié, le choix est gardé aussi');
   await ev(`document.querySelector('[data-car-item="2"] [data-car-act="remove"]').click()`);

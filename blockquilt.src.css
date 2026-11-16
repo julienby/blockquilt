@@ -86,9 +86,9 @@ dialog.bq-full .bq-app { min-height: 100%; }
 /* Largeur du texte : réglable (option `width` ou --bq-width) ; l'éditeur prend la largeur de l'élément qui le contient. */
 .bq-column { width: 100%; max-width: var(--bq-width, 48rem); margin-inline: auto; }
 
-/* Carte à deux affichages (bloc HTML) : le code, ou l'aperçu. */
-[data-id]:not([data-view="preview"]) .bq-view-preview, [data-id][data-view="preview"] .bq-view-code { display: none; }
-[data-id]:not([data-view="collapsed"]) .bq-view-collapsed, [data-id][data-view="collapsed"] .bq-view-expanded { display: none !important; }
+/* Carte à deux affichages (bloc HTML) : le code, ou l'aperçu. `data-view` et non `data-id` : la copie qui suit le doigt n'a plus d'identifiant. */
+[data-view]:not([data-view="preview"]) .bq-view-preview, [data-view][data-view="preview"] .bq-view-code { display: none; }
+[data-view]:not([data-view="collapsed"]) .bq-view-collapsed, [data-view][data-view="collapsed"] .bq-view-expanded { display: none !important; }
 
 /* Vue source : texte et aperçu côte à côte (grand écran), l'un ou l'autre au téléphone ; en plein écran, la zone de texte prend toute la hauteur. */
 .bq-source { max-width: calc(var(--bq-width, 48rem) * 2); }
