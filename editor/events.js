@@ -46,7 +46,7 @@ export function installEvents(ed) {
     if (hit('[data-block-full-close]')) return blockFull.close();
     if (hit('[data-preview]')) return ed.setMode('preview');
     if (hit('[data-source-mode]')) return ed.setMode('source');
-    if (hit('[data-source-tab]')) return ed.showSourcePane(hit('[data-source-tab]').dataset.sourceTab);
+    if (hit('[data-source-layout]')) return ed.showSourceLayout(hit('[data-source-layout]').dataset.sourceLayout, true);
     if (hit('[data-source-line]')) return ed.goToLine(Number(hit('[data-source-line]').dataset.sourceLine));
     if (hit('[data-doc-icon]')) return ed.editing() ? ed.openIcon(null) : null;
     if (hit('[data-back]') && ed.dirty) { e.preventDefault(); return ed.openSheet('leave'); }

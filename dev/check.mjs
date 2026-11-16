@@ -916,11 +916,11 @@ try {
     await ev(`document.querySelector('[data-source-mode]').click()`);
     const src = await ev(`(() => { const t = document.querySelector('[data-source-text]'); const pv = document.querySelector('[data-source-preview]'); return { same: t.value === editor.getMarkdown(), focus: document.activeElement === t, cards: document.querySelectorAll('[data-canvas] [data-id]').length, side: pv.offsetParent !== null, preview: !!pv.querySelector('article.bq-content'), ok: document.querySelector('[data-source-lint]').textContent.includes('Aucune alerte') }; })()`);
     ok(src.same && src.focus && src.cards === 0 && src.preview && src.ok, `${width} px : vue source, le texte Markdown complet, sans alerte`);
-    ok(src.side === (width >= 768), `${width} px : aperçu ${width >= 768 ? 'à côté du texte' : 'derrière la bascule « Aperçu »'}`);
-    if (width < 768) {
-      await ev(`document.querySelector('[data-source-tab="preview"]').click()`);
-      ok(await ev(`document.querySelector('[data-source-preview]').offsetParent !== null && document.querySelector('[data-source-text]').offsetParent === null`), '375 px : la bascule montre l’aperçu');
-      await ev(`document.querySelector('[data-source-tab="text"]').click()`);
+    ok(src.side === (width >= 1024), `${width} px : aperçu ${width >= 1024 ? 'à côté du texte' : 'derrière le choix « Visuel »'}`);
+    if (width < 1024) {
+      await ev(`document.querySelector('[data-source-layout="visual"]').click()`);
+      ok(await ev(`document.querySelector('[data-source-preview]').offsetParent !== null && document.querySelector('[data-source-text]').offsetParent === null`), '375 px : le choix « Visuel » montre l’aperçu');
+      await ev(`document.querySelector('[data-source-layout="text"]').click()`);
     }
     await ev(`(() => { const t = document.querySelector('[data-source-text]'); t.value = t.value + '\\n> [!astuce]\\n> Encadré inconnu\\n\\n## Ajouté à la main\\n'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
     await waitFor(() => ev(`document.querySelector('[data-source-lint]').textContent.includes('encadré inconnu')`), 'alerte lint en direct');
@@ -933,6 +933,29 @@ try {
     await key('z', 'KeyZ', 90, CTRL);
     ok((await mdNow()) === before, `${width} px : Ctrl+Z annule toute la modification faite en vue source, en une fois`);
   }
+  // F4 : choix de la visualisation de la vue source, défaut selon la largeur, gardé après rechargement
+  const layoutState = () => ev(`(() => { const vis = (s) => document.querySelector(s).offsetParent !== null; return { text: vis('[data-source-text]'), preview: vis('[data-source-preview]'), pressed: document.querySelector('[data-source-layout][aria-pressed="true"]')?.textContent, overflow: document.documentElement.scrollWidth > innerWidth, group: document.querySelector('[data-source-layout]').parentElement.scrollWidth <= document.querySelector('[data-source-layout]').parentElement.clientWidth }; })()`);
+  for (const [width, def] of [[1280, 'Source + visuel'], [375, 'Source']]) {
+    await viewport(width);
+    await ev(`localStorage.removeItem('blockquilt.sourceLayout')`);
+    await open();
+    await ev(`document.querySelector('[data-source-mode]').click()`);
+    const d = await layoutState();
+    ok(d.pressed === def && d.text && d.preview === (width >= 1024), `${width} px : vue source, défaut « ${def} » (${JSON.stringify(d)})`);
+    ok(!d.overflow && d.group, `${width} px : le sélecteur tient dans la largeur, sans débordement horizontal`);
+    await ev(`document.querySelector('[data-source-layout="visual"]').click()`);
+    const v = await layoutState();
+    ok(v.pressed === 'Visuel' && !v.text && v.preview && !v.overflow, `${width} px : « Visuel » masque le texte`);
+    await open();
+    await ev(`document.querySelector('[data-source-mode]').click()`);
+    const r = await layoutState();
+    ok(r.pressed === 'Visuel' && !r.text && r.preview, `${width} px : le choix « Visuel » est gardé après rechargement`);
+    await ev(`document.querySelector('[data-source-layout="both"]').click()`);
+    const b = await layoutState();
+    ok(b.text && b.preview && !b.overflow, `${width} px : « Source + visuel » montre texte et aperçu (${width >= 1024 ? 'côte à côte' : 'empilés'})`);
+    await ev(`document.querySelector('[data-source-mode]').click()`);
+  }
+  await ev(`localStorage.removeItem('blockquilt.sourceLayout')`);
   await ev(`(() => { document.querySelector('[data-source-mode]').click(); const t = document.querySelector('[data-source-text]'); t.value = 'Enregistré depuis la vue source\\n'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
   await key('s', 'KeyS', 83, CTRL);
   await saved((x) => x === 'Enregistré depuis la vue source\n', 'Ctrl+S en vue source');

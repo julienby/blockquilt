@@ -1,23 +1,29 @@
 // Vues de l'éditeur : 'edit' (blocs), 'source' (texte Markdown), 'preview' (rendu).
 // Vue source : le texte complet, contrôlé par Blocks.lint et rendu en direct. Grand écran : texte et aperçu côte à côte ;
-// téléphone : bascule « Texte / Aperçu ». En sortant, le texte est relu en blocs (une étape annulable).
+// téléphone : empilés. Choix « Source / Source + visuel / Visuel » gardé dans localStorage ; défaut « Source + visuel » dès 1024 px. En sortant, le texte est relu en blocs (une étape annulable).
 import { esc } from './shared.js';
 
 export function installSource(ed) {
   const { o, $, canvas, titleEl } = ed;
   let sourceText = '';
+  const storeKey = 'blockquilt.sourceLayout';
+  const layouts = [['text', 'Source'], ['both', 'Source + visuel'], ['visual', 'Visuel']];
+  const layoutNow = () => {
+    try { const saved = localStorage.getItem(storeKey); if (layouts.some(([l]) => l === saved)) return saved; } catch { /* stockage refusé : défaut */ }
+    return innerWidth >= 1024 ? 'both' : 'text';
+  };
 
   ed.sourceArea = () => canvas.querySelector('[data-source-text]');
   ed.renderSource = () => {
     ed.hideBar();
-    canvas.innerHTML = `<div data-source data-pane="text" class="bq-source mx-auto grid gap-3 md:grid-cols-2">
-        <div role="group" aria-label="Affichage" class="flex gap-1 rounded-xl border border-current/10 p-1 md:hidden">
-          <button type="button" data-source-tab="text" aria-pressed="true" class="min-h-11 flex-1 rounded-lg text-sm font-semibold aria-pressed:bg-brand-600 aria-pressed:text-white">Texte</button>
-          <button type="button" data-source-tab="preview" aria-pressed="false" class="min-h-11 flex-1 rounded-lg text-sm font-semibold aria-pressed:bg-brand-600 aria-pressed:text-white">Aperçu</button></div>
+    canvas.innerHTML = `<div data-source class="bq-source mx-auto grid gap-3">
+        <div role="group" aria-label="Affichage de la vue source" class="flex gap-1 rounded-xl border border-current/10 p-1">
+          ${layouts.map(([l, name]) => `<button type="button" data-source-layout="${l}" aria-pressed="false" class="min-h-11 flex-1 rounded-lg px-1 text-sm font-semibold aria-pressed:bg-brand-600 aria-pressed:text-white">${name}</button>`).join('')}</div>
         <div data-source-pane="text" class="flex min-w-0 flex-col gap-2">
           <textarea data-source-text spellcheck="false" aria-label="Texte source (Markdown)" class="bq-source-text w-full rounded-xl border bg-transparent p-3 font-mono text-[13px] leading-6">${esc(sourceText)}</textarea>
           <ul data-source-lint aria-live="polite" class="space-y-1 text-xs"></ul></div>
         <div data-source-pane="preview" aria-label="Aperçu" class="min-w-0 overflow-auto rounded-xl border p-3 sm:p-4" data-source-preview></div></div>`;
+    ed.showSourceLayout(layoutNow());
     ed.refreshSource();
   };
   ed.refreshSource = () => {
@@ -39,9 +45,10 @@ export function installSource(ed) {
     area.focus();
     area.setSelectionRange(start, start + (lines[n - 1] || '').length);
   };
-  ed.showSourcePane = (pane) => {
-    canvas.querySelector('[data-source]').dataset.pane = pane;
-    canvas.querySelectorAll('[data-source-tab]').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.sourceTab === pane)));
+  ed.showSourceLayout = (layout, keep = false) => {
+    canvas.querySelector('[data-source]').dataset.layout = layout;
+    canvas.querySelectorAll('[data-source-layout]').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.sourceLayout === layout)));
+    if (keep) try { localStorage.setItem(storeKey, layout); } catch { /* stockage refusé : choix valable pour cet affichage seulement */ }
   };
 
   /** Passe à une vue ; demander la vue courante revient à l'édition. */

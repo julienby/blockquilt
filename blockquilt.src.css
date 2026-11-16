@@ -95,6 +95,5 @@ dialog.bq-full .bq-app { min-height: 100%; }
 .bq-source { max-width: calc(var(--bq-width, 48rem) * 2); }
 .bq-source-text, [data-source-preview] { border-color: var(--bq-border, color-mix(in srgb, currentColor 14%, transparent)); min-height: 60dvh; resize: vertical; }
 .bq-full-inner .bq-source-text, .bq-full-inner [data-source-preview] { min-height: calc(100dvh - 10rem); }
-@media (max-width: 767px) {
-  [data-pane="text"] > [data-source-pane="preview"], [data-pane="preview"] > [data-source-pane="text"] { display: none; }
-}
+[data-layout="text"] > [data-source-pane="preview"], [data-layout="visual"] > [data-source-pane="text"] { display: none; }
+@media (min-width: 1024px) { [data-layout="both"] { grid-template-columns: 1fr 1fr; } [data-layout="both"] > [role="group"] { grid-column: 1 / -1; } }
