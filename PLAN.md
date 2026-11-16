@@ -68,6 +68,25 @@ Principe : le **document est l'unité d'enregistrement**. L'état d'affichage (r
 
 Ordre : F1, F2, F3, F4, F5. L'IA par opérations (§4c) vient après, avec son propre plan.
 
+## 4b-bis. F4b Modes et panneaux (validé le 2026-11-16)
+
+Décidé avec Julien le 2026-11-16 : deux réglages indépendants, mêmes choix partout.
+
+| | 1 panneau | 2 panneaux |
+|---|---|---|
+| Édition en blocs | blocs | blocs + visuel |
+| Édition en source | source | source + visuel |
+
+L'aperçu seul reste un mode à part (lecture). Le choix 1 / 2 panneaux est commun aux deux modes. Le visuel ne suit pas le défilement de l'éditeur.
+
+- [x] **F4b** Remplace le sélecteur à trois boutons de F4 (dans la vue source).
+  - En-tête : à côté de « Texte source » et « Aperçu », un bouton bascule à icône deux colonnes, sans texte visible (`aria-label` et `title` « Visuel à côté », `aria-pressed`). Désactivé en mode Aperçu.
+  - Choix gardé dans `localStorage` (clé `blockquilt.split`, `try/catch`). Défaut : 2 panneaux à partir de 1024 px, 1 panneau en dessous. La clé `blockquilt.sourceLayout` de F4 n'est plus lue.
+  - 2 panneaux : côte à côte à partir de 1024 px, empilés en dessous (éditeur, puis visuel).
+  - Visuel = `Blocks.toHtml` du document courant. Source : à chaque frappe (comme aujourd'hui). Blocs : à chaque modification, avec un délai court (environ 300 ms), et après annuler / rétablir, déplacer, ajouter, supprimer.
+  - Le plein écran d'un bloc n'a pas de visuel à côté.
+  - Tests `dev/check.mjs` (375 px et 1280 px) : défaut à chaque largeur ; bascule en blocs et en source ; choix gardé en passant de blocs à source et après rechargement ; visuel à jour après une frappe dans un bloc ; bouton désactivé en Aperçu ; aucun débordement horizontal à 375 px. Les tests F4 sont adaptés sans perdre ce qu'ils vérifiaient.
+
 ## 4c. IA du document par opérations — à valider
 
 Problème : l'IA du document recopie tout le texte, donc « avant / après » n'a pas de sens. Objectif : des modifications **ciblées sur plusieurs blocs**, que Julien accepte **une à une**. Prévisible, simple, précis. Plan à faire relire avant tout code ; implémentation avec le modèle fort.

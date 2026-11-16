@@ -46,7 +46,7 @@ export function installDrag(ed) {
     Object.assign(ghost.style, { left: r.left + 'px', width: r.width + 'px', top: r.top + 'px' });
     const line = document.createElement('div');
     line.className = 'bq-drop';
-    canvas.firstElementChild.append(line);
+    canvas.querySelector('.bq-column').append(line);
     app.append(ghost);
     cardEl.classList.add('bq-origin');
     app.classList.add('bq-dragging');

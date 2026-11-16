@@ -30,6 +30,8 @@ export function installHistory(ed) {
     ed.typing = true;
     clearTimeout(ed.checkpoint.timer);
     ed.checkpoint.timer = ed.later(ed.checkpoint, 1000);
+    clearTimeout(ed.refreshVisual.timer);
+    ed.refreshVisual.timer = ed.later(ed.refreshVisual, 300);
     updateButtons();
   };
   const restore = (state) => {

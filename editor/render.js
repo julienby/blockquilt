@@ -73,9 +73,45 @@ export function installRender(ed) {
       if (ed.mode === 'preview') canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
     }
   };
+  // Visuel à côté : le même choix en vue blocs et en vue source. 2 panneaux dès 1024 px par défaut.
+  const splitKey = 'blockquilt.split';
+  const wide = matchMedia('(min-width: 1024px)').matches;
+  try { const saved = localStorage.getItem(splitKey); ed.sideBySide = saved === null ? wide : saved === 'true'; } catch { ed.sideBySide = wide; }
+  ed.showSplit = () => ed.app.querySelector('[data-visual-toggle]').setAttribute('aria-pressed', String(ed.sideBySide));
+  ed.showSplit();
+  ed.toggleSplit = () => {
+    ed.sideBySide = !ed.sideBySide;
+    try { localStorage.setItem(splitKey, String(ed.sideBySide)); } catch { /* stockage refusé : choix valable pour cet affichage seulement */ }
+    ed.showSplit();
+    ed.syncFromDom();
+    ed.render();
+  };
+  ed.refreshVisual = () => {
+    const visual = canvas.querySelector('[data-visual]');
+    if (!visual) return;
+    visual.innerHTML = Blocks.toHtml(ed.markdown(), { media: o.media });
+    window.BlockquiltContent?.enhance(visual);
+  };
+  const addVisual = () => {
+    const edit = document.createElement('div');
+    edit.className = 'min-w-0';
+    edit.append(...canvas.childNodes);
+    const visual = document.createElement('div');
+    visual.dataset.visual = '';
+    visual.setAttribute('aria-label', 'Visuel');
+    visual.className = 'min-w-0 overflow-auto rounded-xl border p-3 sm:p-4';
+    const panes = document.createElement('div');
+    panes.dataset.panes = '';
+    panes.className = 'bq-panes mx-auto grid gap-3';
+    panes.append(edit, visual);
+    canvas.append(panes);
+    ed.refreshVisual();
+  };
   ed.render = () => {
     ed.persistViews();
-    return ed.mode === 'preview' ? renderPreview() : ed.mode === 'source' ? ed.renderSource() : renderEdit();
+    if (ed.mode === 'preview') return renderPreview();
+    if (ed.mode === 'source') ed.renderSource(); else renderEdit();
+    if (ed.sideBySide) addVisual();
   };
 
   ed.focusCard = (id) => {

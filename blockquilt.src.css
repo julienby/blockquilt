@@ -91,9 +91,9 @@ dialog.bq-full .bq-app { min-height: 100%; }
 [data-view="collapsed"] [data-fold] { max-height: calc(var(--bq-fold) * 1lh); overflow: hidden; cursor: pointer; mask-image: linear-gradient(#000 55%, transparent); }
 [data-view]:not([data-view="collapsed"]) .bq-view-collapsed, [data-view][data-view="collapsed"] .bq-view-expanded { display: none !important; }
 
-/* Vue source : texte et aperçu côte à côte (grand écran), l'un ou l'autre au téléphone ; en plein écran, la zone de texte prend toute la hauteur. */
-.bq-source { max-width: calc(var(--bq-width, 48rem) * 2); }
-.bq-source-text, [data-source-preview] { border-color: var(--bq-border, color-mix(in srgb, currentColor 14%, transparent)); min-height: 60dvh; resize: vertical; }
-.bq-full-inner .bq-source-text, .bq-full-inner [data-source-preview] { min-height: calc(100dvh - 10rem); }
-[data-layout="text"] > [data-source-pane="preview"], [data-layout="visual"] > [data-source-pane="text"] { display: none; }
-@media (min-width: 1024px) { [data-layout="both"] { grid-template-columns: 1fr 1fr; } [data-layout="both"] > [role="group"] { grid-column: 1 / -1; } }
+/* Vue source et visuel à côté : texte et visuel côte à côte (grand écran), empilés en dessous ; en plein écran, la zone de texte prend toute la hauteur. */
+.bq-panes { max-width: calc(var(--bq-width, 48rem) * 2); }
+.bq-source-text, [data-visual] { border-color: var(--bq-border, color-mix(in srgb, currentColor 14%, transparent)); min-height: 60dvh; }
+.bq-source-text { resize: vertical; }
+.bq-full-inner .bq-source-text, .bq-full-inner [data-visual] { min-height: calc(100dvh - 10rem); }
+@media (min-width: 1024px) { .bq-panes { grid-template-columns: 1fr 1fr; } }
