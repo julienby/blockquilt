@@ -102,7 +102,6 @@ L'éditeur garde dans `localStorage` seulement des préférences d'affichage. Sa
 - `blockquilt.split` : visuel à côté (`true` ou `false`). Sans choix gardé, deux panneaux dès 1024 px.
 - `blockquilt.emoji` : emoji récents.
 
-
 ### Au clavier
 
 Ctrl+S enregistre, Ctrl+Z annule, Ctrl+Maj+Z ou Ctrl+Y rétablit (50 étapes), Ctrl+B / I / U mettent en forme, Alt+F10 donne le focus à la barre de mise en forme, les flèches haut et bas sur la poignée déplacent un bloc, Échap ferme un menu, le plein écran ou annule un glissement.
