@@ -102,7 +102,6 @@ L'éditeur garde dans `localStorage` seulement des préférences d'affichage. Sa
 - `blockquilt.split` : visuel à côté (`true` ou `false`). Sans choix gardé, deux panneaux dès 1024 px.
 - `blockquilt.emoji` : emoji récents.
 
-L'ancienne clé `blockquilt.sourceLayout` (vue source, avant « Visuel à côté ») n'est plus lue.
 
 ### Au clavier
 
