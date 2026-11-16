@@ -15,13 +15,14 @@ export function installEvents(ed) {
     if (hit('[data-menu]')) return ed.openMenu(id, hit('[data-menu]'));
     if (hit('[data-expand]')) return ed.openBlockFull(id);
     // Deuxième affichage d'une carte (aperçu du HTML, carrousel replié…) : data-toggle-view porte son nom.
-    if (hit('[data-toggle-view]')) {
-      const alt = hit('[data-toggle-view]').dataset.toggleView || 'preview';
+    const toggler = hit('[data-toggle-view]') || (cardEl?.dataset.view === 'collapsed' && hit('[data-fold]'));
+    if (toggler) {
+      const alt = toggler.dataset.toggleView || toggler.dataset.fold || 'preview';
       const view = cardEl.dataset.view === alt ? 'edit' : alt;
       ed.views.set(id, view);
       ed.persistViews();
       cardEl.dataset.view = view;
-      hit('[data-toggle-view]').setAttribute('aria-pressed', String(view === alt));
+      toggler.setAttribute('aria-pressed', String(view === alt));
       ed.def(ed.blocks.find((b) => b.id === id)).onInput?.(cardEl, ed.ui);
       return;
     }

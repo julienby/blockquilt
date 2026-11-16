@@ -55,9 +55,10 @@ export function installFullscreen(ed) {
     if (!b || !cardEl) return;
     cardEl.removeAttribute('data-id');
     cardEl.dataset.away = id;
-    const tools = ed.tools(b) ? `<div class="-mt-2 mb-2 flex">${ed.tools(b)}</div>` : '';
+    const view = ed.viewOf(b) === 'collapsed' ? 'edit' : ed.viewOf(b); // le plein écran montre toujours le bloc en entier
+    const tools = ed.tools(b, view) ? `<div class="-mt-2 mb-2 flex">${ed.tools(b, view)}</div>` : '';
     $('[data-block-full-label]', blockFull).textContent = ed.def(b).label;
-    $('[data-block-full-body]', blockFull).innerHTML = `<div data-id="${id}" data-view="${ed.views.get(id) || 'edit'}" class="bq-focus">${tools}${ed.editorOf(b).edit(b, ed.ui)}</div>`;
+    $('[data-block-full-body]', blockFull).innerHTML = `<div data-id="${id}" data-view="${view}" class="bq-focus">${tools}${ed.editorOf(b).edit(b, ed.ui)}</div>`;
     blockFull.style.setProperty('--bq-width', app.style.getPropertyValue('--bq-width') || '');
     inner(blockFull).append(ed.bar, ed.toastEl.parentElement); // la barre et les messages doivent être dans la couche du dialogue
     enter(blockFull);

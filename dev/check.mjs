@@ -649,6 +649,36 @@ try {
   ok(ghost.list && ghost.count && ghost.h <= ghost.card + 2, `glissement : la copie d'un carrousel replié reste repliée (${JSON.stringify(ghost)})`);
   await ev(`document.querySelector('[data-car-count]').closest('[data-id]').querySelector('[data-toggle-view="collapsed"]').click()`);
   ok(await ev(`!localStorage.getItem('blockquilt.views.demo').includes('collapsed') && !!document.querySelector('[data-car-list]').offsetParent`), 'repli mémorisé : déplié, le choix est gardé aussi');
+  // F2 : repli automatique des longs blocs (collapseLines)
+  const longText = Array.from({ length: 12 }, (_, i) => `Ligne ${i + 1}`).join('  \n');
+  const autoFold = (options, act = '') => ev(`(() => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: ${JSON.stringify(longText)} + '\\n\\nCourt', storageKey: 'f2', ...${JSON.stringify(options)} });
+    ${act}
+    const card = el.querySelector('[data-id]'); const body = card.querySelector('[data-card-body]');
+    const out = { view: card.dataset.view, h: body.getBoundingClientRect().height, line: parseFloat(getComputedStyle(body).lineHeight) || 0, footer: card.textContent.includes('+7 lignes') && !!card.querySelector('button.bq-view-collapsed')?.offsetParent, shortView: el.querySelectorAll('[data-id]')[1].dataset.view, full: [...el.querySelectorAll('[data-expand]')][0] && 1 };
+    e.destroy(); el.remove(); return out;
+  })()`);
+  await ev(`localStorage.removeItem('blockquilt.views.f2')`);
+  await viewport(375);
+  const f2 = await autoFold({});
+  ok(f2.view === 'collapsed' && f2.footer && f2.shortView === 'edit' && f2.h < 12 * 24, `repli auto : un bloc de 12 lignes est replié à 375 px, « … +7 lignes » et « Déplier » (${JSON.stringify(f2)})`);
+  const f2open = await autoFold({}, `el.querySelector('[data-fold]').click();`);
+  ok(f2open.view === 'edit' && f2open.h > f2.h, `repli auto : un clic sur la zone repliée déplie (${JSON.stringify(f2open)})`);
+  const f2again = await autoFold({});
+  ok(f2again.view === 'edit', 'repli auto : le bloc reste déplié après rechargement (choix gardé)');
+  const f2off = await autoFold({ collapseLines: 0, storageKey: 'f2off' });
+  ok(f2off.view === 'edit' && f2off.h > f2.h, 'repli auto : collapseLines: 0 ne replie rien');
+  const f2full = await ev(`(async () => {
+    localStorage.removeItem('blockquilt.views.f2');
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: ${JSON.stringify(longText)}, storageKey: 'f2' });
+    el.querySelector('[data-expand]').click();
+    const d = el.querySelector('[data-block-full]') || document.querySelector('[data-block-full]');
+    const inner = d.querySelector('[data-id]'); const r = { view: inner.dataset.view, h: inner.getBoundingClientRect().height };
+    d.close(); e.destroy(); el.remove(); localStorage.removeItem('blockquilt.views.f2'); return r;
+  })()`);
+  ok(f2full.view === 'edit' && f2full.h > f2.h, `repli auto : le plein écran montre le bloc en entier (${JSON.stringify(f2full)})`);
   await ev(`document.querySelector('[data-car-item="2"] [data-car-act="remove"]').click()`);
   ok(await ev(`document.querySelectorAll('[data-car-item]').length === 2`), 'carrousel : photo retirée');
   await ev(`editor.undo()`);

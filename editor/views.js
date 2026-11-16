@@ -6,6 +6,12 @@ export function installViews(ed) {
   const key = (o.storageKey ?? o.contentUrl) ? 'blockquilt.views.' + (o.storageKey ?? o.contentUrl) : null;
   ed.views = new Map();
 
+  // Repli automatique : un long bloc est replié tant que l'utilisateur n'a pas choisi (option `collapseLines`, 0 = jamais).
+  const limit = o.collapseLines ?? 5;
+  ed.foldLimit = limit;
+  ed.hiddenLines = (b) => (limit > 0 && ['text', 'quote', 'code', 'raw', 'carousel'].includes(b.type) ? Math.max(0, Blocks.toMarkdown(b).split('\n').length - limit) : 0);
+  ed.viewOf = (b) => ed.views.get(b.id) || (ed.hiddenLines(b) ? 'collapsed' : 'edit');
+
   ed.persistViews = () => {
     if (!key || !ed.blocks) return;
     const list = ed.blocks.map((b) => [b.type, ed.views.get(b.id) || '']);

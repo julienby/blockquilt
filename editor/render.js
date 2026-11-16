@@ -28,21 +28,29 @@ export function installRender(ed) {
   const round = (data, icon, label, cls = 'bq-muted') => `<button type="button" ${data} aria-label="${label}" title="${label}" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
       <span class="bq-round flex size-8 items-center justify-center rounded-full border transition-colors ${cls}">${ic(icon, 'size-4')}</span></button>`;
   /** Outils propres à un type (ex. œil du bloc HTML), à côté du type. */
-  ed.tools = (b) => (ed.editorOf(b) === ed.def(b) && ed.def(b).tools ? ed.def(b).tools(b, ed.views.get(b.id)) : '');
+  ed.tools = (b, view = ed.viewOf(b)) => (ed.editorOf(b) === ed.def(b) && ed.def(b).tools ? ed.def(b).tools(b, view) : '');
   // Carte : à gauche le type (liste de conversion), à droite du type trois boutons ronds (menu, agrandir, supprimer) ;
   // colonne de droite : monter, poignée, descendre. Une action = un seul endroit.
   // Le contenu est centré verticalement sous le badge : un titre court occupe harmonieusement la hauteur donnée par la colonne.
-  const card = (b, i) => `<article data-id="${b.id}" data-view="${ed.views.get(b.id) || 'edit'}" aria-label="${attr(ed.def(b).label)}" class="bq-card flex border ${ed.def(b).tone.card}">
+  // Long bloc texte : replié, il montre ses premières lignes, un fondu et « … +X lignes » ; un clic dessus le déplie.
+  const foldFooter = (hidden) => `<div class="mt-1 flex min-h-11 items-center gap-2 text-sm">
+          <span class="bq-view-collapsed opacity-70">… +${hidden} ligne${hidden > 1 ? 's' : ''}</span>
+          <button type="button" data-toggle-view="collapsed" class="bq-view-collapsed min-h-11 px-2 font-bold underline">Déplier</button>
+          <button type="button" data-toggle-view="collapsed" class="bq-view-expanded min-h-11 px-2 font-bold underline opacity-70">Replier</button></div>`;
+  const card = (b, i) => {
+    const hidden = b.type === 'carousel' ? 0 : ed.hiddenLines(b);
+    return `<article data-id="${b.id}" data-view="${ed.viewOf(b)}" aria-label="${attr(ed.def(b).label)}" class="bq-card flex border ${ed.def(b).tone.card}">
       <div class="flex min-w-0 flex-1 flex-col pb-3 pl-3 pr-1">
         <div class="flex h-11 items-center">${badge(b)}${ed.tools(b)}<span class="flex-1"></span>
           ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
           ${ed.def(b).fullscreen === false ? '' : round('data-expand', 'maximize', 'Plein écran')}
           ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>
-        <div data-card-body class="flex flex-1 flex-col justify-center">${ed.editorOf(b).edit(b, ed.ui)}</div></div>
+        <div data-card-body ${hidden ? `data-fold="collapsed" style="--bq-fold:${ed.foldLimit}"` : ''} class="flex flex-1 flex-col justify-center">${ed.editorOf(b).edit(b, ed.ui)}</div>${hidden ? foldFooter(hidden) : ''}</div>
       <div data-rail class="flex w-11 shrink-0 select-none flex-col items-center justify-between border-l border-black/5 py-1">
         <button type="button" data-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="Monter ce bloc" class="bq-rail">${ic('chevron_up', 'size-4')}</button>
         <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-rail cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
         <button type="button" data-move="1" ${i === ed.blocks.length - 1 ? 'disabled' : ''} aria-label="Descendre ce bloc" class="bq-rail">${ic('chevron_down', 'size-4')}</button></div></article>`;
+  };
 
   // Un champ vidé par le navigateur garde parfois un <br> : on le vide pour que le texte d'aide réapparaisse.
   ed.clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };

@@ -88,6 +88,7 @@ dialog.bq-full .bq-app { min-height: 100%; }
 
 /* Carte à deux affichages (bloc HTML) : le code, ou l'aperçu. `data-view` et non `data-id` : la copie qui suit le doigt n'a plus d'identifiant. */
 [data-view]:not([data-view="preview"]) .bq-view-preview, [data-view][data-view="preview"] .bq-view-code { display: none; }
+[data-view="collapsed"] [data-fold] { max-height: calc(var(--bq-fold) * 1lh); overflow: hidden; cursor: pointer; mask-image: linear-gradient(#000 55%, transparent); }
 [data-view]:not([data-view="collapsed"]) .bq-view-collapsed, [data-view][data-view="collapsed"] .bq-view-expanded { display: none !important; }
 
 /* Vue source : texte et aperçu côte à côte (grand écran), l'un ou l'autre au téléphone ; en plein écran, la zone de texte prend toute la hauteur. */
