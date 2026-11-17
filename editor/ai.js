@@ -1,16 +1,19 @@
 // Assistant IA : `aiUrl` désigne le service ; l'éditeur n'appelle aucun modèle lui-même et ne contient aucune clé.
 // GET aiUrl → { uses: [{ id, label, scopes }] } : les usages de l'application (modèle et consigne restent chez elle) ;
 // sans réponse, les boutons intégrés (consignes écrites). Envoi (POST) : scope (document | block), use, instruction,
-// text (document), block (Markdown du bloc). Réponse : { markdown }. Relais prêt à monter : ai/blockquilt-ai.js.
-// La réponse passe par Blocks.lint et s'affiche à côté de l'actuel ; puis, au choix (toujours annulable) :
+// text (document), block (Markdown du bloc), blocks (document hors vue source : blocs numérotés, voir ai-ops.js).
+// Réponse : { operations } (propositions une à une, ai-ops.js) ou { markdown }. Relais prêt à monter : ai/blockquilt-ai.js.
+// { markdown } passe par Blocks.lint et s'affiche à côté de l'actuel ; puis, au choix (toujours annulable) :
 // document : remplacer, ajouter au début, à la fin ; bloc : remplacer, insérer au-dessus, dessous ; ou copier sans rien changer.
 import { esc, shared } from './shared.js';
+import { installAiOps } from './ai-ops.js';
 
 export function installAi(ed) {
   const { o, $ } = ed;
   const sheet = ed.sheets.ai;
   ed.openAi = () => {};
   if (!sheet) return; // sans aiUrl, aucun bouton IA
+  installAiOps(ed, sheet);
   let ai = null; // { id, markdown }
   const useCls = 'min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950 hover:bg-amber-100';
   let uses = null; // promesse : usages de l'application, ou null (boutons intégrés)
@@ -49,9 +52,21 @@ export function installAi(ed) {
     button.disabled = true;
     button.querySelector('span').textContent = 'L’IA travaille…';
     try {
-      const r = await fetch(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}) }), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
+      // En vue source, le texte de la zone fait foi : pas de blocs à désigner, le document part entier.
+      const numbered = !b && ed.mode !== 'source' ? { blocks: ed.aiSnapshot() } : {};
+      const r = await fetch(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || typeof j.markdown !== 'string') throw new Error(j.error || 'Pas de réponse de l’IA');
+      const ops = r.ok && typeof j.operations === 'string';
+      if (!ops && (!r.ok || typeof j.markdown !== 'string')) throw new Error(j.error || 'Pas de réponse de l’IA');
+      $('[data-ai-ops]', sheet).hidden = !ops;
+      $('[data-ai-whole]', sheet).hidden = ops;
+      if (ops) {
+        ai.markdown = j.operations;
+        ed.aiShowOps(j.operations);
+        $('[data-ai-form]', sheet).hidden = true;
+        $('[data-ai-result]', sheet).hidden = false;
+        return;
+      }
       ai.markdown = j.markdown.replace(/\r\n/g, '\n');
       const problems = Blocks.lint(ai.markdown);
       const lint = $('[data-ai-lint]', sheet);

@@ -70,8 +70,9 @@ const ai = createAi({
   fallback: ({ scope, instruction, text, block, blocks, output }) => {
     const broken = /non fermé/i.test(instruction) ? '\n:::html\n<p>bloc sans fin</p>\n' : '';
     if (output === 'document') return shout(scope === 'block' ? block : text) + broken;
-    // Opérations : « rien » dans la consigne → rien à changer ; sinon blocs 1 et 2 en majuscules, un paragraphe à la fin.
-    if (/rien/i.test(instruction)) return '@@ rien';
+    // Opérations : une consigne qui commence par « @@ » est renvoyée telle quelle (essais) ;
+    // sinon blocs 1 et 2 en majuscules, un paragraphe à la fin.
+    if (instruction.startsWith('@@')) return instruction;
     const last = blocks.length - 1;
     return [1, 2].filter((n) => n <= last).map((n) => `@@ remplacer ${n}\n${shout(blocks[n]).trim()}\n`)
       .concat(`@@ après ${last}\nParagraphe ajouté par l’IA de démo.${broken}`).join('\n');

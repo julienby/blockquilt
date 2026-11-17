@@ -29,12 +29,16 @@ export function installDocument(ed) {
     if (ed.icon) m.icon = ed.icon; else delete m.icon;
     return m;
   };
-  /** Remplace le document par { meta, blocks } (lu par Blocks.parse) ; un document vide reçoit un bloc texte. */
-  ed.setDoc = ({ meta, blocks }) => {
+  /** Remplace le frontmatter (titre et icône compris). */
+  ed.setMeta = (meta) => {
     ed.meta = meta;
     ed.icon = meta.icon || '';
     titleEl.textContent = meta.title || '';
     ed.showIcon();
+  };
+  /** Remplace le document par { meta, blocks } (lu par Blocks.parse) ; un document vide reçoit un bloc texte. */
+  ed.setDoc = ({ meta, blocks }) => {
+    ed.setMeta(meta);
     const previous = ed.blocks.map((b) => ({ type: b.type, view: ed.views.get(b.id) }));
     ed.blocks = blocks.map((b) => ({ id: ed.newId(), ...b }));
     if (!ed.blocks.length) ed.blocks = [{ id: ed.newId(), ...Blocks.blank('text') }];

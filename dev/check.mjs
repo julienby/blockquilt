@@ -783,7 +783,9 @@ try {
   await ev(`document.querySelector('[data-more]').click()`);
   await ev(`document.querySelector('[data-more-act="ai"]').click()`);
   ok(await ev(`document.querySelector('[data-ai-scope]').textContent.includes('document')`), 'IA sur le document : ouverte depuis l’en-tête');
-  await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'Tout en majuscules'; document.querySelector('[data-ai-run]').click(); })()`);
+  // Document entier : l'usage « En étapes » de la démo (output: 'document') ; les autres répondent en opérations (A3).
+  await waitFor(() => ev(`!!document.querySelector('[data-ai-use="etapes"]')`), 'usage « En étapes »');
+  await ev(`document.querySelector('[data-ai-use="etapes"]').click()`);
   await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden`), 'réponse de l’IA (document)');
   ok((await mdNow()) === docMid, 'IA sur le document : rien ne change avant « Appliquer »');
   await ev(`document.querySelector('[data-ai-apply]').click()`);
@@ -804,11 +806,64 @@ try {
   ok(await ev(`document.querySelector('[data-ai-error]').hidden`), 'IA rouverte : l’ancien message a disparu');
   await ev(`document.querySelector('[data-sheet="ai"]').close()`);
   ok((await mdNow()) === docMid, 'IA refusée : le document n’a pas changé');
+  // A3 : IA du document par opérations, dans un éditeur à part au document connu. La démo répond : blocs 1 et 2 en
+  // majuscules, un paragraphe après le dernier ; une consigne qui commence par « @@ » est renvoyée telle quelle.
+  const opsRun = (instruction, then) => ev(`(async () => {
+    const wait = async (f) => { for (let i = 0; i < 100 && !f(); i++) await new Promise((r) => setTimeout(r, 50)); return f(); };
+    const el = document.createElement('div'); document.body.append(el);
+    const source = '---\\ntitle: Essai\\n---\\n\\nPremier bloc.\\n\\nDeuxième bloc.\\n\\nTroisième bloc.\\n';
+    const e = Blockquilt.mount(el, { source, aiUrl: 'api/ai' });
+    const $ = (s) => el.querySelector(s), $$ = (s) => [...el.querySelectorAll(s)];
+    $('[data-more]').click(); $('[data-more-act="ai"]').click();
+    $('[data-ai-instruction]').value = ${JSON.stringify(instruction)}; $('[data-ai-run]').click();
+    await wait(() => !$('[data-ai-ops]').hidden);
+    const sheet = $('[data-sheet="ai"]');
+    const s = { untouched: e.getMarkdown() === source, whole: $('[data-ai-whole]').hidden, summary: $('[data-ai-ops-summary]').textContent,
+      titles: $$('[data-ai-ops-list] label span').map((x) => x.textContent), checked: $$('[data-ai-op]').map((c) => c.checked),
+      button: $('[data-ai-ops-apply]').textContent, disabled: $('[data-ai-ops-apply]').disabled,
+      del: $('[data-ai-diff] del')?.textContent, ins: $('[data-ai-diff] ins')?.textContent,
+      fits: sheet.scrollWidth <= sheet.clientWidth && sheet.getBoundingClientRect().right <= innerWidth };
+    ${then}
+    if (sheet.open) sheet.close();
+    e.destroy(); el.remove();
+    return s;
+  })()`);
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    const a = await opsRun('Tout en majuscules', `
+      $$('[data-ai-op]')[2].click();
+      s.button2 = $('[data-ai-ops-apply]').textContent;
+      const f = $$('[data-bq] [data-id]')[1].querySelector('[contenteditable="true"]');
+      f.textContent = 'Deuxième bloc modifié.'; f.dispatchEvent(new Event('input', { bubbles: true }));
+      $('[data-ai-ops-apply]').click();
+      s.after = e.getMarkdown(); s.toast = $('[data-toast]').textContent;
+      e.undo(); s.undone = e.getMarkdown();`);
+    ok(a.untouched && a.whole && a.summary === '3 propositions.' && a.titles.join('|') === 'Remplacer le bloc 1|Remplacer le bloc 2|Ajouter après le bloc 3' && a.checked.every(Boolean) && a.button === 'Appliquer les 3 choisies', `${width} px, IA document : une proposition par opération, toutes cochées, rien de changé avant d’appliquer (${JSON.stringify(a)})`);
+    ok(a.del === 'Premier' && a.ins === 'PREMIER' && a.fits, `${width} px, IA document : différences mot à mot (« ${a.del} » → « ${a.ins} »), la feuille tient dans l’écran`);
+    ok(a.button2 === 'Appliquer les 2 choisies' && a.after === '---\ntitle: Essai\n---\n\nPREMIER BLOC.\n\nDeuxième bloc modifié.\n\nTroisième bloc.\n', `${width} px, IA document : seules les propositions cochées ; bloc modifié depuis l’envoi → proposition périmée, jamais appliquée (${JSON.stringify(a.after)})`);
+    ok(a.toast === '1 proposition appliquée · 1 périmée ignorée' && a.undone === '---\ntitle: Essai\n---\n\nPremier bloc.\n\nDeuxième bloc modifié.\n\nTroisième bloc.\n', `${width} px, IA document : message (${a.toast}), une seule étape annulée par Ctrl+Z`);
+  }
+  await viewport(375);
+  {
+    const b = await opsRun('@@ supprimer 3\n@@ avant 1\nAvant tout.\n@@ remplacer 0\n---\ntitle: Nouveau\n---\n@@ après 0\nTout début.\n@@ remplacer 2\nDeuxième bloc.', `
+      $('[data-ai-ops-apply]').click(); s.after = e.getMarkdown();`);
+    ok(b.summary === '4 propositions · 1 bloc inchangé ignoré.' && b.titles.join('|') === 'Supprimer le bloc 3|Ajouter avant le bloc 1|Remplacer le titre et les réglages (frontmatter)|Ajouter au début du document', 'IA document : supprimer, avant, frontmatter, au début ; un remplacement identique ignoré (' + b.summary + ')');
+    ok(b.after === '---\ntitle: Nouveau\n---\n\nTout début.\n\nAvant tout.\n\nPremier bloc.\n\nDeuxième bloc.\n', 'IA document : appliquées à leur place (' + JSON.stringify(b.after) + ')');
+    const c = await opsRun('@@ rien', '');
+    ok(c.summary === 'Aucune modification proposée.' && c.disabled && c.button === 'Aucune proposition choisie' && c.untouched, 'IA document : « @@ rien » → aucune modification proposée');
+    const d = await opsRun('@@ modifier 1\nx', `$('[data-ai-copy]').click(); s.copied = await navigator.clipboard.readText(); s.end = e.getMarkdown() === source;`);
+    ok(d.summary.startsWith('La réponse de l’IA n’est pas utilisable (Ligne 1') && d.disabled && d.copied === '@@ modifier 1\nx' && d.end, 'IA document : réponse illisible → rien d’appliqué, texte brut copiable (' + JSON.stringify(d) + ')');
+    const f = await opsRun('@@ après 3\n:::html\n<p>sans fin</p>', '');
+    ok(f.checked.join() === 'false' && f.button === 'Aucune proposition choisie', 'IA document : proposition en alerte lint → décochée');
+  }
   // I4 : ce qu'on fait de la proposition — au début, à la fin, au-dessus, dessous, ou copier sans rien changer
-  const aiRun = async (blockIndex) => {
+  const aiRun = async (blockIndex, instruction = 'Tout en majuscules') => {
     if (blockIndex === undefined) { await ev(`document.querySelector('[data-more]').click()`); await ev(`document.querySelector('[data-more-act="ai"]').click()`); }
     else { await ev(`document.querySelectorAll('[data-bq] [data-id]')[${blockIndex}].querySelector('[data-menu]').click()`); await ev(`document.querySelector('[data-sheet="menu"] [data-act="ai"]').click()`); }
-    await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'Tout en majuscules'; document.querySelector('[data-ai-run]').click(); })()`);
+    await ev(`document.querySelector('[data-ai-instruction]').value = ${JSON.stringify(instruction)}`);
+    // Sur le document : l'usage « En étapes » (document entier) ; sur un bloc : la consigne.
+    if (blockIndex === undefined) { await waitFor(() => ev(`!!document.querySelector('[data-ai-use="etapes"]')`), 'usage « En étapes »'); await ev(`document.querySelector('[data-ai-use="etapes"]').click()`); }
+    else await ev(`document.querySelector('[data-ai-run]').click()`);
     await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden && !document.querySelector('[data-ai-run]').disabled`), 'réponse de l’IA');
   };
   await aiRun();
@@ -844,10 +899,7 @@ try {
   await aiRun(textIndex);
   await ev(`document.querySelector('[data-ai-copy]').click()`);
   ok((await mdNow()) === docMid && await ev(`navigator.clipboard.readText().then((t) => t === 'LA CLÉ EST DANS LA BOÎTE AUX LETTRES.\\n')`) && !(await ev(`document.querySelector('[data-sheet="ai"]').open`)), 'IA « Copier, ne rien changer » : proposition au presse-papiers, document intact');
-  await ev(`document.querySelector('[data-more]').click()`);
-  await ev(`document.querySelector('[data-more-act="ai"]').click()`);
-  await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'Réponse avec un bloc non fermé'; document.querySelector('[data-ai-run]').click(); })()`);
-  await waitFor(() => ev(`!document.querySelector('[data-ai-result]').hidden`), 'réponse fautive de l’IA');
+  await aiRun(undefined, 'Réponse avec un bloc non fermé');
   ok(await ev(`!document.querySelector('[data-ai-lint]').hidden && document.querySelector('[data-ai-lint]').textContent.includes('non fermé') && [...document.querySelectorAll('[data-ai-apply]')].every((b) => b.disabled) && !document.querySelector('[data-ai-copy]').disabled`), 'IA : « ::: » non fermé → alerte lint, remplacer / ajouter bloqués, copier possible');
   await ev(`(() => { const c = document.querySelector('[data-ai-force]'); c.click(); })()`);
   ok(await ev(`[...document.querySelectorAll('[data-ai-apply]')].every((b) => !b.disabled)`), 'IA : appliquer seulement après confirmation');
