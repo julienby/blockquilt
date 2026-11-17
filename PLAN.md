@@ -141,6 +141,37 @@ Un paragraphe ajouté.
 - [x] **A2b Essai réel, avant l'interface** : un script envoie 5 à 10 documents à un vrai modèle (OpenRouter, `glm-5.3-flash` et un modèle plus fort) et passe chaque réponse dans `parseOps`. Noter le taux de réponses utilisables et les écarts de format dans `DECISIONS.md` ; durcir la consigne, pas le parseur. Format qui ne tient pas → on le change avant A3.
 - [x] **A3 Éditeur** : identifiants et empreintes notés à l'envoi, opérations périmées, feuille de choix une à une, différences mot à mot, application en une étape annulable. Test `dev/check.mjs` à 375 px et 1280 px (dont : on modifie un bloc pendant que l'IA travaille → son opération est périmée, les autres s'appliquent).
 
+## 4d. Lignes composées (validé le 2026-11-17 : « rien ne doit générer un mauvais affichage »)
+
+Fait avant : bloc Carte (`:::card`, commit ded25ca).
+
+Objectif : à la restitution, mettre des blocs côte à côte (une photo à 1/3 et un texte à 2/3, deux photos à 1/2). Trois largeurs seulement, pour cadrer. Dans l'éditeur, les blocs restent les uns sous les autres.
+
+**Format** (validé : commentaire en tête du bloc)
+- Première ligne du bloc : `<!-- 1/3 -->`, `<!-- 1/2 -->` ou `<!-- 2/3 -->`. Rien d'autre n'est permis. Ailleurs (GitHub, autre lecteur Markdown), le commentaire est invisible et les blocs s'empilent : rien n'est perdu.
+- Bloc **Espace** : le commentaire seul (`<!-- 1/3 -->`). Il laisse un vide dans la ligne.
+- Les blocs avec une largeur qui se suivent forment une ligne. La ligne se ferme quand la somme fait 1. Lignes possibles : 1/2 + 1/2, 1/3 + 2/3, 2/3 + 1/3, 1/3 + 1/3 + 1/3.
+- Ligne incomplète (la somme ne fait pas 1 avant un bloc pleine largeur ou la fin) ou qui déborde (1/2 puis 2/3) : alerte `Blocks.lint`. Rendu : ses blocs s'élargissent en gardant leurs proportions, jamais de trou non voulu ; un débordement ouvre une nouvelle ligne ; une ligne d'Espaces seuls n'est pas rendue.
+- Tous les types peuvent avoir une largeur, ligne horizontale comprise (sinon le bloc tomberait en texte source).
+
+**Rendu publié**
+- `<div class="bq-row">` puis une `<div class="bq-col bq-w-1-3">` par bloc. Grille de 6 colonnes dans `blockquilt-content.css`.
+- Dans un conteneur étroit (moins de 36rem, `@container`), la ligne s'empile et les Espaces disparaissent. Une photo à 1/3 sur un téléphone serait trop petite.
+
+**Éditeur**
+- Les blocs restent les uns sous les autres.
+- À côté du type, un bouton montre une petite grille dessinée (2 ou 3 cases), avec la case du bloc en couleur. Pas de texte « 2/3 », qui se confond avec la largeur. Un bloc pleine largeur n'a pas de grille, seulement le bouton.
+- Le bouton ouvre un choix : Pleine largeur, 1/3, 1/2, 2/3.
+- Ligne incomplète : la grille est en orange et porte l'aide « Ligne incomplète ».
+- « Espace » est dans le menu d'ajout, groupe Structure.
+- IA sur un bloc : la réponse garde la largeur du bloc, même si l'IA n'a pas écrit le commentaire.
+
+**Étapes**
+- [x] **L1 Noyau** : lire et écrire la largeur (générique, pour tous les types : `fromMarkdown` / `toMarkdown`), bloc Espace, regroupement en lignes, alertes lint, rendu `bq-row`. Tests Node : aller-retour, types lus, lignes possibles, incomplète, débordement, ligne horizontale refusée, HTML rendu.
+- [x] **L2 CSS publié** : grille et empilement en écran étroit. Test `dev/check.mjs` en aperçu : côte à côte à 1280 px, empilé à 375 px.
+- [ ] **L3 Éditeur** : bouton de largeur et sa grille, choix, alerte de ligne incomplète, Espace dans le menu d'ajout, largeur gardée par l'IA sur un bloc. Tests à 375 px et 1280 px.
+- [ ] **L4 Docs** : `FORMAT.md` (l'IA le reçoit : elle pourra composer des lignes), démo, `DECISIONS.md`.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

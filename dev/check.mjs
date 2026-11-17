@@ -781,6 +781,22 @@ try {
       cardEd.destroy(); document.querySelector('.cardtest').remove(); return ok; })()`), `${width} px, carte : aperçu avec photo, titre et bouton de 44 px au moins`);
   }
 
+  // ---- Lignes composées (L2) : en aperçu, côte à côte en large, empilées en étroit ; ligne incomplète sans trou ----
+  for (const width of [1280, 375]) {
+    await viewport(width);
+    await ev(`(() => { const el = document.createElement('div'); el.className = 'rowtest'; document.body.append(el);
+      window.rowEd = Blockquilt.mount(el, { source: '<!-- 1/3 -->\\n![Vert](media/de0000000003)\\n\\n<!-- 2/3 -->\\nLe chalet est au bout du chemin.\\n\\n<!-- 1/3 -->\\n\\n<!-- 2/3 -->\\nDécalé à droite.\\n\\n<!-- 1/2 -->\\nSeul dans sa ligne.\\n\\nFin.\\n' });
+      el.querySelector('[data-preview]').click(); })()`);
+    await waitFor(() => ev(`document.querySelectorAll('.rowtest .bq-row').length === 3`), 'aperçu des lignes');
+    const r = await ev(`(() => { const rows = [...document.querySelectorAll('.rowtest .bq-row')]; const box = (e) => e.getBoundingClientRect();
+      const [a, b] = rows[0].children, [s, t] = rows[1].children, lone = rows[2].children[0], art = box(document.querySelector('.rowtest .bq-content'));
+      const out = { ratio: Math.round(box(b).width / box(a).width * 10) / 10, sameTop: Math.abs(box(a).top - box(b).top) < 1, spaceShown: box(s).width > 0,
+        tRight: Math.round(art.right - box(t).right), loneFull: Math.round(art.width - box(lone).width), over: document.documentElement.scrollWidth > innerWidth };
+      rowEd.destroy(); document.querySelector('.rowtest').remove(); return out; })()`);
+    if (width === 1280) ok(r.sameTop && r.ratio >= 1.8 && r.ratio <= 2.2 && r.spaceShown && Math.abs(r.tRight) <= 1 && Math.abs(r.loneFull) <= 1 && !r.over, `1280 px, lignes : ⅓ + ⅔ côte à côte, Espace qui décale, ligne incomplète qui remplit la largeur (${JSON.stringify(r)})`);
+    else ok(!r.sameTop && !r.spaceShown && Math.abs(r.loneFull) <= 1 && !r.over, `375 px, lignes : empilées, Espaces cachés, rien ne déborde (${JSON.stringify(r)})`);
+  }
+
   // ---- Phase 9 : IA ----
   await viewport(375);
   await open();

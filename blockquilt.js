@@ -17,6 +17,24 @@ const Blocks = {
   def(type) { return Blocks.types[type] || Blocks.types.raw; },
   /** Types texte convertibles entre eux, dans l'ordre d'enregistrement. */
   get TEXT_KEYS() { return Blocks.order.filter((k) => Blocks.types[k].convertible); },
+  /** Largeur d'un bloc dans une ligne composée : sa première ligne. Trois largeurs seulement. */
+  WIDTH: /^<!-- (1\/3|1\/2|2\/3) -->$/,
+  SIXTHS: { '1/3': 2, '1/2': 3, '2/3': 4 },
+  /** Blocs → suite de { block } (pleine largeur) et { row: [blocs] }. Une ligne se ferme à 6 sixièmes ; ce qui déborde ouvre la suivante. */
+  rows(blocks) {
+    const out = [];
+    let row = null;
+    let sum = 0;
+    for (const b of blocks) {
+      const n = Blocks.SIXTHS[b.width];
+      if (!n) { row = null; out.push({ block: b }); continue; }
+      if (!row || sum + n > 6) { row = []; sum = 0; out.push({ row }); }
+      row.push(b);
+      sum += n;
+      if (sum === 6) row = null;
+    }
+    return out;
+  },
   CALLOUTS: ['info', 'tip', 'success', 'warning', 'danger'],
 
   ENTITIES: { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" },
@@ -56,6 +74,8 @@ const Blocks = {
       cur = [];
     };
     const push = (line, i) => { if (!cur.length) start = offset + i + 1; cur.push(line); };
+    // Une ligne de largeur (« <!-- 1/3 --> ») seule reste en tête du bloc qui la suit, même un bloc ::: ou un titre.
+    const open = () => { if (!(cur.length === 1 && Blocks.WIDTH.test(cur[0]))) flush(); };
     lines.forEach((line, i) => {
       let m;
       if (fence) {
@@ -63,11 +83,11 @@ const Blocks = {
         push(line, i);
         if (fence.close.test(line)) { fence = null; flush(); }
       } else if ((m = /^(`{3,}|~{3,})/.exec(line))) {
-        flush(); push(line, i); fence = { close: new RegExp('^' + m[1] + '\\s*$'), line: offset + i + 1, kind: 'code' };
+        open(); push(line, i); fence = { close: new RegExp('^' + m[1] + '\\s*$'), line: offset + i + 1, kind: 'code' };
       } else if (/^:::\w/.test(line)) {
-        flush(); push(line, i); fence = { close: /^:::\s*$/, line: offset + i + 1, kind: ':::' };
+        open(); push(line, i); fence = { close: /^:::\s*$/, line: offset + i + 1, kind: ':::' };
       } else if (/^#{1,6} /.test(line)) {
-        flush(); push(line, i); flush();
+        open(); push(line, i); flush();
       } else if (line.trim() === '') flush();
       else push(line, i);
     });
@@ -100,6 +120,10 @@ const Blocks = {
       const m = /^> ?\[!(\w+)\]/.exec(c.text);
       if (m && !Blocks.CALLOUTS.includes(m[1].toLowerCase())) out.push({ line: c.line, message: `Type d’encadré inconnu « ${m[1]} » (connus : ${Blocks.CALLOUTS.join(', ')})` });
       else if (Blocks.fromMarkdown(c.text).type === 'raw') out.push({ line: c.line, message: 'Bloc non reconnu, gardé tel quel : « ' + c.text.split('\n')[0].slice(0, 60) + ' »' });
+    }
+    const blocks = chunks.map((c) => ({ ...Blocks.fromMarkdown(c.text), line: c.line }));
+    for (const r of Blocks.rows(blocks)) {
+      if (r.row && r.row.reduce((n, b) => n + Blocks.SIXTHS[b.width], 0) < 6) out.push({ line: r.row[0].line, message: `Ligne incomplète (${r.row.map((b) => b.width).join(' + ')}) : ses blocs s'élargissent pour la remplir. Lignes possibles : 1/2 + 1/2, 1/3 + 2/3, 2/3 + 1/3, 1/3 + 1/3 + 1/3.` });
     }
     return out.sort((a, b) => a.line - b.line);
   },
@@ -501,7 +525,13 @@ const Blocks = {
   tidy(x) { return x.split('\n').map((l) => l.replace(/\s+$/, '')).join('\n').replace(/^\n+|\n+$/g, ''); },
 
   fromMarkdown(md) {
-    const t = Blocks.tidy(md);
+    const lines = Blocks.tidy(md).split('\n');
+    const w = Blocks.WIDTH.exec(lines[0]);
+    if (w) {
+      if (lines.length === 1) return { type: 'space', width: w[1] };
+      return { ...Blocks.fromMarkdown(lines.slice(1).join('\n')), width: w[1] };
+    }
+    const t = lines.join('\n');
     for (const type of Blocks.order) {
       const def = Blocks.types[type];
       const m = def.match ? def.match(t) : null;
@@ -511,7 +541,12 @@ const Blocks = {
   },
 
   /** Modèle → Markdown du bloc (vide si le bloc est vide : il disparaît à l'enregistrement). */
-  toMarkdown(b) { return Blocks.def(b.type).toMarkdown(b); },
+  toMarkdown(b) {
+    const x = Blocks.def(b.type).toMarkdown(b);
+    if (!b.width) return x;
+    // Un bloc vidé disparaît, sa largeur avec lui ; l'Espace n'a que sa largeur.
+    return x || b.type === 'space' ? `<!-- ${b.width} -->` + (x ? '\n' + x : '') : '';
+  },
 
   /** Modèle d'un bloc neuf : vide, c'est le texte d'aide qui guide. */
   blank(type) { return { type, ...Blocks.def(type).blank() }; },
@@ -581,7 +616,11 @@ const Blocks = {
     const icon = meta.icon ? `<span class="bq-icon" aria-hidden="true">${Blocks.esc(meta.icon)}</span> ` : '';
     // Titre du frontmatter en <h1>, sauf si le contenu a déjà son bloc H1 : jamais deux <h1>.
     const head = title && meta.title && !blocks.some((b) => b.type === 'h1') ? `<header><h1>${icon}${Blocks.esc(meta.title)}</h1></header>\n` : '';
-    return `<article class="bq-content">\n${head}${blocks.map((b) => Blocks.def(b.type).toHtml(b, ctx)).filter(Boolean).join('\n')}\n</article>`;
+    const one = (b) => Blocks.def(b.type).toHtml(b, ctx);
+    // Ligne composée : une colonne par bloc, de 2, 3 ou 4 sixièmes (blockquilt-content.css) ; une ligne d'Espaces seuls ne s'affiche pas.
+    const col = (b) => (b.type === 'space' ? `<div class="bq-col bq-w${Blocks.SIXTHS[b.width]} bq-space" aria-hidden="true"></div>` : `<div class="bq-col bq-w${Blocks.SIXTHS[b.width]}">${one(b)}</div>`);
+    const html = Blocks.rows(blocks).map((r) => (r.block ? one(r.block) : r.row.every((b) => b.type === 'space') ? '' : `<div class="bq-row">${r.row.map(col).join('')}</div>`));
+    return `<article class="bq-content">\n${head}${html.filter(Boolean).join('\n')}\n</article>`;
   },
 };
 
@@ -795,6 +834,15 @@ const Blocks = {
     toMarkdown: () => '---',
     toHtml: () => '<hr>',
     blank: () => ({}),
+  });
+
+  // Espace : une place vide dans une ligne composée. Son texte n'est que sa largeur (« <!-- 1/3 --> »), lue par fromMarkdown.
+  Blocks.register('space', {
+    label: 'Espace', short: 'Espace', icon: 'space', group: 'structure', ai: false,
+    tone: tone('bq-tone bq-tone-dashed border-dashed', 'bq-badge'),
+    toMarkdown: () => '',
+    toHtml: () => '',
+    blank: () => ({ width: '1/3' }),
   });
 
   Blocks.register('code', {

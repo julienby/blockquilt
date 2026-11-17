@@ -318,4 +318,27 @@ for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'edit
   ok(Blocks.lint(':::card\n### A\n')[0]?.message.includes('non fermé'), 'carte non fermée : alerte lint');
 }
 
+// ---- Lignes composées : largeur en tête de bloc, Espace, regroupement, rendu (L1) ----
+{
+  const doc = '<!-- 1/3 -->\n![Chalet](media/c1)\n\n<!-- 2/3 -->\nLe chalet est au bout du chemin.\n\n<!-- 1/2 -->\n:::card\n### A\n:::\n\n<!-- 1/2 -->\n## Titre\n\n<!-- 1/3 -->\n\n<!-- 1/3 -->\n---\n\n<!-- 1/3 -->\n```js\nx\n```\n\nPleine largeur.\n';
+  const { blocks } = Blocks.parse(doc);
+  ok(blocks.map((b) => `${b.type}:${b.width || '-'}`).join() === 'photo:1/3,text:2/3,card:1/2,h2:1/2,space:1/3,hr:1/3,code:1/3,text:-', 'largeur : lue sur tous les types, Espace, titre et bloc ::: gardés avec leur largeur — ' + blocks.map((b) => `${b.type}:${b.width || '-'}`).join());
+  ok(Blocks.serialize({}, blocks) === doc, 'largeur : aller-retour exact');
+  ok(Blocks.lint(doc).length === 0, 'lignes complètes : aucune alerte');
+  ok(types('<!-- 3/4 -->\nTexte') !== 'text' || !Blocks.parse('<!-- 3/4 -->\nTexte').blocks[0].width, 'largeur : seules 1/3, 1/2, 2/3');
+  ok(Blocks.parse('<!-- 1/2 -->\nTexte').blocks[0].html === 'Texte', 'largeur : le commentaire ne reste pas dans le texte');
+  ok(Blocks.toMarkdown({ type: 'text', html: '', width: '1/2' }) === '', 'bloc vide avec largeur : disparaît');
+  ok(Blocks.toMarkdown({ type: 'space', width: '1/3' }) === '<!-- 1/3 -->', 'Espace : le commentaire seul');
+  const rows = (md) => Blocks.rows(Blocks.parse(md).blocks).map((r) => (r.row ? '[' + r.row.map((b) => b.width).join('+') + ']' : '-')).join(' ');
+  ok(rows('<!-- 1/2 -->\nA\n\n<!-- 1/2 -->\nB\n\n<!-- 1/3 -->\nC\n\n<!-- 2/3 -->\nD\n\n<!-- 1/3 -->\nE\n\n<!-- 1/3 -->\nF\n\n<!-- 1/3 -->\nG\n\nH') === '[1/2+1/2] [1/3+2/3] [1/3+1/3+1/3] -', 'lignes : ½+½, ⅓+⅔, ⅓+⅓+⅓, puis pleine largeur');
+  ok(rows('<!-- 1/2 -->\nA\n\n<!-- 2/3 -->\nB\n\n<!-- 1/3 -->\nC') === '[1/2] [2/3+1/3]', 'débordement : nouvelle ligne');
+  ok(rows('<!-- 1/3 -->\nA\n\nB') === '[1/3] -', 'incomplète puis pleine largeur');
+  const warn = Blocks.lint('Intro\n\n<!-- 1/2 -->\nA\n\n<!-- 2/3 -->\nB\n\n<!-- 1/3 -->\nC');
+  ok(warn.length === 1 && warn[0].line === 3 && warn[0].message.startsWith('Ligne incomplète'), 'lint : ligne incomplète signalée à sa première ligne — ' + JSON.stringify(warn));
+  const h = Blocks.toHtml('<!-- 1/3 -->\n![C](media/c1)\n\n<!-- 2/3 -->\nTexte.\n\nFin.', { title: false });
+  ok(h.includes('<div class="bq-row"><div class="bq-col bq-w2"><figure>') && h.includes('<div class="bq-col bq-w4"><p>Texte.</p></div></div>\n<p>Fin.</p>'), 'rendu : bq-row, une bq-col par bloc (sixièmes) — ' + h);
+  ok(Blocks.toHtml('<!-- 1/3 -->\n\n<!-- 2/3 -->\nT', { title: false }).includes('<div class="bq-col bq-w2 bq-space" aria-hidden="true"></div>'), 'rendu : Espace = colonne vide cachée aux lecteurs d’écran');
+  ok(!Blocks.toHtml('<!-- 1/3 -->\n\n<!-- 1/3 -->', { title: false }).includes('bq-row'), 'rendu : une ligne faite seulement d’Espaces ne s’affiche pas');
+}
+
 process.exit(failed ? 1 : 0);
