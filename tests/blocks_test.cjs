@@ -270,6 +270,31 @@ delete Blocks.types.demo; Blocks.order.splice(Blocks.order.indexOf('demo'), 1);
   ok(Blocks.diffLines(big, big.replace('l3', 'x'), 0).filter((l) => l.op !== ' ').length === 2, 'diffLines : au-delà de la limite, retrait + ajout en bloc');
 }
 
+// ---- A1 : IA du document par opérations ----
+{
+  const show = (r) => (r.error ? 'ERR ' + r.error : r.ops.map((o) => `${o.mode} ${o.n}:${o.markdown}`).join(' | '));
+  const r = Blocks.parseOps('@@ remplacer 3\nNouveau bloc 3.\n\n@@ après 5\n## Titre\n\nUn paragraphe.\n\n@@ avant 1\nTout début.\n@@ supprimer 4\n', 5);
+  ok(show(r) === 'replace 3:Nouveau bloc 3. | after 5:## Titre\n\nUn paragraphe. | before 1:Tout début. | remove 4:', 'parseOps : quatre verbes, corps jusqu’au prochain @@, plusieurs blocs permis (' + show(r) + ')');
+  ok(show(Blocks.parseOps('', 3)) === '' && show(Blocks.parseOps('  \n\n', 3)) === '', 'parseOps : réponse vide → aucune opération (valide)');
+  ok(show(Blocks.parseOps('@@ remplacer 0\n---\ntitle: T\n---\n@@ après 0\nEn tête.', 2)) === 'replace 0:---\ntitle: T\n--- | after 0:En tête.', 'parseOps : bloc 0 (frontmatter) : remplacer et après');
+  ok(show(Blocks.parseOps('@@ avant 0\nx', 2)).startsWith('ERR ') && show(Blocks.parseOps('@@ supprimer 0', 2)).startsWith('ERR '), 'parseOps : avant 0, supprimer 0 refusés');
+  ok(show(Blocks.parseOps('@@ après 2\nA\n@@ après 2\nB\n@@ avant 2\nC', 2)) === 'after 2:A | after 2:B | before 2:C', 'parseOps : plusieurs avant / après sur un même numéro');
+  ok(show(Blocks.parseOps('@@ remplacer 2\nA\n@@ supprimer 2', 2)).includes('bloc 2'), 'parseOps : remplacer + supprimer sur un même numéro refusés');
+  ok(show(Blocks.parseOps('@@ remplacer 2\nA\n@@ remplacer 2\nB', 2)).startsWith('ERR '), 'parseOps : deux remplacer sur un même numéro refusés');
+  ok(show(Blocks.parseOps('@@ remplacer 7\nA', 3)) === 'ERR Ligne 1 : pas de bloc 7 (le document en a 3)', 'parseOps : numéro inconnu, message avec la ligne');
+  ok(show(Blocks.parseOps('Voici les changements :\n@@ remplacer 1\nA', 3)).startsWith('ERR Ligne 1'), 'parseOps : texte avant le premier @@ refusé');
+  ok(show(Blocks.parseOps('@@ modifier 1\nA', 3)).startsWith('ERR Ligne 1'), 'parseOps : verbe inconnu refusé');
+  ok(show(Blocks.parseOps('@@ remplacer 1\n\n@@ supprimer 2', 3)).startsWith('ERR Ligne 1') && show(Blocks.parseOps('@@ supprimer 2\nreste', 3)).startsWith('ERR Ligne 1'), 'parseOps : remplacer sans corps, supprimer avec corps refusés');
+  ok(show(Blocks.parseOps('@@ remplacer 1\r\nA\r\n', 3)) === 'replace 1:A', 'parseOps : fins de ligne Windows');
+
+  const words = (a, b) => Blocks.diffWords(a, b).map((p) => p.op + p.text).join('|');
+  ok(words('Le chein dort.', 'Le chien dort.') === ' Le |-chein|+chien|  dort.', 'diffWords : un mot changé, le reste en morceaux communs (' + words('Le chein dort.', 'Le chien dort.') + ')');
+  ok(words('a b', 'a b') === ' a b' && words('', 'x') === '+x' && words('x', '') === '-x', 'diffWords : égaux, tout ajouté, tout retiré');
+  const back = (a, b) => { const d = Blocks.diffWords(a, b); return d.filter((p) => p.op !== '+').map((p) => p.text).join('') === a && d.filter((p) => p.op !== '-').map((p) => p.text).join('') === b; };
+  ok(back('un deux trois', 'un trois quatre') && back('Ligne **un**\nligne deux', 'Ligne **1**\nligne deux, fin') && back('', ''), 'diffWords : l’ancien = communs + retirés, le nouveau = communs + ajoutés');
+  ok(Blocks.diffWords('un deux trois', 'un trois quatre').filter((p) => p.op === ' ').map((p) => p.text.trim()).join() === 'un,trois', 'diffWords : plus longue sous-suite commune de mots');
+}
+
 // ---- Modules de l'écran : syntaxe valide (une erreur bloquerait tout l'éditeur dans le navigateur) ----
 const { spawnSync } = require('node:child_process');
 for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'editor')).map((x) => 'editor/' + x)]) {

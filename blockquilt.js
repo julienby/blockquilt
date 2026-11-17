@@ -184,8 +184,23 @@ const Blocks = {
    * Au-delà de `limit` lignes différentes de chaque côté, tout l'ancien est retiré et tout le nouveau ajouté.
    */
   diffLines(a, b, limit = 1500) {
-    const x = String(a).replace(/\r\n/g, '\n').split('\n');
-    const y = String(b).replace(/\r\n/g, '\n').split('\n');
+    const lines = (t) => String(t).replace(/\r\n/g, '\n').split('\n');
+    return Blocks.diff(lines(a), lines(b), limit);
+  },
+
+  /** Différences mot à mot (espaces compris) → [{ op, text }] ; les mots voisins de même sorte sont réunis en un morceau. */
+  diffWords(a, b, limit = 1500) {
+    const words = (t) => String(t).split(/(\s+)/).filter(Boolean);
+    const out = [];
+    for (const p of Blocks.diff(words(a), words(b), limit)) {
+      if (out.at(-1)?.op === p.op) out.at(-1).text += p.text;
+      else out.push({ ...p });
+    }
+    return out;
+  },
+
+  /** Différences entre deux listes de textes (lignes, mots) : le moteur de diffLines et diffWords. */
+  diff(x, y, limit) {
     let s = 0;
     while (s < x.length && s < y.length && x[s] === y[s]) s++;
     let e = 0;
@@ -208,6 +223,42 @@ const Blocks = {
     }
     const same = (t) => ({ op: ' ', text: t });
     return [...x.slice(0, s).map(same), ...mid, ...x.slice(x.length - e).map(same)];
+  },
+
+  /**
+   * Réponse de l'IA en opérations → { ops: [{ mode, n, markdown }] } ou { error } (rien n'est réparé).
+   * Format : une ligne « @@ <verbe> <n> », puis le corps jusqu'au prochain « @@ » (plusieurs blocs permis).
+   * Verbes : remplacer, avant, après (corps obligatoire), supprimer (sans corps) ; modes : replace, before, after, remove.
+   * n : place du bloc dans le document envoyé, qui en a `count` ; 0 = frontmatter (remplacer, après seulement).
+   * Un seul « remplacer » ou « supprimer » par bloc. Réponse vide : aucune opération, ce qui est valide.
+   */
+  parseOps(text, count) {
+    const MODES = { remplacer: 'replace', avant: 'before', après: 'after', supprimer: 'remove' };
+    const lines = String(text ?? '').replace(/\r\n/g, '\n').split('\n');
+    const heads = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('@@')) heads.push({ at: i + 1, head: /^@@ (\S+) (\d+)\s*$/.exec(lines[i]), body: [] });
+      else if (heads.length) heads.at(-1).body.push(lines[i]);
+      else if (lines[i].trim()) return { error: `Ligne ${i + 1} : « @@ <verbe> <numéro> » attendu, pas de texte avant` };
+    }
+    const ops = [];
+    const changed = new Set();
+    for (const { at, head, body } of heads) {
+      const fail = (message) => ({ error: `Ligne ${at} : ${message}` });
+      const mode = head && MODES[head[1]];
+      if (!mode) return fail('« @@ remplacer | avant | après | supprimer <numéro> » attendu');
+      const n = Number(head[2]);
+      const markdown = Blocks.fragment(body.join('\n'));
+      if (n > count) return fail(`pas de bloc ${n} (le document en a ${count})`);
+      if (n === 0 && (mode === 'before' || mode === 'remove')) return fail('le bloc 0 (frontmatter) se remplace ou se complète après, rien d’autre');
+      if (mode === 'remove' ? markdown : !markdown) return fail(mode === 'remove' ? '« supprimer » n’a pas de texte' : `« ${head[1]} » sans texte`);
+      if (mode === 'replace' || mode === 'remove') {
+        if (changed.has(n)) return fail(`un seul « remplacer » ou « supprimer » par bloc (bloc ${n})`);
+        changed.add(n);
+      }
+      ops.push({ mode, n, markdown });
+    }
+    return { ops };
   },
 
   // ---- Texte visible ⇄ Markdown ----
