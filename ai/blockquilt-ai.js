@@ -6,7 +6,8 @@
 //   GET  → { uses: [{ id, label, scopes }] }   les usages proposés (boutons de la feuille IA)
 //   POST → champs (multipart, urlencoded ou JSON) : scope (document | block), use (facultatif), instruction,
 //          text (document complet), block (Markdown du bloc si scope=block)
-//        → 200 { markdown } · 400 { error } (demande invalide) · 502 { error } (modèle indisponible)
+//        → 200 { markdown } · 400 { error } (demande invalide) · 413 { error } (texte trop long, limits.maxChars)
+//          · 429 { error } (limite de jetons du jour atteinte) · 502 { error } (modèle indisponible)
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,10 +20,21 @@ const FORMAT = fs.readFileSync(path.join(__dirname, '..', 'FORMAT.md'), 'utf8');
  * params : champs en plus de la requête au modèle, pour tous les usages (ceux d'un usage passent devant), par exemple
  *   OpenRouter `{ reasoning: { effort: 'low' } }` : un modèle qui « réfléchit » peut épuiser max_tokens avant de répondre ;
  * maxTokens : longueur maximale de la réponse (un document entier : 16 000 par défaut) ;
- * fallback({ scope, instruction, text, block, use }) : réponse sans clé (démo, essais).
+ * fallback({ scope, instruction, text, block, use }) : réponse sans clé (démo, essais) ;
+ * limits : { maxChars, perUserDay, globalDay } (absent ou 0 = pas de limite). maxChars : texte + bloc + consigne envoyés.
+ *   perUserDay, globalDay : jetons du jour (usage.total_tokens du modèle), par personne et pour tout le site ;
+ *   compteurs en mémoire, remis à zéro à minuit (heure du serveur) et au redémarrage ;
+ * userOf(req) : la personne qui demande (clé du compteur), le jeton Bearer par défaut ; null = seul le plafond global compte ;
+ * now() : l'heure (essais).
  */
-function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}, fallback = null, maxTokens = 16000 }) {
+function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}, fallback = null, maxTokens = 16000,
+  limits = {}, userOf = (req) => /^Bearer (\S+)$/.exec(req.headers.authorization || '')?.[1] || null, now = () => new Date() }) {
   const byId = new Map(uses.map((u) => [u.id, u]));
+  const spent = { day: '', global: 0, users: new Map() };
+  const today = () => {
+    const day = now().toDateString();
+    if (spent.day !== day) Object.assign(spent, { day, global: 0, users: new Map() });
+  };
 
   const prompt = ({ scope, instruction, text, block, use }) => ({
     system: 'Tu modifies un contenu au format blockquilt. Réponds uniquement avec le Markdown demandé, sans explication ni bloc de code autour.'
@@ -34,8 +46,8 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
       + (scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
   });
 
-  /** Demande → Markdown proposé. Erreur avec .status (400 ou 502). */
-  const complete = async (req) => {
+  /** Demande (et personne qui demande, ou null) → Markdown proposé. Erreur avec .status (400, 413, 429 ou 502). */
+  const complete = async (req, who = null) => {
     const scope = req.scope === 'block' ? 'block' : 'document';
     const use = req.use ? byId.get(req.use) : null;
     const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -44,10 +56,15 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     if (!use && !String(req.instruction || '').trim()) throw fail(400, 'Consigne vide');
     if (scope === 'block' && !String(req.block || '').trim()) throw fail(400, 'Bloc vide');
     const ask = { scope, use, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
+    const size = ask.text.length + ask.block.length + ask.instruction.length;
+    if (limits.maxChars && size > limits.maxChars) throw fail(413, `Texte trop long pour l’IA : ${size} caractères envoyés, ${limits.maxChars} au plus.`);
     if (!apiKey) {
       if (fallback) return fallback({ ...ask, use: use?.id || null });
       throw fail(502, 'IA non configurée (clé absente)');
     }
+    today();
+    if (limits.globalDay && spent.global >= limits.globalDay) throw fail(429, 'La limite IA du jour du site est atteinte. Réessayer demain.');
+    if (limits.perUserDay && who !== null && (spent.users.get(who) || 0) >= limits.perUserDay) throw fail(429, `Votre limite IA du jour est atteinte (${limits.perUserDay} jetons). Réessayer demain.`);
     const { system, user } = prompt(ask);
     let r;
     try {
@@ -60,6 +77,10 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
       throw fail(502, 'Modèle injoignable : ' + error.message);
     }
     const j = await r.json().catch(() => ({}));
+    // Jetons comptés dès la réponse, même si elle est refusée plus bas : le fournisseur les a facturés.
+    const tokens = j.usage?.total_tokens || 0;
+    spent.global += tokens;
+    if (who !== null) spent.users.set(who, (spent.users.get(who) || 0) + tokens);
     if (!r.ok) throw fail(502, j.error?.message || `Modèle indisponible (${r.status})`);
     const choice = j.choices?.[0];
     // Réponse coupée par la limite de longueur : jamais renvoyée (on pourrait l'appliquer et perdre la fin du texte).
@@ -87,7 +108,7 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     if (req.method === 'GET') return json(200, { uses: uses.map(({ id, label, scopes }) => ({ id, label, scopes: scopes || ['document', 'block'] })) });
     if (req.method !== 'POST') return json(405, { error: 'GET ou POST' });
     try {
-      json(200, { markdown: await complete(await read(req)) });
+      json(200, { markdown: await complete(await read(req), userOf(req)) });
     } catch (error) {
       json(error.status || 400, { error: error.message });
     }

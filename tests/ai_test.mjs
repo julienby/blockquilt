@@ -61,6 +61,39 @@ try {
   const json = await fetch(APP, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'document', instruction: 'x', text: 'T' }) });
   ok(json.status === 502, 'POST JSON accepté aussi');
 
+  // F5 : limites. Taille envoyée, jetons par personne et pour tout le site, d'après `usage` ; remis à zéro à minuit.
+  let clock = new Date('2026-11-16T10:00:00');
+  const lim = createAi({ baseUrl, apiKey: 'k', model: 'm', limits: { maxChars: 50, perUserDay: 100, globalDay: 250 }, now: () => clock, fallback: () => 'repli\n' });
+  const asks = (user, more = {}) => lim.complete({ scope: 'document', instruction: 'x', text: 'T', ...more }, user).then(() => 200, (e) => e.status + ' ' + e.message);
+  answer = { status: 200, body: { choices: [{ message: { content: 'ok' } }], usage: { total_tokens: 60 } } };
+  const big = await asks('ana', { text: 'a'.repeat(50) });
+  ok(big.startsWith('413 ') && big.includes('51 caractères') && big.includes('50 au plus'), 'maxChars : texte + bloc + consigne au-delà → 413, message avec les nombres (' + big + ')');
+  ok(await asks('ana') === 200 && await asks('ana') === 200, 'perUserDay : sous la limite, les demandes passent');
+  const full = await asks('ana');
+  ok(full.startsWith('429 ') && full.includes('Votre limite'), 'perUserDay : 120 jetons comptés sur 100 → 429 pour cette personne (' + full + ')');
+  ok(await asks('bob') === 200 && await asks('bob') === 200, 'perUserDay : une autre personne a son propre compteur');
+  ok(await asks('cyd') === 200, 'globalDay : 240 jetons comptés sur 250, la demande passe');
+  const site = await asks('dan');
+  ok(site.startsWith('429 ') && site.includes('du site'), 'globalDay : 300 jetons comptés sur 250 → 429 pour tout le monde (' + site + ')');
+  ok(await asks(null).then((x) => x.startsWith('429 ')), 'sans personne connue : le plafond global s’applique quand même');
+  clock = new Date('2026-11-17T00:00:01');
+  ok(await asks('ana') === 200, 'minuit passé : compteurs remis à zéro');
+  answer = { status: 200, body: { choices: [{ finish_reason: 'length', message: { content: 'coupé' } }], usage: { total_tokens: 60 } } };
+  await asks('ana');
+  answer = { status: 200, body: { choices: [{ message: { content: 'ok' } }], usage: { total_tokens: 60 } } };
+  ok((await asks('ana')).startsWith('429 '), 'réponse refusée (coupée) : ses jetons comptent quand même');
+  const free = createAi({ baseUrl, apiKey: '', model: 'm', limits: { maxChars: 5, perUserDay: 1, globalDay: 1 }, fallback: () => 'repli\n' });
+  ok(await free.complete({ scope: 'document', instruction: 'x', text: 'T' }, 'ana') === 'repli\n' && await free.complete({ scope: 'document', instruction: 'x', text: 'T' }, 'ana') === 'repli\n', 'réponse de repli : aucun jeton compté');
+  ok(await free.complete({ scope: 'document', instruction: 'x', text: 'T'.repeat(9) }).then(() => false, (e) => e.status === 413), 'réponse de repli : maxChars s’applique quand même');
+  // Par HTTP : la personne vient de userOf(req), le jeton Bearer par défaut.
+  const limApp = http.createServer((req, res) => lim.handler(req, res));
+  await new Promise((r) => limApp.listen(0, '127.0.0.1', r));
+  clock = new Date('2026-11-18T09:00:00');
+  const asHttp = (token) => fetch(`http://127.0.0.1:${limApp.address().port}/`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify({ scope: 'document', instruction: 'x', text: 'T' }) }).then(async (r) => r.status + ' ' + ((await r.json()).error || ''));
+  const seen = [await asHttp('jo'), await asHttp('jo'), await asHttp('jo'), await asHttp('li')];
+  limApp.close();
+  ok(seen[0].startsWith('200') && seen[1].startsWith('200') && seen[2].startsWith('429 Votre limite') && seen[3].startsWith('200'), 'HTTP : compteur par jeton Bearer, 429 avec { error } (' + seen.join(' | ') + ')');
+
   const demo = createAi({ baseUrl, apiKey: '', model: 'm', uses, fallback: ({ scope, use, text }) => `${scope}:${use}:${text}` });
   ok(await demo.complete({ scope: 'document', use: 'corriger', text: 'T' }) === 'document:corriger:T', 'sans clé : la réponse de repli de l’application');
   ok(await createAi({ baseUrl, model: 'm' }).complete({ scope: 'document', instruction: 'x', text: 'T' }).then(() => false, (e) => e.status === 502), 'sans clé ni repli : 502');

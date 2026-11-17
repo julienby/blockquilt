@@ -791,6 +791,19 @@ try {
   await ev(`document.activeElement.blur()`);
   await key('z', 'KeyZ', 90, CTRL);
   ok((await mdNow()) === docMid, 'IA sur le document : restauré par Ctrl+Z');
+  // F5 : au-delà de maxChars (20 000 dans la démo), le relais répond 413 ; le message reste dans la feuille.
+  await ev(`document.querySelector('[data-more]').click()`);
+  await ev(`document.querySelector('[data-more-act="ai"]').click()`);
+  await ev(`(() => { document.querySelector('[data-ai-instruction]').value = 'x'.repeat(20001); document.querySelector('[data-ai-run]').click(); })()`);
+  await waitFor(() => ev(`!document.querySelector('[data-ai-error]').hidden`), 'message de limite de l’IA');
+  await sleep(2500);
+  ok(await ev(`(() => { const e = document.querySelector('[data-ai-error]'); return e.offsetParent !== null && e.textContent.startsWith('Texte trop long pour l’IA') && e.textContent.includes('20000 au plus') && document.querySelector('[data-ai-result]').hidden; })()`), 'IA, texte trop long : message clair dans la feuille, encore visible après 2,5 s');
+  await ev(`document.querySelector('[data-sheet="ai"]').close()`);
+  await ev(`document.querySelector('[data-more]').click()`);
+  await ev(`document.querySelector('[data-more-act="ai"]').click()`);
+  ok(await ev(`document.querySelector('[data-ai-error]').hidden`), 'IA rouverte : l’ancien message a disparu');
+  await ev(`document.querySelector('[data-sheet="ai"]').close()`);
+  ok((await mdNow()) === docMid, 'IA refusée : le document n’a pas changé');
   // I4 : ce qu'on fait de la proposition — au début, à la fin, au-dessus, dessous, ou copier sans rien changer
   const aiRun = async (blockIndex) => {
     if (blockIndex === undefined) { await ev(`document.querySelector('[data-more]').click()`); await ev(`document.querySelector('[data-more-act="ai"]').click()`); }

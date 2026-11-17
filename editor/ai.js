@@ -27,6 +27,7 @@ export function installAi(ed) {
     $('[data-ai-form]', sheet).hidden = false;
     $('[data-ai-result]', sheet).hidden = true;
     $('[data-ai-instruction]', sheet).value = '';
+    $('[data-ai-error]', sheet).hidden = true;
     ed.openSheet('ai');
     loadUses().then((list) => {
       if (!list || !ai || ai.id !== id) return;
@@ -43,6 +44,8 @@ export function installAi(ed) {
     const b = ai.id && ed.blocks.find((x) => x.id === ai.id);
     if (ai.id && !b) return sheet.close();
     const button = $('[data-ai-run]', sheet);
+    const failure = $('[data-ai-error]', sheet);
+    failure.hidden = true;
     button.disabled = true;
     button.querySelector('span').textContent = 'L’IA travaille…';
     try {
@@ -63,7 +66,8 @@ export function installAi(ed) {
       $('[data-ai-form]', sheet).hidden = true;
       $('[data-ai-result]', sheet).hidden = false;
     } catch (error) {
-      if (error.name !== 'AbortError') ed.toast(error.message);
+      // Dans la feuille, pas en notification : un message de limite (413, 429) doit rester le temps d'être lu.
+      if (error.name !== 'AbortError') { failure.textContent = error.message; failure.hidden = false; }
     } finally {
       button.disabled = false;
       button.querySelector('span').textContent = 'Envoyer';

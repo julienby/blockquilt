@@ -164,7 +164,9 @@ app.all('/api/ai', ai.handler);   // GET : usages ; POST : { markdown }
 
 Le contrat (en tête du fichier) se réécrit en quelques lignes ailleurs, en PHP par exemple. `params` ajoute des champs à la requête du modèle (pour tous les usages, ou par usage) : avec un modèle qui « réfléchit » avant de répondre, `{ reasoning: { effort: 'low' } }` (OpenRouter) évite qu'il épuise `maxTokens` (16 000 par défaut) sans répondre. Une réponse coupée par la limite est toujours refusée, jamais renvoyée.
 
-La démo utilise ce relais : une clé dans `.env` (`AI_KEY=…`, fichier ignoré par git), puis `docker compose up -d` ; `AI_MODEL`, `AI_BASE_URL`, `AI_REASONING` (`low` par défaut) pour régler. Sans clé, elle met le texte en majuscules.
+**Limites** : `limits: { maxChars, perUserDay, globalDay }` (absent ou `0` = pas de limite). Au-delà de `maxChars` caractères envoyés (document + bloc + consigne) : 413. Jetons du jour (`usage.total_tokens` du modèle) au-delà de `perUserDay` pour une personne, ou de `globalDay` pour tout le site : 429. Compteurs en mémoire, remis à zéro à minuit (heure du serveur) et au redémarrage. La personne vient de `userOf(req)` : le jeton `Authorization: Bearer` par défaut ; `null` = seul le plafond global compte. L'éditeur affiche le message d'erreur dans la feuille IA. Garder aussi une limite de crédit chez le fournisseur.
+
+La démo utilise ce relais : une clé dans `.env` (`AI_KEY=…`, fichier ignoré par git), puis `docker compose up -d` ; `AI_MODEL`, `AI_BASE_URL`, `AI_REASONING` (`low` par défaut) pour régler. Sans clé, elle met le texte en majuscules. Ses limites : 20 000 caractères, 50 000 jetons par personne (jeton, sinon adresse IP) et 500 000 pour tout le site, par jour.
 
 ### Serveur MCP (Claude Code, ChatGPT…)
 

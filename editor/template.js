@@ -64,7 +64,8 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
       <p data-ai-scope class="mb-2 truncate rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900"></p>
       <div data-ai-uses class="flex flex-wrap gap-1.5">${[['Corriger', 'Corrige l’orthographe et la grammaire, sans changer le sens ni la structure.'], ['Raccourcir', 'Raccourcis le texte en gardant l’essentiel.'], ['En étapes', 'Réécris sous forme d’étapes numérotées.'], ['Traduire', 'Traduis en anglais, en gardant la structure.']].map(([l, t]) => `<button type="button" data-ai-preset="${attr(t)}" class="min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950 hover:bg-amber-100">${l}</button>`).join('')}</div>
       <textarea data-ai-instruction rows="3" aria-label="Consigne" placeholder="Votre consigne, par exemple : ajoute une astuce sur le parking" class="mt-2 w-full rounded-xl border border-stone-300 p-3 text-[15px]"></textarea>
-      <button type="button" data-ai-run class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 font-semibold text-white disabled:opacity-60">${ic('wand', 'size-4')}<span>Envoyer</span></button></div>
+      <button type="button" data-ai-run class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 font-semibold text-white disabled:opacity-60">${ic('wand', 'size-4')}<span>Envoyer</span></button>
+      <p data-ai-error role="alert" hidden class="mt-2 rounded-xl bg-red-50 p-3 text-sm text-red-800"></p></div>
     <div data-ai-result hidden>
       <ul data-ai-lint role="alert" class="mb-2 space-y-1 rounded-xl bg-red-50 p-3 text-xs text-red-800"></ul>
       <label data-ai-force-wrap class="mb-2 flex min-h-11 items-center gap-2 text-sm font-semibold text-red-800"><input type="checkbox" data-ai-force class="size-5"> Appliquer malgré les alertes</label>

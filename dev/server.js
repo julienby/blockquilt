@@ -59,6 +59,13 @@ const ai = createAi({
     { id: 'etapes', label: 'En étapes', instruction: 'Réécris sous forme d’étapes numérotées.' },
     { id: 'traduire', label: 'En anglais', instruction: 'Traduis en anglais, en gardant la structure et les emoji.' },
   ],
+  // Démo publique : limites basses. Personne = son jeton (Bearer ou cookie bq_token de /app), sinon son adresse IP
+  // (X-Forwarded-For posé par Caddy). Garder aussi une limite de crédit sur la clé OpenRouter.
+  limits: { maxChars: 20000, perUserDay: 50000, globalDay: 500000 },
+  userOf: (req) => /^Bearer (\S+)$/.exec(req.headers.authorization || '')?.[1]
+    || /(?:^|;\s*)bq_token=([^;]+)/.exec(req.headers.cookie || '')?.[1]
+    || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    || req.socket.remoteAddress,
   // Démo : « non fermé » dans la consigne donne une réponse fautive, pour essayer les alertes.
   fallback: ({ scope, instruction, text, block }) => shout(scope === 'block' ? block : text) + (/non fermé/i.test(instruction) ? '\n:::html\n<p>bloc sans fin</p>\n' : ''),
 });
