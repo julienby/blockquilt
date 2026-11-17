@@ -779,6 +779,9 @@ try {
     const changed = pa.map((x, i) => x !== pb[i]).reduce((n, x) => n + x, 0);
     ok(pa.length === pb.length && changed === 1 && pa[tipIndex].startsWith('> [!tip]') && pa[tipIndex].includes('GAREZ-VOUS'), 'IA sur un bloc : seul ce bloc change dans document.md');
   }
+  ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Texte.\\n\\n---\\n', aiUrl: 'api/ai' });
+    const has = (i) => { el.querySelectorAll('[data-id]')[i].querySelector('[data-menu]').click(); const m = el.querySelector('[data-sheet="menu"]'); const r = !!m.querySelector('[data-act="ai"]'); m.close(); return r; };
+    const r = has(0) && !has(1); e.destroy(); el.remove(); return r; })()`), 'IA sur un bloc : absente du menu d’une ligne horizontale');
   const docMid = await mdNow();
   await ev(`document.querySelector('[data-more]').click()`);
   await ev(`document.querySelector('[data-more-act="ai"]').click()`);
@@ -808,10 +811,10 @@ try {
   ok((await mdNow()) === docMid, 'IA refusée : le document n’a pas changé');
   // A3 : IA du document par opérations, dans un éditeur à part au document connu. La démo répond : blocs 1 et 2 en
   // majuscules, un paragraphe après le dernier ; une consigne qui commence par « @@ » est renvoyée telle quelle.
-  const opsRun = (instruction, then) => ev(`(async () => {
+  const opsRun = (instruction, then, source = '---\\ntitle: Essai\\n---\\n\\nPremier bloc.\\n\\nDeuxième bloc.\\n\\nTroisième bloc.\\n') => ev(`(async () => {
     const wait = async (f) => { for (let i = 0; i < 100 && !f(); i++) await new Promise((r) => setTimeout(r, 50)); return f(); };
     const el = document.createElement('div'); document.body.append(el);
-    const source = '---\\ntitle: Essai\\n---\\n\\nPremier bloc.\\n\\nDeuxième bloc.\\n\\nTroisième bloc.\\n';
+    const source = '${source}';
     const e = Blockquilt.mount(el, { source, aiUrl: 'api/ai' });
     const $ = (s) => el.querySelector(s), $$ = (s) => [...el.querySelectorAll(s)];
     $('[data-more]').click(); $('[data-more-act="ai"]').click();
@@ -853,6 +856,10 @@ try {
     ok(c.summary === 'Aucune modification proposée.' && c.disabled && c.button === 'Aucune proposition choisie' && c.untouched, 'IA document : « @@ rien » → aucune modification proposée');
     const d = await opsRun('@@ modifier 1\nx', `$('[data-ai-copy]').click(); s.copied = await navigator.clipboard.readText(); s.end = e.getMarkdown() === source;`);
     ok(d.summary.startsWith('La réponse de l’IA n’est pas utilisable (Ligne 1') && d.disabled && d.copied === '@@ modifier 1\nx' && d.end, 'IA document : réponse illisible → rien d’appliqué, texte brut copiable (' + JSON.stringify(d) + ')');
+    // Supprimer : le type du bloc et le début de son texte, sans code Markdown.
+    const g = await opsRun('@@ supprimer 1\n@@ supprimer 2\n@@ supprimer 3', `s.removed = $$('[data-ai-ops-list] li > p').map((x) => x.textContent);`,
+      '## Les clés\\n\\n> [!tip]\\n> Garez-**vous** sur le parking du haut, il est gratuit le soir et le week-end, pensez-y.\\n\\n---\\n');
+    ok(g.removed?.join('|') === 'Titre H2 · « Les clés »|Astuce · « Garez-vous sur le parking du haut, il est gratuit le soir et le week-end, pensez… »|Ligne horizontale', 'IA document, supprimer : type du bloc et début du texte, sans code Markdown (' + JSON.stringify(g.removed) + ')');
     const f = await opsRun('@@ après 3\n:::html\n<p>sans fin</p>', '');
     ok(f.checked.join() === 'false' && f.button === 'Aucune proposition choisie', 'IA document : proposition en alerte lint → décochée');
   }

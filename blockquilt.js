@@ -748,7 +748,7 @@ const Blocks = {
   });
 
   Blocks.register('hr', {
-    label: 'Ligne horizontale', short: 'Ligne', icon: 'minus', group: 'structure',
+    label: 'Ligne horizontale', short: 'Ligne', icon: 'minus', group: 'structure', ai: false, // aucun texte : pas d'IA sur ce bloc
     tone: tone('bq-tone', 'bq-badge'),
     match: (t) => (t === '---' ? {} : null),
     toMarkdown: () => '---',

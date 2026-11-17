@@ -94,7 +94,7 @@ export function installActions(ed) {
       + item('data-act="copy"', 'copy', 'Copier')
       + item('data-act="paste-above"', 'paste', 'Coller au-dessus')
       + item('data-act="paste"', 'paste', 'Coller dessous')
-      + (o.aiUrl ? item('data-act="ai"', 'wand', 'IA sur ce bloc', 'text-amber-800') : '');
+      + (o.aiUrl && ed.def(b).ai !== false ? item('data-act="ai"', 'wand', 'IA sur ce bloc', 'text-amber-800') : '');
     ed.openSheet('menu', from);
   };
   ed.on(sheets.menu, 'click', (e) => {

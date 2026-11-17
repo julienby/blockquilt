@@ -42,9 +42,18 @@ export function installAiOps(ed, sheet) {
   const title = ({ mode, n }) => (n > 0 ? `${VERB[mode]} le bloc ${n}`
     : mode === 'replace' ? 'Remplacer le titre et les réglages (frontmatter)' : 'Ajouter au début du document');
 
+  // Bloc à supprimer : son type et le début de son texte rendu (le code Markdown seul ressemblerait à une erreur).
+  const named = (md) => {
+    const label = Blocks.def(Blocks.parse(md).blocks[0]?.type).label;
+    const box = document.createElement('div');
+    box.innerHTML = Blocks.toHtml(md, { media: o.media, title: false });
+    const text = box.textContent.replace(/\s+/g, ' ').trim();
+    return text ? `${label} · « ${text.length > 80 ? text.slice(0, 80) + '…' : text} »` : label;
+  };
+
   // Remplacer : différences mot à mot dans le Markdown ; supprimer : le bloc barré ; ajouter : le rendu du texte ajouté.
   const body = (op) => {
-    if (op.mode === 'remove') return `<p class="${BOX} bg-red-50 text-red-900 line-through decoration-red-300">${esc(target(op.n))}</p>`;
+    if (op.mode === 'remove') return `<p class="${BOX} bg-red-50 text-red-900">${esc(named(target(op.n)))}</p>`;
     if (op.mode === 'replace') {
       const parts = Blocks.diffWords(target(op.n), op.markdown).map((p) => (p.op === ' ' ? esc(p.text)
         : p.op === '-' ? `<del class="bg-red-50 text-red-900 decoration-red-300">${esc(p.text)}</del>`
