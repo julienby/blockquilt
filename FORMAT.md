@@ -48,6 +48,12 @@ Prendre le chemin derrière la maison.
 [Voir le plan](https://exemple.fr/plage)
 :::
 
+<!-- 1/3 -->
+![La terrasse](media/aaa111bbb222)
+
+<!-- 2/3 -->
+La terrasse est plein sud. Les chaises sont dans l'abri.
+
 https://youtu.be/dQw4w9WgXcQ
 
 ---
@@ -78,6 +84,8 @@ ssh maison.local
 | Vidéo | Adresse YouTube ou Vimeo, seule sur sa ligne |
 | Ligne horizontale | `---` seul, entre deux lignes vides |
 | Code | Trois accents graves suivis du langage (` ```js `), le code, puis trois accents graves |
+
+**Lignes composées.** Pour mettre des blocs côte à côte, écrire leur largeur en première ligne du bloc : `<!-- 1/3 -->`, `<!-- 1/2 -->` ou `<!-- 2/3 -->` (rien d'autre). Les blocs avec une largeur qui se suivent forment une ligne, fermée quand la somme fait 1 : `1/2 + 1/2`, `1/3 + 2/3`, `2/3 + 1/3`, `1/3 + 1/3 + 1/3`. Le commentaire seul est un bloc Espace : une place vide dans la ligne. Sur un écran étroit, les blocs s'empilent. Une ligne incomplète est signalée par `Blocks.lint` ; à l'affichage, ses blocs s'élargissent pour la remplir.
 
 **Types d'encadré** (en minuscules) : `info`, `tip` (astuce), `success`, `warning` (attention), `danger`.
 

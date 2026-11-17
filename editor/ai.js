@@ -93,7 +93,8 @@ export function installAi(ed) {
     if (ai.id) {
       const i = ed.blocks.findIndex((x) => x.id === ai.id);
       if (i < 0) return;
-      const added = Blocks.parse(ai.markdown).blocks.map((b) => ({ id: ed.newId(), ...b }));
+      const parsed = Blocks.parse(ai.markdown).blocks;
+      const added = (how === 'replace' ? Blocks.keepWidth(ed.blocks[i], parsed) : parsed).map((b) => ({ id: ed.newId(), ...b }));
       ed.change(() => (how === 'replace' ? ed.blocks.splice(i, 1, ...added) : ed.blocks.splice(how === 'start' ? i : i + 1, 0, ...added)));
     } else {
       // Remplacer : sans frontmatter dans la réponse, le titre et l'icône du document sont gardés ; au début / à la fin : ses clés absentes sont ajoutées.

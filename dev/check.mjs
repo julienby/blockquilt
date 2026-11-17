@@ -797,6 +797,34 @@ try {
     else ok(!r.sameTop && !r.spaceShown && Math.abs(r.loneFull) <= 1 && !r.over, `375 px, lignes : empilées, Espaces cachés, rien ne déborde (${JSON.stringify(r)})`);
   }
 
+  // ---- Lignes composées dans l'éditeur (L3) : blocs l'un sous l'autre, petite grille à côté du type, largeur au menu « ⋯ » ----
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    const r = await ev(`(async () => {
+      const el = document.createElement('div'); el.className = 'coltest'; document.body.append(el);
+      const e = Blockquilt.mount(el, { source: '<!-- 1/3 -->\\n:::carousel\\n![a](media/de0000000002)\\n![b](media/de0000000003)\\n:::\\n\\n<!-- 2/3 -->\\nTexte.\\n\\n<!-- 1/2 -->\\nSeul.\\n\\nPlein.\\n' });
+      const cards = () => [...el.querySelectorAll('[data-id]')];
+      const grid = (i) => cards()[i].querySelector('[data-col-grid]');
+      const s = { stacked: cards()[1].getBoundingClientRect().top > cards()[0].getBoundingClientRect().bottom,
+        labels: cards().map((c, i) => grid(i)?.getAttribute('aria-label') ?? '-'), incomplete: !!grid(2)?.hasAttribute('data-incomplete'),
+        fits: cards().every((c) => c.scrollWidth <= c.clientWidth + 1) && document.documentElement.scrollWidth <= innerWidth };
+      const pick = (i, w) => { cards()[i].querySelector('[data-menu]').click(); const m = el.querySelector('[data-sheet="menu"]'); s.options ??= [...m.querySelectorAll('[data-col]')].map((x) => x.dataset.col + (x.getAttribute('aria-pressed') === 'true' ? '*' : '')).join(); m.querySelector('[data-col="' + w + '"]').click(); };
+      pick(3, '1/2');
+      s.afterHalf = e.getMarkdown(); s.complete = !grid(2).hasAttribute('data-incomplete') && !!grid(3);
+      pick(0, '');
+      s.afterFull = e.getMarkdown(); s.noGrid = !grid(0);
+      e.undo(); s.undone = e.getMarkdown().startsWith('<!-- 1/3 -->');
+      el.querySelector('[data-insert="end"]').click(); el.querySelector('[data-pick="space"]').click();
+      s.space = e.getMarkdown().endsWith('<!-- 1/3 -->\\n');
+      cards()[4].querySelector('[data-menu]').click(); const m = el.querySelector('[data-sheet="menu"]');
+      s.spaceOptions = [...m.querySelectorAll('[data-col]')].map((x) => x.dataset.col).join(); s.spaceAi = !!m.querySelector('[data-act="ai"]'); m.close();
+      e.destroy(); el.remove(); return s; })()`);
+    ok(r.stacked && r.labels[0].includes('1/3') && r.labels[0].includes('1re place sur 2') && r.labels[2].includes('incomplète') && r.incomplete && r.labels[3] === '-' && r.fits, `${width} px, lignes dans l’éditeur : blocs l’un sous l’autre, grille à côté du type, ligne incomplète signalée, rien ne déborde (${JSON.stringify(r)})`);
+    ok(r.afterHalf.includes('<!-- 1/2 -->\nSeul.\n\n<!-- 1/2 -->\nPlein.') && r.complete && r.options === '*,1/3,1/2,2/3', `${width} px, largeur choisie au menu « ⋯ » : la ligne se complète (${r.options})`);
+    ok(r.afterFull.startsWith(':::carousel') && r.noGrid && r.undone, `${width} px, pleine largeur : commentaire retiré, plus de grille ; Ctrl+Z le remet`);
+    ok(r.space && r.spaceOptions === '1/3,1/2,2/3' && !r.spaceAi, `${width} px, Espace : ajouté depuis le menu, sans « Pleine largeur » ni IA (${r.spaceOptions})`);
+  }
+
   // ---- Phase 9 : IA ----
   await viewport(375);
   await open();

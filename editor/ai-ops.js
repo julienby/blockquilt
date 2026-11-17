@@ -15,6 +15,8 @@ export function installAiOps(ed, sheet) {
 
   const head = () => Blocks.serialize(ed.docMeta(), []).trim();
   const target = (n) => (n === 0 ? sent.head : sent.blocks[n - 1].md);
+  // Remplacement sans ligne de largeur : le bloc garde la sienne (Blocks.keepWidth) ; on compare donc sans elle.
+  const before = (op) => (op.n > 0 && !Blocks.WIDTH.test(op.markdown.split('\n')[0]) ? target(op.n).replace(/^<!-- [^\n]* -->\n/, '') : target(op.n));
 
   /** Le champ `blocks` à envoyer ; garde de quoi retrouver chaque bloc à l'application. */
   ed.aiSnapshot = () => {
@@ -55,7 +57,7 @@ export function installAiOps(ed, sheet) {
   const body = (op) => {
     if (op.mode === 'remove') return `<p class="${BOX} bg-red-50 text-red-900">${esc(named(target(op.n)))}</p>`;
     if (op.mode === 'replace') {
-      const parts = Blocks.diffWords(target(op.n), op.markdown).map((p) => (p.op === ' ' ? esc(p.text)
+      const parts = Blocks.diffWords(before(op), op.markdown).map((p) => (p.op === ' ' ? esc(p.text)
         : p.op === '-' ? `<del class="bg-red-50 text-red-900 decoration-red-300">${esc(p.text)}</del>`
           : `<ins class="bg-emerald-50 text-emerald-900 no-underline">${esc(p.text)}</ins>`));
       return `<p data-ai-diff class="${BOX} bg-stone-50">${parts.join('')}</p>`;
@@ -79,7 +81,7 @@ export function installAiOps(ed, sheet) {
     let unchanged = 0;
     for (const op of parsed.ops || []) {
       // Un modèle recopie parfois un bloc sans rien changer : ce n'est pas une proposition.
-      if (op.mode === 'replace' && op.markdown === Blocks.fragment(target(op.n))) unchanged++;
+      if (op.mode === 'replace' && op.markdown === Blocks.fragment(before(op))) unchanged++;
       else items.push({ op, alerts: alertsOf(op) });
     }
     if (parsed.error) summary.textContent = `La réponse de l’IA n’est pas utilisable (${parsed.error}). Vous pouvez la copier.`;
@@ -117,7 +119,7 @@ export function installAiOps(ed, sheet) {
         const g = at.get(id);
         if (op.mode === 'before') g.before.push(...fresh(op.markdown));
         else if (op.mode === 'after') g.after.push(...fresh(op.markdown));
-        else g.with = op.mode === 'remove' ? [] : fresh(op.markdown);
+        else g.with = op.mode === 'remove' ? [] : Blocks.keepWidth(ed.blocks.find((b) => b.id === id), Blocks.parse(op.markdown).blocks).map((b) => ({ id: ed.newId(), ...b }));
       }
       ed.blocks = [...start, ...ed.blocks.flatMap((b) => {
         const g = at.get(b.id);

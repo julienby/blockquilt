@@ -79,6 +79,7 @@ Blocks.editable = editable;
     read: (card, b) => { b.html = card.querySelector('[data-html]').value; },
     onInput: (card, ui) => { card.querySelector('[data-html-preview]').innerHTML = Blocks.sanitize(card.querySelector('[data-html]').value, ui.media); },
   });
+  Object.assign(Blocks.types.space, { fullscreen: false, edit: () => '<p class="py-2 text-sm italic opacity-60">Espace vide dans la ligne (caché sur un écran étroit)</p>', read: () => {} });
   Object.assign(Blocks.types.hr, { fullscreen: false, edit: () => '<hr class="my-3 border-t-2 border-stone-300">', read: () => {} });
   Object.assign(Blocks.types.code, {
     edit: (b) => `<input data-lang value="${attr(b.lang)}" placeholder="langage (js, html, sh…)" aria-label="Langage du code" class="mb-1 h-9 w-full bg-transparent font-mono text-xs focus:outline-none">

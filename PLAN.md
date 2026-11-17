@@ -160,7 +160,7 @@ Objectif : à la restitution, mettre des blocs côte à côte (une photo à 1/3 
 
 **Éditeur**
 - Les blocs restent les uns sous les autres.
-- À côté du type, un bouton montre une petite grille dessinée (2 ou 3 cases), avec la case du bloc en couleur. Pas de texte « 2/3 », qui se confond avec la largeur. Un bloc pleine largeur n'a pas de grille, seulement le bouton.
+- À côté du type, une petite grille dessinée (pas un bouton : la place manque à 375 px ; la largeur se choisit dans le menu « ⋯ ») (2 ou 3 cases), avec la case du bloc en couleur. Pas de texte « 2/3 », qui se confond avec la largeur. Un bloc pleine largeur n'a pas de grille, seulement le bouton.
 - Le bouton ouvre un choix : Pleine largeur, 1/3, 1/2, 2/3.
 - Ligne incomplète : la grille est en orange et porte l'aide « Ligne incomplète ».
 - « Espace » est dans le menu d'ajout, groupe Structure.
@@ -169,8 +169,8 @@ Objectif : à la restitution, mettre des blocs côte à côte (une photo à 1/3 
 **Étapes**
 - [x] **L1 Noyau** : lire et écrire la largeur (générique, pour tous les types : `fromMarkdown` / `toMarkdown`), bloc Espace, regroupement en lignes, alertes lint, rendu `bq-row`. Tests Node : aller-retour, types lus, lignes possibles, incomplète, débordement, ligne horizontale refusée, HTML rendu.
 - [x] **L2 CSS publié** : grille et empilement en écran étroit. Test `dev/check.mjs` en aperçu : côte à côte à 1280 px, empilé à 375 px.
-- [ ] **L3 Éditeur** : bouton de largeur et sa grille, choix, alerte de ligne incomplète, Espace dans le menu d'ajout, largeur gardée par l'IA sur un bloc. Tests à 375 px et 1280 px.
-- [ ] **L4 Docs** : `FORMAT.md` (l'IA le reçoit : elle pourra composer des lignes), démo, `DECISIONS.md`.
+- [x] **L3 Éditeur** : bouton de largeur et sa grille, choix, alerte de ligne incomplète, Espace dans le menu d'ajout, largeur gardée par l'IA sur un bloc. Tests à 375 px et 1280 px.
+- [x] **L4 Docs** : `FORMAT.md` (l'IA le reçoit : elle pourra composer des lignes), démo, `DECISIONS.md`.
 
 ## 5. IA — fait (I1 à I6)
 

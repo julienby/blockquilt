@@ -565,12 +565,21 @@ const Blocks = {
   /** Convertit un bloc texte en un autre type texte. Entre encadrés, l'icône et le titre suivent ; sinon le titre devient une ligne. */
   convert(b, type) {
     if (b.type === type) return b;
+    const out = Blocks.convertBody(b, type);
+    return b.width ? { ...out, width: b.width } : out;
+  },
+  convertBody(b, type) {
     const to = Blocks.def(type);
     const keep = Blocks.CALLOUTS.includes(b.type) && Blocks.CALLOUTS.includes(type);
     const lines = keep ? Blocks.htmlToMd(b.html ?? '', true).split('\n').filter((l) => l.trim() !== '') : Blocks.mdLines(b);
     // Vers un titre : une seule ligne, sans puces.
     if (to.single) return { type, html: Blocks.esc(Blocks.stripTags(lines.map((l) => Blocks.inlineHtml(l.replace(/^\s*(?:[-*]|\d+\.) /, ''))).join(' ')).replace(/\s+/g, ' ').trim()) };
     return { ...Blocks.blank(type), ...(keep ? { icon: b.icon, title: b.title } : {}), html: Blocks.linesToHtml(lines) };
+  },
+
+  /** Blocs qui remplacent `old` (réponse de l'IA sur un bloc) : un bloc seul, sans largeur écrite, garde celle de `old`. */
+  keepWidth(old, blocks) {
+    return old.width && blocks.length === 1 && !blocks[0].width ? [{ ...blocks[0], width: old.width }] : blocks;
   },
 
   /** Fusionne deux blocs voisins : le type du dessus l'emporte, les lignes du dessous suivent. null si impossible (titre au-dessus, média, bloc avancé). */

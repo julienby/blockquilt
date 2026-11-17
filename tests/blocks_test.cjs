@@ -341,4 +341,13 @@ for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'edit
   ok(!Blocks.toHtml('<!-- 1/3 -->\n\n<!-- 1/3 -->', { title: false }).includes('bq-row'), 'rendu : une ligne faite seulement d’Espaces ne s’affiche pas');
 }
 
+// ---- Lignes composées dans l'éditeur (L3) : la largeur survit au changement de type et à l'IA ----
+{
+  const b = Blocks.parse('<!-- 1/2 -->\nTexte.').blocks[0];
+  ok(Blocks.convert(b, 't2').width === '1/2' && Blocks.convert(b, 'h2').width === '1/2', 'changer de type : la largeur reste');
+  ok(Blocks.keepWidth(b, Blocks.parse('TEXTE.').blocks)[0].width === '1/2', 'IA sur un bloc : un bloc rendu sans largeur garde la sienne');
+  ok(Blocks.keepWidth(b, Blocks.parse('<!-- 1/3 -->\nTEXTE.').blocks)[0].width === '1/3', 'IA sur un bloc : une largeur écrite par l’IA l’emporte');
+  ok(Blocks.keepWidth(b, Blocks.parse('A\n\nB').blocks).every((x) => !x.width), 'IA sur un bloc : plusieurs blocs rendus → pas de largeur imposée');
+}
+
 process.exit(failed ? 1 : 0);

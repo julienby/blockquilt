@@ -90,7 +90,11 @@ export function installActions(ed) {
     menuId = id;
     const b = ed.blocks.find((x) => x.id === id);
     sheets.menu.setAttribute('aria-label', 'Actions du bloc ' + ed.def(b).label);
-    $('[data-menu-list]', sheets.menu).innerHTML = item('data-act="duplicate"', 'duplicate', 'Dupliquer')
+    // Largeur dans une ligne composée ; un Espace n'a pas de pleine largeur (il n'existe que dans une ligne).
+    const widths = b.type === 'space' ? ['1/3', '1/2', '2/3'] : ['', '1/3', '1/2', '2/3'];
+    $('[data-menu-list]', sheets.menu).innerHTML = `<div class="flex min-h-11 items-center gap-1 px-3"><span class="mr-auto text-[15px] font-medium">Largeur</span>
+      ${widths.map((w) => `<button type="button" data-col="${w}" aria-pressed="${(b.width || '') === w}" aria-label="${w ? 'Largeur ' + w : 'Pleine largeur'}" class="min-h-11 min-w-11 rounded-xl border border-stone-200 px-2 text-sm font-semibold hover:bg-stone-100 aria-pressed:border-brand-600 aria-pressed:bg-brand-600 aria-pressed:text-white">${w || 'Pleine'}</button>`).join('')}</div>`
+      + item('data-act="duplicate"', 'duplicate', 'Dupliquer')
       + item('data-act="copy"', 'copy', 'Copier')
       + item('data-act="paste-above"', 'paste', 'Coller au-dessus')
       + item('data-act="paste"', 'paste', 'Coller dessous')
@@ -98,6 +102,14 @@ export function installActions(ed) {
     ed.openSheet('menu', from);
   };
   ed.on(sheets.menu, 'click', (e) => {
+    const col = e.target.closest('[data-col]');
+    if (col) {
+      sheets.menu.close();
+      const b = ed.blocks.find((x) => x.id === menuId);
+      if (!b) return;
+      ed.change(() => { if (col.dataset.col) b.width = col.dataset.col; else delete b.width; });
+      return ed.toast(col.dataset.col ? 'Largeur ' + col.dataset.col : 'Pleine largeur');
+    }
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (!act) return;
     sheets.menu.close();

@@ -37,11 +37,28 @@ export function installRender(ed) {
           <span class="bq-view-collapsed opacity-70">… +${hidden} ligne${hidden > 1 ? 's' : ''}</span>
           <button type="button" data-toggle-view="collapsed" class="bq-view-collapsed min-h-11 px-2 font-bold underline">Déplier</button>
           <button type="button" data-toggle-view="collapsed" class="bq-view-expanded min-h-11 px-2 font-bold underline opacity-70">Replier</button></div>`;
+  // Ligne composée : petite grille à côté du type, la case du bloc pleine. Ligne incomplète : orange, pointillés pour la place libre.
+  let place = new Map(); // identifiant → { row, k, sum }
+  const colGrid = (b) => {
+    const p = place.get(b.id);
+    if (!p) return '';
+    const unit = 28 / 6;
+    let x = 0;
+    const cells = p.row.map((c, k) => {
+      const w = Blocks.SIXTHS[c.width] * unit;
+      const r = `<rect x="${x + 0.75}" y="0.75" width="${w - 2.5}" height="14.5" rx="2" ${k === p.k ? 'fill="currentColor"' : 'fill="none"'}/>`;
+      x += w;
+      return r;
+    }).join('') + (p.sum < 6 ? `<rect x="${x + 0.75}" y="0.75" width="${28 - x - 1.5}" height="14.5" rx="2" fill="none" stroke-dasharray="2 2"/>` : '');
+    const label = `Largeur ${b.width}, ${p.k ? p.k + 1 + 'e' : '1re'} place sur ${p.row.length}${p.sum < 6 ? ' · ligne incomplète : ses blocs s’élargissent pour la remplir' : ''}`;
+    return `<span data-col-grid role="img" aria-label="${label}" title="${label}" ${p.sum < 6 ? 'data-incomplete' : ''} class="ml-1.5 inline-flex shrink-0 ${p.sum < 6 ? 'text-amber-600' : 'text-brand-600'}">
+      <svg width="28" height="16" viewBox="0 0 28 16" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${cells}</svg></span>`;
+  };
   const card = (b, i) => {
     const hidden = b.type === 'carousel' ? 0 : ed.hiddenLines(b);
     return `<article data-id="${b.id}" data-view="${ed.viewOf(b)}" aria-label="${attr(ed.def(b).label)}" class="bq-card flex border ${ed.def(b).tone.card}">
       <div class="flex min-w-0 flex-1 flex-col pb-3 pl-3 pr-1">
-        <div class="flex h-11 items-center">${badge(b)}${ed.tools(b)}<span class="flex-1"></span>
+        <div class="flex h-11 items-center">${badge(b)}${colGrid(b)}${ed.tools(b)}<span class="flex-1"></span>
           ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
           ${ed.def(b).fullscreen === false ? '' : round('data-expand', 'maximize', 'Plein écran')}
           ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>
@@ -55,6 +72,12 @@ export function installRender(ed) {
   // Un champ vidé par le navigateur garde parfois un <br> : on le vide pour que le texte d'aide réapparaisse.
   ed.clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };
   const renderEdit = () => {
+    place = new Map();
+    for (const r of Blocks.rows(ed.blocks)) {
+      if (!r.row) continue;
+      const sum = r.row.reduce((n, c) => n + Blocks.SIXTHS[c.width], 0);
+      r.row.forEach((c, k) => place.set(c.id, { row: r.row, k, sum }));
+    }
     canvas.innerHTML = `<div class="bq-column relative">${ed.blocks.map((b, i) => gap(i) + card(b, i)).join('')}
       <button type="button" data-insert="end" class="bq-add mt-3 flex min-h-12 w-full items-center justify-center gap-2 border border-dashed border-stone-300 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
     canvas.querySelectorAll('.bq-edit').forEach(ed.clean);
