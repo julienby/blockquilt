@@ -56,7 +56,7 @@ const ai = createAi({
   uses: [
     { id: 'corriger', label: 'Corriger', instruction: 'Corrige l’orthographe et la grammaire, sans changer le sens ni la structure.' },
     { id: 'raccourcir', label: 'Raccourcir', instruction: 'Raccourcis le texte en gardant l’essentiel.' },
-    { id: 'etapes', label: 'En étapes', instruction: 'Réécris sous forme d’étapes numérotées.' },
+    { id: 'etapes', label: 'En étapes', instruction: 'Réécris sous forme d’étapes numérotées.', output: 'document' },
     { id: 'traduire', label: 'En anglais', instruction: 'Traduis en anglais, en gardant la structure et les emoji.' },
   ],
   // Démo publique : limites basses. Personne = son jeton (Bearer ou cookie bq_token de /app), sinon son adresse IP
@@ -67,11 +67,19 @@ const ai = createAi({
     || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
     || req.socket.remoteAddress,
   // Démo : « non fermé » dans la consigne donne une réponse fautive, pour essayer les alertes.
-  fallback: ({ scope, instruction, text, block }) => shout(scope === 'block' ? block : text) + (/non fermé/i.test(instruction) ? '\n:::html\n<p>bloc sans fin</p>\n' : ''),
+  fallback: ({ scope, instruction, text, block, blocks, output }) => {
+    const broken = /non fermé/i.test(instruction) ? '\n:::html\n<p>bloc sans fin</p>\n' : '';
+    if (output === 'document') return shout(scope === 'block' ? block : text) + broken;
+    // Opérations : « rien » dans la consigne → rien à changer ; sinon blocs 1 et 2 en majuscules, un paragraphe à la fin.
+    if (/rien/i.test(instruction)) return '';
+    const last = blocks.length - 1;
+    return [1, 2].filter((n) => n <= last).map((n) => `@@ remplacer ${n}\n${shout(blocks[n]).trim()}\n`)
+      .concat(`@@ après ${last}\nParagraphe ajouté par l’IA de démo.${broken}`).join('\n');
+  },
 });
 
 const routes = {
-  // IA : GET → usages proposés ; POST → { markdown } (contrat dans ai/blockquilt-ai.js).
+  // IA : GET → usages proposés ; POST → { markdown } ou { operations } (contrat dans ai/blockquilt-ai.js).
   'GET /api/ai': (req, res) => ai.handler(req, res),
   'POST /api/ai': (req, res) => ai.handler(req, res),
   // Enregistrer : le Markdown complet (champ `text`), réponse JSON { ok: true }.

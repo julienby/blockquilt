@@ -5,8 +5,11 @@
 // Contrat HTTP (à réécrire tel quel ailleurs, en PHP par exemple) — c'est l'`aiUrl` de l'éditeur :
 //   GET  → { uses: [{ id, label, scopes }] }   les usages proposés (boutons de la feuille IA)
 //   POST → champs (multipart, urlencoded ou JSON) : scope (document | block), use (facultatif), instruction,
-//          text (document complet), block (Markdown du bloc si scope=block)
-//        → 200 { markdown } · 400 { error } (demande invalide) · 413 { error } (texte trop long, limits.maxChars)
+//          text (document complet), block (Markdown du bloc si scope=block),
+//          blocks (scope=document, facultatif : liste JSON de textes, [0] = frontmatter ou "", [n] = Markdown du bloc n)
+//        → 200 { markdown } (bloc, document sans `blocks`, usage `output: 'document'`)
+//          · 200 { operations } (document avec `blocks` : texte « @@ remplacer | avant | après | supprimer n », vide = rien à changer)
+//          · 400 { error } (demande invalide) · 413 { error } (texte trop long, limits.maxChars)
 //          · 429 { error } (limite de jetons du jour atteinte) · 502 { error } (modèle indisponible)
 'use strict';
 const fs = require('node:fs');
@@ -14,14 +17,40 @@ const path = require('node:path');
 
 const FORMAT = fs.readFileSync(path.join(__dirname, '..', 'FORMAT.md'), 'utf8');
 
+// Format des opérations, lu par Blocks.parseOps dans l'éditeur.
+const OPERATIONS = `Le document est donné en blocs numérotés : [0] est le frontmatter, [1], [2]… les blocs.
+Réponds uniquement par des opérations, sans explication ni bloc de code autour. Une opération commence par une ligne « @@ <verbe> <numéro> », suivie de son texte Markdown jusqu'à la ligne « @@ » suivante :
+
+@@ remplacer 3
+Nouveau texte du bloc 3.
+
+@@ après 5
+## Nouveau titre
+
+Un paragraphe ajouté.
+
+@@ avant 1
+Texte ajouté au tout début.
+
+@@ supprimer 4
+
+Règles :
+- Verbes : remplacer, avant, après, supprimer. « supprimer » n'a pas de texte ; les autres en ont un, qui peut contenir plusieurs blocs.
+- Les numéros sont ceux du document reçu, même après d'autres opérations.
+- Un seul « remplacer » ou « supprimer » par bloc.
+- Bloc 0 : seulement « remplacer 0 » (frontmatter complet, entre deux lignes ---) ou « après 0 » (ajout en tête du document).
+- N'écris que les blocs qui changent ; ne recopie jamais un bloc inchangé.
+- S'il n'y a rien à changer, réponds par un texte vide.`;
+
 /**
  * baseUrl : « https://openrouter.ai/api/v1 » ; apiKey ; model : modèle par défaut ;
- * uses : [{ id, label, instruction, model?, scopes?, params? }] ; headers : en-têtes en plus (OpenRouter : HTTP-Referer, X-Title) ;
+ * uses : [{ id, label, instruction, model?, scopes?, params?, output? }] ; output : 'operations' (défaut) ou 'document'
+ *   (réponse = document entier, pour un usage qui restructure tout) ; ne joue que sur le document, quand `blocks` est envoyé ; headers : en-têtes en plus (OpenRouter : HTTP-Referer, X-Title) ;
  * params : champs en plus de la requête au modèle, pour tous les usages (ceux d'un usage passent devant), par exemple
  *   OpenRouter `{ reasoning: { effort: 'low' } }` : un modèle qui « réfléchit » peut épuiser max_tokens avant de répondre ;
  * maxTokens : longueur maximale de la réponse (un document entier : 16 000 par défaut) ;
- * fallback({ scope, instruction, text, block, use }) : réponse sans clé (démo, essais) ;
- * limits : { maxChars, perUserDay, globalDay } (absent ou 0 = pas de limite). maxChars : texte + bloc + consigne envoyés.
+ * fallback({ scope, instruction, text, block, blocks, use, output }) : réponse sans clé (démo, essais), Markdown ou opérations ;
+ * limits : { maxChars, perUserDay, globalDay } (absent ou 0 = pas de limite). maxChars : texte (ou blocs) + bloc + consigne envoyés.
  *   perUserDay, globalDay : jetons du jour (usage.total_tokens du modèle), par personne et pour tout le site ;
  *   compteurs en mémoire, remis à zéro à minuit (heure du serveur) et au redémarrage ;
  * userOf(req) : la personne qui demande (clé du compteur), le jeton Bearer par défaut ; null = seul le plafond global compte ;
@@ -36,17 +65,24 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     if (spent.day !== day) Object.assign(spent, { day, global: 0, users: new Map() });
   };
 
-  const prompt = ({ scope, instruction, text, block, use }) => ({
-    system: 'Tu modifies un contenu au format blockquilt. Réponds uniquement avec le Markdown demandé, sans explication ni bloc de code autour.'
-      + (use?.instruction ? `\n\nTâche : ${use.instruction}` : '') + '\n\n' + FORMAT,
-    user: (scope === 'block'
-      ? `Document complet, pour le contexte :\n\n${text}\n\n---\n\nBloc à modifier :\n\n${block}\n\n`
-      : `Document :\n\n${text}\n\n`)
-      + (instruction ? `Consigne : ${instruction}\n\n` : '')
-      + (scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
-  });
+  const prompt = ({ scope, instruction, text, block, blocks, use, output }) => {
+    const ops = output === 'operations';
+    const doc = ops ? 'Document :\n\n' + blocks.map((b, n) => `[${n}]\n${b || (n ? '' : '(pas de frontmatter)')}`).join('\n\n') + '\n\n'
+      : scope === 'block' ? `Document complet, pour le contexte :\n\n${text}\n\n---\n\nBloc à modifier :\n\n${block}\n\n`
+        : `Document :\n\n${text}\n\n`;
+    return {
+      system: 'Tu modifies un contenu au format blockquilt. '
+        + (ops ? OPERATIONS : 'Réponds uniquement avec le Markdown demandé, sans explication ni bloc de code autour.')
+        + (use?.instruction ? `\n\nTâche : ${use.instruction}` : '') + '\n\n' + FORMAT,
+      user: doc + (instruction ? `Consigne : ${instruction}\n\n` : '')
+        + (ops ? 'Réponds par des opérations.' : scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
+    };
+  };
 
-  /** Demande (et personne qui demande, ou null) → Markdown proposé. Erreur avec .status (400, 413, 429 ou 502). */
+  /**
+   * Demande (et personne qui demande, ou null) → { markdown } ou { operations } (texte, vide = rien à changer).
+   * Erreur avec .status (400, 413, 429 ou 502).
+   */
   const complete = async (req, who = null) => {
     const scope = req.scope === 'block' ? 'block' : 'document';
     const use = req.use ? byId.get(req.use) : null;
@@ -55,11 +91,18 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     if (use?.scopes && !use.scopes.includes(scope)) throw fail(400, `« ${use.label} » ne s’applique pas à ce choix`);
     if (!use && !String(req.instruction || '').trim()) throw fail(400, 'Consigne vide');
     if (scope === 'block' && !String(req.block || '').trim()) throw fail(400, 'Bloc vide');
-    const ask = { scope, use, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
-    const size = ask.text.length + ask.block.length + ask.instruction.length;
+    let blocks = null;
+    if (scope === 'document' && req.blocks !== undefined && req.blocks !== '') {
+      try { blocks = typeof req.blocks === 'string' ? JSON.parse(req.blocks) : req.blocks; } catch { blocks = null; }
+      if (!Array.isArray(blocks) || !blocks.length || !blocks.every((b) => typeof b === 'string')) throw fail(400, 'blocks : liste JSON de textes attendue');
+    }
+    const output = blocks && use?.output !== 'document' ? 'operations' : 'document';
+    const ask = { scope, use, output, blocks, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
+    const size = (output === 'operations' ? blocks.join('').length : ask.text.length) + ask.block.length + ask.instruction.length;
     if (limits.maxChars && size > limits.maxChars) throw fail(413, `Texte trop long pour l’IA : ${size} caractères envoyés, ${limits.maxChars} au plus.`);
+    const answer = (out) => ({ [output === 'operations' ? 'operations' : 'markdown']: out });
     if (!apiKey) {
-      if (fallback) return fallback({ ...ask, use: use?.id || null });
+      if (fallback) return answer(await fallback({ ...ask, use: use?.id || null }));
       throw fail(502, 'IA non configurée (clé absente)');
     }
     today();
@@ -88,10 +131,11 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
       throw fail(502, choice.message?.content ? 'Réponse coupée : le modèle a atteint sa longueur maximale. Réessayer, ou choisir un modèle plus court à répondre.'
         : 'Le modèle a épuisé sa longueur maximale à réfléchir, sans répondre. Réessayer, ou régler sa réflexion (params) ou son modèle.');
     }
-    const out = String(choice?.message?.content ?? '').trim();
-    if (!out) throw fail(502, 'Réponse vide du modèle');
     // Un modèle entoure parfois sa réponse d'un bloc de code : on l'enlève.
-    return out.replace(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/, '$1').replace(/\r\n/g, '\n') + '\n';
+    const out = String(choice?.message?.content ?? '').trim().replace(/^```(?:markdown|md)?\n([\s\S]*?)\n```$/, '$1').replace(/\r\n/g, '\n').trim();
+    // Opérations : une réponse vide veut dire « rien à changer ».
+    if (!out && output !== 'operations') throw fail(502, 'Réponse vide du modèle');
+    return answer(out ? out + '\n' : '');
   };
 
   const read = async (req) => {
@@ -108,7 +152,7 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     if (req.method === 'GET') return json(200, { uses: uses.map(({ id, label, scopes }) => ({ id, label, scopes: scopes || ['document', 'block'] })) });
     if (req.method !== 'POST') return json(405, { error: 'GET ou POST' });
     try {
-      json(200, { markdown: await complete(await read(req), userOf(req)) });
+      json(200, await complete(await read(req), userOf(req)));
     } catch (error) {
       json(error.status || 400, { error: error.message });
     }

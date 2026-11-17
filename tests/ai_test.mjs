@@ -83,7 +83,7 @@ try {
   answer = { status: 200, body: { choices: [{ message: { content: 'ok' } }], usage: { total_tokens: 60 } } };
   ok((await asks('ana')).startsWith('429 '), 'réponse refusée (coupée) : ses jetons comptent quand même');
   const free = createAi({ baseUrl, apiKey: '', model: 'm', limits: { maxChars: 5, perUserDay: 1, globalDay: 1 }, fallback: () => 'repli\n' });
-  ok(await free.complete({ scope: 'document', instruction: 'x', text: 'T' }, 'ana') === 'repli\n' && await free.complete({ scope: 'document', instruction: 'x', text: 'T' }, 'ana') === 'repli\n', 'réponse de repli : aucun jeton compté');
+  ok(await free.complete({ scope: 'document', instruction: 'x', text: 'T' }, 'ana').then((r) => r.markdown) === 'repli\n' && await free.complete({ scope: 'document', instruction: 'x', text: 'T' }, 'ana').then((r) => r.markdown) === 'repli\n', 'réponse de repli : aucun jeton compté');
   ok(await free.complete({ scope: 'document', instruction: 'x', text: 'T'.repeat(9) }).then(() => false, (e) => e.status === 413), 'réponse de repli : maxChars s’applique quand même');
   // Par HTTP : la personne vient de userOf(req), le jeton Bearer par défaut.
   const limApp = http.createServer((req, res) => lim.handler(req, res));
@@ -94,8 +94,34 @@ try {
   limApp.close();
   ok(seen[0].startsWith('200') && seen[1].startsWith('200') && seen[2].startsWith('429 Votre limite') && seen[3].startsWith('200'), 'HTTP : compteur par jeton Bearer, 429 avec { error } (' + seen.join(' | ') + ')');
 
+  // A2 : document en blocs numérotés (champ `blocks`) → réponse en opérations, { operations } au lieu de { markdown }.
+  answer = { status: 200, body: { choices: [{ message: { content: '```\n@@ remplacer 2\nC\n```' } }] } };
+  const sent = ['---\ntitle: T\n---', '# A', 'B'];
+  const op = await post({ scope: 'document', instruction: 'corrige', text: 'texte entier', blocks: JSON.stringify(sent) });
+  ok(op.status === 200 && op.operations === '@@ remplacer 2\nC\n' && op.markdown === undefined, 'blocks envoyés : { operations }, bloc de code autour retiré (' + JSON.stringify(op) + ')');
+  const sys = last.body.messages[0].content, usr = last.body.messages[1].content;
+  ok(sys.includes('@@ remplacer') && sys.includes('@@ supprimer') && sys.includes('> [!tip]'), 'opérations : consigne système = format des opérations + FORMAT.md');
+  ok(usr.includes('[0]\n---\ntitle: T\n---') && usr.includes('[1]\n# A') && usr.includes('[2]\nB') && !usr.includes('texte entier') && usr.includes('Consigne : corrige'), 'opérations : document numéroté depuis `blocks` (0 = frontmatter), pas le texte entier');
+  await post({ scope: 'document', instruction: 'x', text: 'T', blocks: JSON.stringify(['', 'B']) });
+  ok(last.body.messages[1].content.includes('[0]\n(pas de frontmatter)'), 'opérations : bloc 0 vide → « (pas de frontmatter) »');
+  answer = { status: 200, body: { choices: [{ message: { content: '' } }] } };
+  const none = await post({ scope: 'document', instruction: 'x', text: 'T', blocks: JSON.stringify(sent) });
+  ok(none.status === 200 && none.operations === '', 'opérations : réponse vide valide (rien à changer)');
+  answer = { status: 200, body: { choices: [{ message: { content: 'Réécrit.' } }] } };
+  const whole = await createAi({ baseUrl, apiKey: 'k', model: 'm', uses: [{ id: 'etapes', label: 'En étapes', instruction: 'En étapes.', output: 'document' }] })
+    .complete({ scope: 'document', use: 'etapes', text: 'T', blocks: sent });
+  ok(whole.markdown === 'Réécrit.\n' && last.body.messages[1].content.includes('Document :\n\nT'), 'usage output: document : document entier, même avec blocks');
+  ok((await post({ scope: 'document', instruction: 'x', text: 'T' })).markdown === 'Réécrit.\n', 'sans blocks : document entier, comme avant');
+  ok((await post({ scope: 'block', instruction: 'x', text: 'T', block: 'B', blocks: JSON.stringify(sent) })).markdown === 'Réécrit.\n', 'sur un bloc : rien ne change');
+  ok((await post({ scope: 'document', instruction: 'x', text: 'T', blocks: '{"a":1}' })).error === 'blocks : liste JSON de textes attendue', 'blocks mal formé : 400');
+  const small = createAi({ baseUrl, apiKey: 'k', model: 'm', limits: { maxChars: 20 } });
+  ok(await small.complete({ scope: 'document', instruction: 'x', text: 'T', blocks: ['', 'a'.repeat(30)] }).then(() => false, (e) => e.status === 413), 'opérations : maxChars compte les blocs envoyés');
+  let seenAsk = null;
+  const fb = await createAi({ baseUrl, apiKey: '', model: 'm', fallback: (a) => { seenAsk = a; return '@@ supprimer 1'; } }).complete({ scope: 'document', instruction: 'x', text: 'T', blocks: sent });
+  ok(fb.operations === '@@ supprimer 1' && seenAsk.output === 'operations' && seenAsk.blocks.length === 3, 'sans clé : la réponse de repli reçoit output et blocks');
+
   const demo = createAi({ baseUrl, apiKey: '', model: 'm', uses, fallback: ({ scope, use, text }) => `${scope}:${use}:${text}` });
-  ok(await demo.complete({ scope: 'document', use: 'corriger', text: 'T' }) === 'document:corriger:T', 'sans clé : la réponse de repli de l’application');
+  ok(await demo.complete({ scope: 'document', use: 'corriger', text: 'T' }).then((r) => r.markdown) === 'document:corriger:T', 'sans clé : la réponse de repli de l’application');
   ok(await createAi({ baseUrl, model: 'm' }).complete({ scope: 'document', instruction: 'x', text: 'T' }).then(() => false, (e) => e.status === 502), 'sans clé ni repli : 502');
 } catch (error) {
   ok(false, error.stack);

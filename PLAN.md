@@ -137,7 +137,7 @@ Un paragraphe ajouté.
 
 **Étapes**
 - [x] **A1 Noyau** (fonctions pures, tests Node) : `Blocks.parseOps(texte)` (format, verbes, numéros, bloc 0, doublons, réponse vide) ; `Blocks.diffWords(avant, après)`. Tests : valides, mal formés, numéro inconnu, doublon, verbe interdit sur le bloc 0, réponse vide. Pas de `applyOps` sur le Markdown : l'éditeur applique sur `ed.blocks`. À ajouter seulement si un outil MCP doit appliquer plusieurs opérations d'un coup.
-- [ ] **A2 Relais** : un usage déclare `output: 'operations' | 'document'` (défaut `operations` sur le document) ; la consigne système contient le format ci-dessus et le document numéroté. Le contrat HTTP du relais est mis à jour. Démo : réponse fixe avec 3 opérations.
+- [x] **A2 Relais** : un usage déclare `output: 'operations' | 'document'` (défaut `operations` sur le document) ; la consigne système contient le format ci-dessus et le document numéroté. Le contrat HTTP du relais est mis à jour. Démo : réponse fixe avec 3 opérations.
 - [ ] **A2b Essai réel, avant l'interface** : un script envoie 5 à 10 documents à un vrai modèle (OpenRouter, `glm-5.3-flash` et un modèle plus fort) et passe chaque réponse dans `parseOps`. Noter le taux de réponses utilisables et les écarts de format dans `DECISIONS.md` ; durcir la consigne, pas le parseur. Format qui ne tient pas → on le change avant A3.
 - [ ] **A3 Éditeur** : identifiants et empreintes notés à l'envoi, opérations périmées, feuille de choix une à une, différences mot à mot, application en une étape annulable. Test `dev/check.mjs` à 375 px et 1280 px (dont : on modifie un bloc pendant que l'IA travaille → son opération est périmée, les autres s'appliquent).
 
