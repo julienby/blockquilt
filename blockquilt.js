@@ -722,6 +722,47 @@ const Blocks = {
     blank: () => ({ items: [] }),
   });
 
+  // Carte : `:::card`, puis, chacun facultatif et dans cet ordre : une photo, un titre `### …`, du texte, un lien seul sur
+  // la dernière ligne (rendu en bouton) ; puis `:::`. Le titre reste hors du plan de la page (pas d'ancre).
+  const LINK = /^\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:)[^)\s]+)\)$/;
+  Blocks.register('card', {
+    label: 'Carte', short: 'Carte', icon: 'card', group: 'media',
+    tone: tone('bq-tone', 'bq-badge'),
+    match: (t) => {
+      const lines = t.split('\n');
+      if (lines[0] !== ':::card' || lines[lines.length - 1] !== ':::' || lines.length < 3) return null;
+      const rest = lines.slice(1, -1);
+      const photo = Blocks.PHOTO.exec(rest[0]);
+      if (photo) rest.shift();
+      const title = /^### (.+)$/.exec(rest[0] ?? '');
+      if (title) rest.shift();
+      const link = LINK.exec(rest[rest.length - 1] ?? '');
+      if (link) rest.pop();
+      if (rest.some((l) => lead.test(l) || Blocks.PHOTO.test(l))) return null;
+      return { src: photo ? photo[2] : '', alt: photo ? Blocks.plain(photo[1]) : '', title: title ? Blocks.plain(title[1]) : '',
+        html: rest.length ? Blocks.linesToHtml(rest) : '', label: link ? Blocks.plain(link[1]) : '', href: link ? link[2] : '' };
+    },
+    toMarkdown: (b) => {
+      const text = body(b.html);
+      const title = b.title.replace(/\s+/g, ' ').trim();
+      const label = b.label.replace(/\s+/g, ' ').trim();
+      const lines = [
+        b.src && Blocks.types.photo.toMarkdown(b),
+        title && '### ' + Blocks.htmlToMd(Blocks.esc(title)),
+        text.trim() && text,
+        label && b.href.trim() && `[${Blocks.htmlToMd(Blocks.esc(label))}](${b.href.trim()})`,
+      ].filter(Boolean);
+      return lines.length ? [':::card', ...lines, ':::'].join('\n') : '';
+    },
+    toHtml: (b, ctx) => {
+      const img = b.src ? `<img src="${Blocks.attr(Blocks.mediaUrl(b.src, ctx.media))}" alt="${Blocks.attr(b.alt)}" loading="lazy">` : '';
+      const text = body(b.html);
+      const link = b.label && /^(https?:\/\/|mailto:|tel:)/i.test(b.href) ? `<p><a class="bq-card-link" href="${Blocks.attr(b.href)}">${Blocks.esc(b.label)}</a></p>` : '';
+      return `<div class="bq-card">${img}<div class="bq-card-body">${b.title ? `<h3 class="bq-card-title">${Blocks.esc(b.title)}</h3>` : ''}${text.trim() ? Blocks.flowHtml(text.split('\n')) : ''}${link}</div></div>`;
+    },
+    blank: () => ({ src: '', alt: '', title: '', html: '', label: '', href: '' }),
+  });
+
   Blocks.register('video', {
     label: 'Vidéo', short: 'Vidéo', icon: 'video', group: 'media',
     tone: tone('bg-rose-50/50 border-rose-200/80 text-rose-950', 'bg-rose-100 text-rose-900 border-rose-200'),

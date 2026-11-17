@@ -11,7 +11,7 @@ const FIX = path.join(__dirname, 'fixtures');
 const expected = {
   'h1.md': 'h1', 't.md': 't1,t2,t3', 'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
-  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
+  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
 };
 for (const file of fs.readdirSync(FIX).sort()) {
   const x = fs.readFileSync(path.join(FIX, file), 'utf8');
@@ -301,6 +301,21 @@ const { spawnSync } = require('node:child_process');
 for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'editor')).map((x) => 'editor/' + x)]) {
   const r = spawnSync(process.execPath, ['--input-type=module', '--check'], { input: fs.readFileSync(path.join(ROOT, f)) });
   ok(r.status === 0, `module ${f} : syntaxe valide${r.status ? ' — ' + String(r.stderr).split('\n').slice(0, 4).join(' ') : ''}`);
+}
+
+// ---- Carte : photo, titre, texte, lien en bouton, chacun facultatif ----
+{
+  const c = Blocks.parse(fs.readFileSync(path.join(FIX, 'card.md'), 'utf8')).blocks;
+  ok(c[0].src === 'media/abc123def456' && c[0].alt === 'Paysage de montagne' && c[0].title === 'Les plus beaux sentiers des Alpes' && c[0].label === 'Lire l’article'.replace('’', "'") && c[0].href === 'https://exemple.fr/sentiers', 'carte : photo, titre, lien lus');
+  ok(c[1].src === '' && c[1].href === '' && c[1].title === 'Sans photo ni lien', 'carte : sans photo ni lien');
+  const h = Blocks.toHtml(':::card\n![Montagne](media/m1)\n### Les Alpes\nUn **beau** texte.\n[Lire](https://exemple.fr)\n:::', { media: '/m/' });
+  ok(h.includes('<div class="bq-card"><img src="/m/m1" alt="Montagne" loading="lazy"><div class="bq-card-body"><h3 class="bq-card-title">Les Alpes</h3><p>Un <strong>beau</strong> texte.</p><p><a class="bq-card-link" href="https://exemple.fr">Lire</a></p></div></div>'), 'carte : rendu HTML (photo, titre sans ancre, texte, bouton) — ' + h);
+  ok(!Blocks.toHtml(':::card\n### A\n:::\n\n## A').includes('id="a-2"'), 'carte : son titre ne prend pas d’ancre dans le plan de la page');
+  ok(types(':::card\n[Lire](javascript:alert(1))\n:::') !== 'card' || !Blocks.toHtml(':::card\n[Lire](javascript:alert(1))\n:::').includes('href="javascript'), 'carte : lien javascript: jamais en bouton');
+  ok(types(':::card\n## Pas un titre de carte\n:::') === 'raw' && types(':::card\n:::') === 'raw' && types(':::card\n> citation\n:::') === 'raw', 'carte : ## , vide ou citation → texte source');
+  ok(Blocks.toMarkdown({ type: 'card', ...Blocks.blank('card') }) === '', 'carte vide : rien');
+  ok(Blocks.toMarkdown({ type: 'card', ...Blocks.blank('card'), title: 'T', label: 'Lire', href: 'https://x.fr' }) === ':::card\n### T\n[Lire](https://x.fr)\n:::', 'carte : écrite sans photo ni texte');
+  ok(Blocks.lint(':::card\n### A\n')[0]?.message.includes('non fermé'), 'carte non fermée : alerte lint');
 }
 
 process.exit(failed ? 1 : 0);

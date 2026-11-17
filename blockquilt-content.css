@@ -48,6 +48,18 @@
 .bq-content .bq-callout-warning { background: var(--bq-warning-bg, #fdf6e9); border-color: var(--bq-warning-line, #fcd34d); color: var(--bq-warning-text, #78350f); }
 .bq-content .bq-callout-danger { background: var(--bq-danger-bg, #fff1f2); border-color: var(--bq-danger-line, #fda4af); color: var(--bq-danger-text, #881337); }
 
+/* Carte : <div class="bq-card"> photo, puis titre, texte et lien en bouton. Prend toute la largeur de son conteneur. */
+.bq-content .bq-card { margin: 1.25rem 0; overflow: hidden; border: 1px solid var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); border-radius: var(--bq-radius, 0.9rem); }
+.bq-content .bq-card > img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.bq-content .bq-card-body { padding: 1rem 1.15rem 1.15rem; }
+.bq-content .bq-card-body > :first-child { margin-top: 0; }
+.bq-content .bq-card-body > :last-child { margin-bottom: 0; }
+.bq-content .bq-card-body p { margin: 0.4rem 0; }
+.bq-content .bq-card-title { margin: 0 0 0.4rem; font-size: 1.1rem; line-height: 1.3; }
+.bq-content .bq-card-body p:has(> .bq-card-link) { margin-top: 0.9rem; }
+.bq-content a.bq-card-link { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 1rem; border-radius: 0.6rem; background: var(--bq-accent, #0369a1); color: #fff; font-weight: 600; text-decoration: none; }
+.bq-content a.bq-card-link:hover { filter: brightness(1.1); }
+
 /* Carrousel : une photo à la fois (scroll-snap). Avec blockquilt-content.js : flèches sur les côtés, puces dessous, sans barre de défilement. */
 .bq-content .bq-carousel { position: relative; margin: 1.25rem 0; }
 .bq-content .bq-carousel-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; border-radius: var(--bq-radius, 0.9rem); scrollbar-width: thin; }

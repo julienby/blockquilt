@@ -49,6 +49,23 @@ Blocks.editable = editable;
         <span class="min-w-0 truncate text-sm italic opacity-60">${esc(b.items.map((x) => x.alt).filter(Boolean).join(' · '))}</span></div>`,
     read: (card, b) => { card.querySelectorAll('[data-car-item]').forEach((el) => { b.items[Number(el.dataset.carItem)].alt = el.querySelector('[data-car-alt]').value; }); },
   });
+  // Carte : la photo (ajouter, retirer), son texte alternatif, le titre, le texte, le bouton (texte et lien).
+  const field = 'h-11 min-w-0 rounded-xl border border-stone-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
+  Object.assign(Blocks.types.card, {
+    edit: (b, ui) => `<div class="grid gap-2">${b.src ? `<div class="relative"><img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="max-h-48 w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">
+          <button type="button" data-card-act="remove" aria-label="Retirer la photo de la carte" class="bq-btn absolute right-1 top-1 bg-white/90 text-red-600">${ic('trash', 'size-4')}</button></div>
+        <input data-card-alt value="${attr(b.alt)}" placeholder="Description de la photo (lue aux personnes malvoyantes)…" aria-label="Description de la photo" class="${field} italic">`
+        : `<button type="button" data-card-act="photo" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-current/20 text-sm font-bold opacity-70 hover:opacity-100">${ic('image', 'size-4')}Ajouter une photo</button>`}
+        <input data-card-title value="${attr(b.title)}" placeholder="Titre de la carte" aria-label="Titre de la carte" class="h-11 min-w-0 bg-transparent text-[17px] font-bold placeholder:font-medium placeholder:opacity-50 focus:outline-none">
+        ${richEdit('text-[15px] leading-relaxed', 'Texte de la carte…')(b)}
+        <div class="flex gap-2"><input data-card-label value="${attr(b.label)}" placeholder="Texte du bouton" aria-label="Texte du bouton" class="${field} w-1/3">
+          <input data-card-href type="url" value="${attr(b.href)}" placeholder="https://… (lien du bouton)" aria-label="Lien du bouton" class="${field} flex-1"></div></div>`,
+    read: (card, b) => {
+      readHtml(card, b);
+      b.alt = card.querySelector('[data-card-alt]')?.value ?? b.alt;
+      for (const k of ['title', 'label', 'href']) b[k] = card.querySelector(`[data-card-${k}]`).value;
+    },
+  });
   Object.assign(Blocks.types.video, {
     edit: (b) => `<input data-url type="url" value="${attr(b.url)}" class="h-11 w-full rounded-xl border border-rose-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" placeholder="https://www.youtube.com/watch?v=…" aria-label="Lien de la vidéo YouTube ou Vimeo">`,
     read: (card, b) => { b.url = card.querySelector('[data-url]').value.trim(); },

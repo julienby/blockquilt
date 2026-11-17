@@ -756,6 +756,31 @@ try {
   ok(await ev(`!window.pwned && !document.querySelector('[data-canvas] script, [data-canvas] [onclick], [data-canvas] [onerror]') && document.querySelector('[data-canvas] .bq-html strong')?.textContent === 'Gras'`), 'bloc HTML : rendu filtré, aucun script exécuté');
   ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: ':::html\\n<b>x</b>\\n:::' }); el.querySelector('[data-insert="end"]').click(); const has = !!el.querySelector('[data-pick="html"]'); const raw = !!el.querySelector('[data-id] [data-raw]') && !el.querySelector('[data-html-preview]'); e.destroy(); el.remove(); return !has && raw; })()`), 'bloc HTML désactivé par défaut : absent du menu, édité comme texte source');
 
+  // ---- Carte : ajoutée depuis le menu, photo envoyée, champs écrits, rendu en aperçu, à 375 et 1280 px ----
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    await ev(`(() => { const el = document.createElement('div'); el.className = 'cardtest'; document.body.append(el);
+      window.cardEd = Blockquilt.mount(el, { source: 'Intro.\\n', uploadUrl: 'api/upload' });
+      el.querySelector('[data-insert="end"]').click(); el.querySelector('[data-pick="card"]').click(); })()`);
+    ok(await ev(`!!document.querySelector('.cardtest [data-id] [data-card-act="photo"]') && !!document.querySelector('.cardtest [data-card-title]')`), `${width} px, carte : ajoutée depuis le menu, avec « Ajouter une photo »`);
+    await ev(`document.querySelector('.cardtest [data-card-act="photo"]').click()`);
+    await setFiles('div.cardtest input[data-file]', [png]);
+    await waitFor(() => ev(`!!document.querySelector('.cardtest [data-card-act="remove"]')`), 'photo de la carte');
+    const card = await ev(`(() => { const el = document.querySelector('.cardtest'); const c = el.querySelectorAll('[data-id]')[1];
+      const put = (s, v) => { const i = c.querySelector(s); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); };
+      put('[data-card-alt]', 'Un pixel'); put('[data-card-title]', 'Les Alpes'); put('[data-card-label]', 'Lire'); put('[data-card-href]', 'https://exemple.fr');
+      const t = c.querySelector('[data-body]'); t.textContent = 'Un texte court.'; t.dispatchEvent(new Event('input', { bubbles: true }));
+      const md = cardEd.getMarkdown();
+      const fits = c.scrollWidth <= c.clientWidth + 1 && c.getBoundingClientRect().right <= innerWidth;
+      el.querySelector('[data-preview]').click();
+      return { md, fits }; })()`);
+    ok(/^Intro\.\n\n:::card\n!\[Un pixel\]\(media\/[\w.-]+\)\n### Les Alpes\nUn texte court\.\n\[Lire\]\(https:\/\/exemple\.fr\)\n:::\n$/.test(card.md) && card.fits, `${width} px, carte : photo, titre, texte et bouton écrits en Markdown, la carte tient dans l’écran (${JSON.stringify(card)})`);
+    await waitFor(() => ev(`!!document.querySelector('.cardtest .bq-card a.bq-card-link')`), 'aperçu de la carte');
+    ok(await ev(`(() => { const a = document.querySelector('.cardtest .bq-card a.bq-card-link'); const r = a.getBoundingClientRect(); const img = document.querySelector('.cardtest .bq-card > img');
+      const ok = r.height >= 44 && getComputedStyle(a).color === 'rgb(255, 255, 255)' && img.getBoundingClientRect().width > 0 && document.querySelector('.cardtest .bq-card-title').textContent === 'Les Alpes';
+      cardEd.destroy(); document.querySelector('.cardtest').remove(); return ok; })()`), `${width} px, carte : aperçu avec photo, titre et bouton de 44 px au moins`);
+  }
+
   // ---- Phase 9 : IA ----
   await viewport(375);
   await open();

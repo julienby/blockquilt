@@ -33,6 +33,7 @@ export function installEvents(ed) {
     }
     if (hit('[data-callout-icon]')) { ed.syncFromDom(); return ed.openIcon(id); }
     if (hit('[data-car-act], [data-car-add]')) return ed.carousel(el, id);
+    if (hit('[data-card-act]')) return ed.cardPhoto(hit('[data-card-act]').dataset.cardAct, id);
     if (hit('[data-save]')) return ed.save();
     if (hit('[data-undo]')) return ed.undo();
     if (hit('[data-redo]')) return ed.redo();

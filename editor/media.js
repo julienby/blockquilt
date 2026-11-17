@@ -25,7 +25,11 @@ export function installMedia(ed) {
       const srcs = [];
       for (const f of files) srcs.push(await upload(f));
       const items = srcs.map((src) => ({ src, alt: '' }));
-      if (t.add) {
+      if (t.card) {
+        ed.syncFromDom();
+        const b = ed.blocks.find((x) => x.id === t.card);
+        if (b) ed.change(() => { b.src = srcs[0]; });
+      } else if (t.add) {
         ed.syncFromDom();
         const b = ed.blocks.find((x) => x.id === t.add);
         if (b) ed.change(() => b.items.push(...items));
@@ -41,6 +45,14 @@ export function installMedia(ed) {
       ed.toast(error.message);
     }
   });
+
+  // ---- Carte : une seule photo (la première si plusieurs fichiers sont choisis) ----
+  ed.cardPhoto = (act, id) => {
+    if (act === 'photo') return ed.pickFiles({ card: id });
+    const b = ed.blocks.find((x) => x.id === id);
+    ed.syncFromDom();
+    ed.change(() => { b.src = ''; b.alt = ''; });
+  };
 
   // ---- Carrousel : retrait, ajout, ordre (poignée : glisser, ou flèches haut et bas au clavier) ----
   const moveItem = (id, from, to) => {

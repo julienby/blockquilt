@@ -41,6 +41,13 @@ Le code est ==1515==, voir [le plan](https://exemple.fr/plan).
 
 ![Le portail vu de la rue](media/abc123def456)
 
+:::card
+![La plage](media/def456abc123)
+### La plage à 5 minutes
+Prendre le chemin derrière la maison.
+[Voir le plan](https://exemple.fr/plage)
+:::
+
 https://youtu.be/dQw4w9WgXcQ
 
 ---
@@ -67,6 +74,7 @@ ssh maison.local
 | Citation | Chaque ligne commence par `> ` |
 | Encadré | Première ligne `> [!type]`, puis facultatifs un emoji et un titre : `> [!tip] 🔑 La clé`. Le texte suit, chaque ligne commençant par `> `. |
 | Photo | `![légende](media/<id>)` ou `![légende](https://…)`, seule sur sa ligne |
+| Carte | `:::card`, puis, chacun facultatif et dans cet ordre : une photo `![…](…)`, un titre `### …`, du texte, un lien `[Lire](https://…)` seul sur la dernière ligne (rendu en bouton) ; puis `:::`. Remplace une carte écrite en HTML. |
 | Vidéo | Adresse YouTube ou Vimeo, seule sur sa ligne |
 | Ligne horizontale | `---` seul, entre deux lignes vides |
 | Code | Trois accents graves suivis du langage (` ```js `), le code, puis trois accents graves |
