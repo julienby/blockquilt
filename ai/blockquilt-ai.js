@@ -8,7 +8,7 @@
 //          text (document complet), block (Markdown du bloc si scope=block),
 //          blocks (scope=document, facultatif : liste JSON de textes, [0] = frontmatter ou "", [n] = Markdown du bloc n)
 //        → 200 { markdown } (bloc, document sans `blocks`, usage `output: 'document'`)
-//          · 200 { operations } (document avec `blocks` : texte « @@ remplacer | avant | après | supprimer n », vide = rien à changer)
+//          · 200 { operations } (document avec `blocks` : texte « @@ remplacer | avant | après | supprimer n », « @@ rien » ou vide = rien à changer)
 //          · 400 { error } (demande invalide) · 413 { error } (texte trop long, limits.maxChars)
 //          · 429 { error } (limite de jetons du jour atteinte) · 502 { error } (modèle indisponible)
 'use strict';
@@ -19,7 +19,7 @@ const FORMAT = fs.readFileSync(path.join(__dirname, '..', 'FORMAT.md'), 'utf8');
 
 // Format des opérations, lu par Blocks.parseOps dans l'éditeur.
 const OPERATIONS = `Le document est donné en blocs numérotés : [0] est le frontmatter, [1], [2]… les blocs.
-Réponds uniquement par des opérations, sans explication ni bloc de code autour. Une opération commence par une ligne « @@ <verbe> <numéro> », suivie de son texte Markdown jusqu'à la ligne « @@ » suivante :
+Réponds uniquement par des opérations, sans explication ni bloc de code autour. Une opération commence par une ligne « @@ <verbe> <numéro> », suivie de son texte Markdown. Ce texte va jusqu'à l'opération suivante ou jusqu'à la fin de la réponse. Exemple :
 
 @@ remplacer 3
 Nouveau texte du bloc 3.
@@ -40,7 +40,8 @@ Règles :
 - Un seul « remplacer » ou « supprimer » par bloc.
 - Bloc 0 : seulement « remplacer 0 » (frontmatter complet, entre deux lignes ---) ou « après 0 » (ajout en tête du document).
 - N'écris que les blocs qui changent ; ne recopie jamais un bloc inchangé.
-- S'il n'y a rien à changer, réponds par un texte vide.`;
+- Pas de ligne « @@ » seule, ni au milieu ni à la fin.
+- S'il n'y a rien à changer, réponds exactement « @@ rien », et rien d'autre.`;
 
 /**
  * baseUrl : « https://openrouter.ai/api/v1 » ; apiKey ; model : modèle par défaut ;
@@ -75,12 +76,12 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
         + (ops ? OPERATIONS : 'Réponds uniquement avec le Markdown demandé, sans explication ni bloc de code autour.')
         + (use?.instruction ? `\n\nTâche : ${use.instruction}` : '') + '\n\n' + FORMAT,
       user: doc + (instruction ? `Consigne : ${instruction}\n\n` : '')
-        + (ops ? 'Réponds par des opérations.' : scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
+        + (ops ? 'Réponds par des opérations, ou par « @@ rien ».' : scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
     };
   };
 
   /**
-   * Demande (et personne qui demande, ou null) → { markdown } ou { operations } (texte, vide = rien à changer).
+   * Demande (et personne qui demande, ou null) → { markdown } ou { operations } (texte, « @@ rien » ou vide = rien à changer).
    * Erreur avec .status (400, 413, 429 ou 502).
    */
   const complete = async (req, who = null) => {

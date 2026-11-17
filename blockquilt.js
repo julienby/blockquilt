@@ -230,10 +230,11 @@ const Blocks = {
    * Format : une ligne « @@ <verbe> <n> », puis le corps jusqu'au prochain « @@ » (plusieurs blocs permis).
    * Verbes : remplacer, avant, après (corps obligatoire), supprimer (sans corps) ; modes : replace, before, after, remove.
    * n : place du bloc dans le document envoyé, qui en a `count` ; 0 = frontmatter (remplacer, après seulement).
-   * Un seul « remplacer » ou « supprimer » par bloc. Réponse vide : aucune opération, ce qui est valide.
+   * Un seul « remplacer » ou « supprimer » par bloc. « @@ rien » (ou une réponse vide) : aucune opération, ce qui est valide.
    */
   parseOps(text, count) {
     const MODES = { remplacer: 'replace', avant: 'before', après: 'after', supprimer: 'remove' };
+    if (String(text ?? '').trim() === '@@ rien') return { ops: [] };
     const lines = String(text ?? '').replace(/\r\n/g, '\n').split('\n');
     const heads = [];
     for (let i = 0; i < lines.length; i++) {
