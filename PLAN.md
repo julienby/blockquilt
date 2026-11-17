@@ -87,15 +87,18 @@ L'aperçu seul reste un mode à part (lecture). Le choix 1 / 2 panneaux est comm
   - Le plein écran d'un bloc n'a pas de visuel à côté.
   - Tests `dev/check.mjs` (375 px et 1280 px) : défaut à chaque largeur ; bascule en blocs et en source ; choix gardé en passant de blocs à source et après rechargement ; visuel à jour après une frappe dans un bloc ; bouton désactivé en Aperçu ; aucun débordement horizontal à 375 px. Les tests F4 sont adaptés sans perdre ce qu'ils vérifiaient.
 
-## 4c. IA du document par opérations — à valider
+## 4c. IA du document par opérations (validé le 2026-11-17)
 
 Problème : l'IA du document recopie tout le texte, donc « avant / après » n'a pas de sens. Objectif : des modifications **ciblées sur plusieurs blocs**, que Julien accepte **une à une**. Prévisible, simple, précis. Plan à faire relire avant tout code ; implémentation avec le modèle fort.
 
+Gain en plus : la réponse ne contient que les changements. Le modèle écrit ses jetons un par un, donc une réponse 5 à 10 fois plus courte arrive 5 à 10 fois plus vite, coûte moins (F5) et risque moins d'être coupée (`finish_reason: length`). Le document envoyé, lui, garde sa taille.
+
 **Principes**
-- L'IA reçoit le document en **blocs numérotés** (1, 2, 3…), comme le serveur MCP. Elle renvoie des **opérations**, jamais le document.
-- L'IA ne donne **que des numéros**. L'éditeur ajoute l'empreinte du bloc qu'il a envoyé. Une IA ne sait pas recopier une empreinte ; l'éditeur, si.
-- Tous les numéros se rapportent au document **envoyé** (pas au document en cours de modification). Les opérations s'appliquent du bas vers le haut : la numérotation ne bouge pas.
-- Document changé entre l'envoi et l'application → tout est refusé (même règle que `If-Match`).
+- L'IA reçoit le document en **blocs numérotés** (1, 2, 3…), comme le serveur MCP. Le frontmatter est le bloc **0**. Elle renvoie des **opérations**, jamais le document.
+- L'IA ne donne **que des numéros**. Une IA ne sait pas recopier une empreinte ; l'éditeur, si.
+- Tous les numéros se rapportent au document **envoyé**. À l'envoi, l'éditeur note pour chaque numéro l'identifiant interne du bloc (`ed.blocks[i].id`) et son empreinte. À l'application, chaque opération vise ce bloc par son identifiant, pas par sa place.
+- On continue d'écrire pendant que l'IA travaille. Une opération dont le bloc n'a pas changé s'applique, même si d'autres blocs ont bougé. Une opération dont le bloc a été modifié ou supprimé est **périmée** : affichée, décochée, désactivée. (Pas de refus global : une lettre tapée ailleurs ferait perdre toute la réponse.)
+- Réponse vide → « Aucune modification proposée » (réponse valide, par exemple « Corriger » sur un texte sans faute).
 - Réponse mal formée → rien n'est appliqué ; message « La réponse de l'IA n'est pas utilisable » et le texte brut reste copiable. Pas de réparation automatique.
 
 **Format de réponse** (texte, pas de JSON : le Markdown n'a pas à être échappé)
@@ -116,22 +119,27 @@ Un paragraphe ajouté.
 ```
 
 - Quatre verbes : `remplacer n`, `avant n`, `après n`, `supprimer n`. Le corps (plusieurs blocs permis) va jusqu'au prochain `@@` ; `supprimer` n'a pas de corps.
+- Bloc 0 (frontmatter) : seuls `remplacer 0` (le corps est un frontmatter) et `après 0` (ajout en tête du document) sont permis.
 - Un seul `remplacer` ou `supprimer` par numéro ; plusieurs `avant` / `après` permis.
-- Tout corps passe `Blocks.lint` avant d'être proposé.
+- Un `remplacer` dont le corps est identique au bloc est retiré, et compté : « 4 blocs inchangés ignorés ».
+- Chaque corps passe `Blocks.lint`. Une opération en alerte est décochée et montre son alerte ; les autres restent utilisables.
 
 **Interface**
-- Feuille « Propositions de l'IA » : une ligne par opération (« Remplacer le bloc 3 », « Ajouter après le bloc 5 »), case à cocher, avant → après. Tout est coché au départ.
+- Feuille « Propositions de l'IA » : une ligne par opération (« Remplacer le bloc 3 », « Ajouter après le bloc 5 »), case à cocher. Tout est coché au départ, sauf les opérations périmées ou en alerte.
+- `remplacer` : différences **mot à mot** (mots retirés barrés, mots ajoutés surlignés), pas avant / après en entier. Pour une correction, on voit le changement en un coup d'œil.
 - « Appliquer les N choisies » : une seule étape annulable (Ctrl+Z).
 - « Copier la réponse » reste disponible.
-- Le mode actuel (réponse = document entier : remplacer / début / fin) reste pour un usage « réécrire tout », déclaré par l'usage.
+
+**Mode par défaut** (question tranchée)
+- Sur le document, « opérations » est le défaut : usages et consigne libre.
+- Un usage qui restructure tout (« En étapes ») déclare `output: 'document'` et garde le mode actuel (remplacer / début / fin).
+- Sur un bloc : rien ne change.
 
 **Étapes**
-- [ ] **A1 Noyau** (fonctions pures, tests Node) : `Blocks.parseOps(texte)` (format, verbes, numéros, doublons) ; `Blocks.applyOps(md, ops, choisies)` (refus si document changé, ordre bas → haut, lint). Tests : valides, mal formés, numéro inconnu, doublon, document périmé, sélection partielle.
-- [ ] **A2 Relais** : un usage déclare `output: 'operations'` ; la consigne système contient le format ci-dessus et le document numéroté. Le contrat HTTP du relais est mis à jour. Démo : réponse fixe avec 3 opérations.
-- [ ] **A3 Éditeur** : feuille de choix une à une, application en une étape annulable. Test `dev/check.mjs` à 375 px et 1280 px.
-- [ ] **A4 Essai réel** avec un vrai modèle (OpenRouter). Noter les écarts de format dans `DECISIONS.md` ; durcir la consigne, pas le parseur.
-
-Question ouverte : l'usage document par défaut devient-il « opérations », avec « réécrire tout » en usage à part ?
+- [ ] **A1 Noyau** (fonctions pures, tests Node) : `Blocks.parseOps(texte)` (format, verbes, numéros, bloc 0, doublons, réponse vide) ; `Blocks.diffWords(avant, après)`. Tests : valides, mal formés, numéro inconnu, doublon, verbe interdit sur le bloc 0, réponse vide. Pas de `applyOps` sur le Markdown : l'éditeur applique sur `ed.blocks`. À ajouter seulement si un outil MCP doit appliquer plusieurs opérations d'un coup.
+- [ ] **A2 Relais** : un usage déclare `output: 'operations' | 'document'` (défaut `operations` sur le document) ; la consigne système contient le format ci-dessus et le document numéroté. Le contrat HTTP du relais est mis à jour. Démo : réponse fixe avec 3 opérations.
+- [ ] **A2b Essai réel, avant l'interface** : un script envoie 5 à 10 documents à un vrai modèle (OpenRouter, `glm-5.3-flash` et un modèle plus fort) et passe chaque réponse dans `parseOps`. Noter le taux de réponses utilisables et les écarts de format dans `DECISIONS.md` ; durcir la consigne, pas le parseur. Format qui ne tient pas → on le change avant A3.
+- [ ] **A3 Éditeur** : identifiants et empreintes notés à l'envoi, opérations périmées, feuille de choix une à une, différences mot à mot, application en une étape annulable. Test `dev/check.mjs` à 375 px et 1280 px (dont : on modifie un bloc pendant que l'IA travaille → son opération est périmée, les autres s'appliquent).
 
 ## 5. IA — fait (I1 à I6)
 
