@@ -351,7 +351,7 @@ Le rendu HTML est fait par `Blocks.toHtml`, dans `blockquilt.js`. Sans Node, il 
 ```php
 <?php
 $file = __DIR__ . '/data/page.md';
-$markdown = is_file($file) ? file_get_contents($file) : '';
+$markdown = is_file($file) ? file_get_contents($file) : "---\ntitle: Ma page\n---\n\nBonjour.\n";
 ?>
 <!doctype html>
 <html lang="fr">
@@ -433,6 +433,7 @@ La liste complète est dans le README, section « Apparence ». `blockquilt-cont
 | Le fichier change à chaque enregistrement | Fins de ligne `\r\n` gardées | Les remplacer par `\n` |
 | La page casse quand le texte contient `</script>` | Texte inséré sans échappement | `JSON_HEX_TAG` en PHP, `tojson` en Flask |
 | « Jeton invalide » sur une grosse photo (PHP) | Envoi au-delà de `post_max_size` | Monter `upload_max_filesize` et `post_max_size` |
+| Page publique blanche | Rien n'est encore enregistré, ou une erreur JavaScript | Enregistrer une fois depuis l'éditeur ; sinon, lire la console du navigateur (F12) : chemin de `blockquilt/` faux, ou erreur de syntaxe dans le `<script>` |
 | Photo enregistrée mais pas affichée | Option `media` différente de l'adresse qui sert `media/` | Même adresse des deux côtés |
 
 ## Aller plus loin
