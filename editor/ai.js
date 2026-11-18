@@ -15,6 +15,9 @@ export function installAi(ed) {
   if (!sheet) return; // sans aiUrl, aucun bouton IA
   installAiOps(ed, sheet);
   let ai = null; // { id, markdown }
+  // Demande en cours : annulée quand la feuille se ferme, pour qu'une réponse n'arrive jamais dans une autre ouverture.
+  let pending = null;
+  ed.on(sheet, 'close', () => pending?.abort());
   const useCls = 'min-h-11 rounded-xl border border-amber-200 bg-amber-50 px-3 text-sm font-semibold text-amber-950 hover:bg-amber-100';
   let uses = null; // promesse : usages de l'application, ou null (boutons intégrés)
   const loadUses = () => (uses ??= fetch(o.aiUrl, { headers: { Accept: 'application/json' }, signal: ed.ac.signal })
@@ -51,11 +54,14 @@ export function installAi(ed) {
     failure.hidden = true;
     button.disabled = true;
     button.querySelector('span').textContent = 'L’IA travaille…';
+    const mine = new AbortController();
+    pending = mine;
     try {
       // En vue source, le texte de la zone fait foi : pas de blocs à désigner, le document part entier.
       const numbered = !b && ed.mode !== 'source' ? { blocks: ed.aiSnapshot() } : {};
-      const r = await fetch(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
+      const r = await fetch(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
       const j = await r.json().catch(() => ({}));
+      if (mine.signal.aborted) return;
       const ops = r.ok && typeof j.operations === 'string';
       if (!ops && (!r.ok || typeof j.markdown !== 'string')) throw new Error(j.error || 'Pas de réponse de l’IA');
       $('[data-ai-ops]', sheet).hidden = !ops;
@@ -84,6 +90,7 @@ export function installAi(ed) {
       // Dans la feuille, pas en notification : un message de limite (413, 429) doit rester le temps d'être lu.
       if (error.name !== 'AbortError') { failure.textContent = error.message; failure.hidden = false; }
     } finally {
+      if (pending === mine) pending = null;
       button.disabled = false;
       button.querySelector('span').textContent = 'Envoyer';
     }

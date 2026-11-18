@@ -851,6 +851,24 @@ try {
   ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Texte.\\n\\n---\\n', aiUrl: 'api/ai' });
     const has = (i) => { el.querySelectorAll('[data-id]')[i].querySelector('[data-menu]').click(); const m = el.querySelector('[data-sheet="menu"]'); const r = !!m.querySelector('[data-act="ai"]'); m.close(); return r; };
     const r = has(0) && !has(1); e.destroy(); el.remove(); return r; })()`), 'IA sur un bloc : absente du menu d’une ligne horizontale');
+  // Demande en cours, feuille fermée puis rouverte sur un autre bloc : l'ancienne réponse n'arrive jamais dans la nouvelle feuille.
+  ok(await ev(`(async () => {
+    const real = window.fetch;
+    window.fetch = (url, init) => (init?.method === 'POST' && String(url).includes('lent') ? new Promise((r) => setTimeout(r, 300)).then(() => real(url, init)) : real(url, init));
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Un.\\n\\nDeux.\\n', aiUrl: 'api/ai?lent' });
+    const sheet = el.querySelector('[data-sheet="ai"]');
+    const openOn = (i) => { el.querySelectorAll('[data-id]')[i].querySelector('[data-menu]').click(); el.querySelector('[data-sheet="menu"] [data-act="ai"]').click(); };
+    openOn(0);
+    sheet.querySelector('[data-ai-instruction]').value = 'x';
+    sheet.querySelector('[data-ai-run]').click();
+    sheet.close();
+    openOn(1);
+    await new Promise((r) => setTimeout(r, 600));
+    const r = { scope: sheet.querySelector('[data-ai-scope]').textContent, result: !sheet.querySelector('[data-ai-result]').hidden, run: !sheet.querySelector('[data-ai-run]').disabled };
+    window.fetch = real; e.destroy(); el.remove();
+    return !r.result && r.run;
+  })()`), 'IA : une demande en cours est annulée à la fermeture de la feuille (pas de réponse périmée sur un autre bloc)');
   const docMid = await mdNow();
   await ev(`document.querySelector('[data-more]').click()`);
   await ev(`document.querySelector('[data-more-act="ai"]').click()`);
