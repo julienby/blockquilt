@@ -172,6 +172,18 @@ Objectif : à la restitution, mettre des blocs côte à côte (une photo à 1/3 
 - [x] **L3 Éditeur** : bouton de largeur et sa grille, choix, alerte de ligne incomplète, Espace dans le menu d'ajout, largeur gardée par l'IA sur un bloc. Tests à 375 px et 1280 px.
 - [x] **L4 Docs** : `FORMAT.md` (l'IA le reçoit : elle pourra composer des lignes), démo, `DECISIONS.md`.
 
+## 4e. Avant la V1 : retours de Billy et Cod (validé le 2026-11-18)
+
+Source : `AVIS-Billy.md`, `AVIS-Cod.md`. Écartés (voir `DECISIONS.md`) : temporisateurs, `syncFromDom` en N², délai du visuel, JSDoc de `ed`, découpage de `check.mjs`, contrôle du CSS généré.
+
+- [x] **V1 Sécurité du serveur de démo** (`dev/server.js`) : fichiers servis par liste blanche (pas de `.env`, ni fichier caché, ni document interne) ; corps reçu limité en octets (413) ; photos limitées en taille et à JPEG, PNG, WebP, GIF (pas de SVG envoyé) ; délai maximal de l'appel au fournisseur dans `ai/blockquilt-ai.js`. Tests.
+- [ ] **V2 Écritures concurrentes** (`dev/app.js`) : lire le corps, puis relire la version, comparer, écrire sans attente. Test : deux PUT avec le même ETag → un 204, un 412.
+- [ ] **V3 Vue source** : saisie, puis « Visuel à côté » → texte gardé. Test navigateur d'abord (saisir → basculer → enregistrer → relire), puis correctif.
+- [ ] **V4 Demande IA périmée** : une demande par `AbortController`, annulée à la fermeture de la feuille ou à une nouvelle demande. Test d'abord.
+- [ ] **V5 Marge du carrousel** : marge haute différente des photos, textes, vidéos. Reproduire (où et à quelle largeur), puis aligner.
+- [ ] **V6 Docs** : `FORMAT.md` (`:::carousel`, `:::html` et sa condition) ; README (case « forcer », ChatGPT non validé, portée de « sans perte ») ; feuille IA : « le document est envoyé au service configuré ».
+- [ ] **V7 Essais manuels (Julien)** : vrai modèle, iPhone, Android, Safari, Firefox, une intégration pilote.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

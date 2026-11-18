@@ -10,7 +10,8 @@
 //        → 200 { markdown } (bloc, document sans `blocks`, usage `output: 'document'`)
 //          · 200 { operations } (document avec `blocks` : texte « @@ remplacer | avant | après | supprimer n », « @@ rien » ou vide = rien à changer)
 //          · 400 { error } (demande invalide) · 413 { error } (texte trop long, limits.maxChars)
-//          · 429 { error } (limite de jetons du jour atteinte) · 502 { error } (modèle indisponible)
+//          · 413 { error } (demande de plus de maxBytes octets)
+//          · 429 { error } (limite de jetons du jour atteinte) · 502 { error } (modèle indisponible) · 504 { error } (modèle trop lent)
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -50,6 +51,7 @@ Règles :
  * params : champs en plus de la requête au modèle, pour tous les usages (ceux d'un usage passent devant), par exemple
  *   OpenRouter `{ reasoning: { effort: 'low' } }` : un modèle qui « réfléchit » peut épuiser max_tokens avant de répondre ;
  * maxTokens : longueur maximale de la réponse (un document entier : 16 000 par défaut) ;
+ * timeout : attente maximale du modèle en ms (120 000 par défaut ; au-delà, 504) ; maxBytes : taille maximale de la demande reçue (2 Mo ; au-delà, 413) ;
  * fallback({ scope, instruction, text, block, blocks, use, output }) : réponse sans clé (démo, essais), Markdown ou opérations ;
  * limits : { maxChars, perUserDay, globalDay } (absent ou 0 = pas de limite). maxChars : texte (ou blocs) + bloc + consigne envoyés.
  *   perUserDay, globalDay : jetons du jour (usage.total_tokens du modèle), par personne et pour tout le site ;
@@ -58,7 +60,7 @@ Règles :
  * now() : l'heure (essais).
  */
 function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}, fallback = null, maxTokens = 16000,
-  limits = {}, userOf = (req) => /^Bearer (\S+)$/.exec(req.headers.authorization || '')?.[1] || null, now = () => new Date() }) {
+  timeout = 120000, maxBytes = 2 * 1024 * 1024, limits = {}, userOf = (req) => /^Bearer (\S+)$/.exec(req.headers.authorization || '')?.[1] || null, now = () => new Date() }) {
   const byId = new Map(uses.map((u) => [u.id, u]));
   const spent = { day: '', global: 0, users: new Map() };
   const today = () => {
@@ -82,7 +84,7 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
 
   /**
    * Demande (et personne qui demande, ou null) → { markdown } ou { operations } (texte, « @@ rien » ou vide = rien à changer).
-   * Erreur avec .status (400, 413, 429 ou 502).
+   * Erreur avec .status (400, 413, 429, 502 ou 504).
    */
   const complete = async (req, who = null) => {
     const scope = req.scope === 'block' ? 'block' : 'document';
@@ -116,8 +118,10 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey, ...headers },
         body: JSON.stringify({ model: use?.model || model, max_tokens: maxTokens, ...params, ...use?.params, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+        signal: AbortSignal.timeout(timeout),
       });
     } catch (error) {
+      if (error.name === 'TimeoutError') throw fail(504, `Modèle trop lent : pas de réponse en ${timeout / 1000} s. Réessayer.`);
       throw fail(502, 'Modèle injoignable : ' + error.message);
     }
     const j = await r.json().catch(() => ({}));
@@ -140,9 +144,18 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
   };
 
   const read = async (req) => {
+    // Corps arrêté dès qu'il dépasse maxBytes (413) : jamais chargé en entier en mémoire.
+    const parts = [];
+    let size = 0;
+    for await (const p of req) {
+      size += p.length;
+      if (size > maxBytes) throw Object.assign(new Error(`Demande trop grosse : ${Math.round(maxBytes / 1024 / 1024)} Mo au plus.`), { status: 413 });
+      parts.push(p);
+    }
+    const body = Buffer.concat(parts);
     const type = req.headers['content-type'] || '';
-    if (type.includes('application/json')) { const parts = []; for await (const p of req) parts.push(p); return JSON.parse(Buffer.concat(parts).toString('utf8') || '{}'); }
-    const data = await new Request('http://local/', { method: 'POST', headers: req.headers, body: req, duplex: 'half' }).formData();
+    if (type.includes('application/json')) return JSON.parse(body.toString('utf8') || '{}');
+    const data = await new Request('http://local/', { method: 'POST', headers: req.headers, body }).formData();
     // Un formulaire multipart envoie les fins de ligne en \r\n : on les remet en \n.
     return Object.fromEntries([...data.entries()].map(([k, v]) => [k, String(v).replace(/\r\n/g, '\n')]));
   };

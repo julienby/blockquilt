@@ -13,6 +13,8 @@ let answer = { status: 200, body: { choices: [{ message: { content: '```markdown
 const upstream = http.createServer(async (req, res) => {
   const parts = []; for await (const p of req) parts.push(p);
   last = { url: req.url, auth: req.headers.authorization, title: req.headers['x-title'], body: JSON.parse(Buffer.concat(parts).toString('utf8')) };
+  if (answer.delay) await new Promise((r) => setTimeout(r, answer.delay));
+  if (res.destroyed) return;
   res.writeHead(answer.status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(answer.body));
 });
 await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
@@ -123,6 +125,14 @@ try {
   const demo = createAi({ baseUrl, apiKey: '', model: 'm', uses, fallback: ({ scope, use, text }) => `${scope}:${use}:${text}` });
   ok(await demo.complete({ scope: 'document', use: 'corriger', text: 'T' }).then((r) => r.markdown) === 'document:corriger:T', 'sans clé : la réponse de repli de l’application');
   ok(await createAi({ baseUrl, model: 'm' }).complete({ scope: 'document', instruction: 'x', text: 'T' }).then(() => false, (e) => e.status === 502), 'sans clé ni repli : 502');
+
+  // Fournisseur trop lent : la demande s'arrête au délai maximal.
+  answer = { ...answer, delay: 500 };
+  const slow = await createAi({ baseUrl, apiKey: 'k', model: 'm', timeout: 100 }).complete({ scope: 'document', instruction: 'x', text: 'T' }).then(() => null, (e) => e);
+  ok(slow?.status === 504 && slow.message.includes('trop lent'), 'fournisseur trop lent : 504 au délai maximal');
+  delete answer.delay;
+  const huge = await fetch(APP, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'document', instruction: 'x', text: 'a'.repeat(2_100_000) }) });
+  ok(huge.status === 413 && (await huge.json()).error.includes('trop gros'), 'corps reçu de plus de 2 Mo : 413, sans le lire en entier');
 } catch (error) {
   ok(false, error.stack);
 } finally {

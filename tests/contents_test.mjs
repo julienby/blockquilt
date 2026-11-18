@@ -60,6 +60,26 @@ try {
   ok(page.includes('Bienvenue au chalet') && page.includes('contentUrl: "contents/guide-2a", version: "\\"'), 'app : le premier contenu de user2 dans l’éditeur, avec son adresse et sa version');
   ok((await (await fetch(BASE + 'app?c=guide-1a', { headers: { Cookie: cookie } })).text()).includes('n\'a pas accès'), 'app : contenu d’un autre refusé');
   ok((await (await fetch(BASE + 'contents', { headers: { Cookie: cookie, Accept: 'application/json' } })).json()).length === 1, 'le cookie vaut jeton pour le navigateur');
+
+  // Fichiers servis : seulement ceux de l'éditeur (liste blanche).
+  const status = async (p) => (await fetch(BASE + p)).status;
+  const served = await Promise.all(['blockquilt.js', 'blockquilt-editor.js', 'blockquilt-content.js', 'blockquilt.css', 'blockquilt-content.css', 'emoji.json', 'editor/ai.js', 'fonts/newsreader.woff2'].map(status));
+  ok(served.every((s) => s === 200), 'fichiers de l’éditeur servis : ' + served.join(' '));
+  const hidden = await Promise.all(['.env', '.gitignore', 'README.md', 'PLAN.md', 'tailwind.config.js', 'ai/blockquilt-ai.js', 'mcp/SKILL.md', 'dev/app.js', 'editor/../.env', 'fonts/OFL-newsreader.txt'].map(status));
+  ok(hidden.every((s) => s === 404), 'autres fichiers (.env, docs, serveurs) : 404 : ' + hidden.join(' '));
+
+  // Photos : JPEG, PNG, WebP ou GIF reconnus à leur contenu, 5 Mo au plus.
+  const upload = (bytes, type) => { const f = new FormData(); f.set('photo', new Blob([bytes], { type }), 'x'); return fetch(BASE + 'api/upload', { method: 'POST', body: f }); };
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64)]);
+  const up = await upload(png, 'image/jpeg');
+  const { id } = await up.json();
+  const media = await fetch(BASE + 'media/' + id);
+  ok(up.status === 200 && media.headers.get('content-type') === 'image/png', 'photo PNG : gardée, servie avec le type de son contenu (pas celui déclaré)');
+  ok((await upload('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>', 'image/svg+xml')).status === 422, 'SVG envoyé : 422');
+  ok((await upload('pas une image', 'image/png')).status === 422, 'contenu qui n’est pas une image : 422');
+  ok((await upload(Buffer.concat([png, Buffer.alloc(5 * 1024 * 1024)]), 'image/png')).status === 413, 'photo de plus de 5 Mo : 413');
+  const big = new FormData(); big.set('text', 'a'.repeat(2 * 1024 * 1024));
+  ok((await fetch(BASE + 'api/save', { method: 'POST', body: big })).status === 413, 'enregistrement de plus de 1 Mo : 413');
 } catch (error) {
   ok(false, error.message);
 } finally {

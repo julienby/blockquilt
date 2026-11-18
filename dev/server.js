@@ -22,15 +22,30 @@ const reference = application(DATA);
 // Serveur MCP (transport HTTP) : un client du contrat /contents de cette même application, avec le jeton du client MCP.
 const mcp = httpHandler({ base: `http://127.0.0.1:${PORT}/` });
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.md': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2' };
+// Les seuls fichiers du projet servis : ceux que le navigateur charge pour l'éditeur (liste blanche).
+const PUBLIC = /^(blockquilt(-editor|-content)?\.(js|css)|emoji\.json|editor\/[a-z-]+\.js|fonts\/[a-z-]+\.woff2)$/;
+// Photos acceptées, reconnues à leurs premiers octets (pas au type déclaré par le navigateur).
+const IMAGES = [['image/jpeg', /^\xff\xd8\xff/], ['image/png', /^\x89PNG\r\n\x1a\n/], ['image/gif', /^GIF8[79]a/], ['image/webp', /^RIFF[\s\S]{4}WEBP/]];
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // no-cache : le navigateur revérifie chaque fichier, une démo mise à jour n'est jamais servie à moitié depuis le cache.
 const send = (res, code, type, body) => { res.writeHead(code, { 'Content-Type': type, 'Cache-Control': 'no-cache' }); res.end(body); };
 const json = (res, code, data) => send(res, code, 'application/json', JSON.stringify(data));
 
-// Formulaire multipart reçu → FormData (le parseur de fetch, intégré à Node).
-const form = (req) => new Request('http://local' + req.url, { method: 'POST', headers: req.headers, body: req, duplex: 'half' }).formData();
+// Corps reçu, arrêté dès qu'il dépasse max octets (413) : jamais chargé en entier en mémoire.
+const read = async (req, max) => {
+  const parts = [];
+  let size = 0;
+  for await (const p of req) {
+    size += p.length;
+    if (size > max) throw Object.assign(new Error(`Envoi trop gros : ${Math.round(max / 1024 / 1024)} Mo au plus`), { status: 413 });
+    parts.push(p);
+  }
+  return Buffer.concat(parts);
+};
+// Formulaire multipart reçu → FormData (le parseur de fetch, intégré à Node). 1 Mo au plus, sauf photo.
+const form = async (req, max = 1024 * 1024) => new Request('http://local' + req.url, { method: 'POST', headers: req.headers, body: await read(req, max) }).formData();
 
 // La démo : index.html, avec le dernier document enregistré dans le champ source s'il existe.
 const page = () => {
@@ -97,13 +112,18 @@ const routes = {
     const data = await form(req);
     send(res, 200, 'text/html; charset=utf-8', Blocks.toHtml(String(data.get('text') ?? '').replace(/\r\n/g, '\n'), { media: 'media/' }));
   },
-  // Photo : le fichier est gardé tel quel, réponse JSON { id }.
+  // Photo : JPEG, PNG, GIF ou WebP de 5 Mo au plus, gardée telle quelle, réponse JSON { id }.
   'POST /api/upload': async (req, res) => {
-    const file = (await form(req)).get('photo');
-    if (!file || typeof file === 'string' || !file.type.startsWith('image/')) return json(res, 422, { error: 'Image attendue' });
+    const MAX = 5 * 1024 * 1024;
+    const file = (await form(req, MAX + 64 * 1024)).get('photo');
+    if (!file || typeof file === 'string') return json(res, 422, { error: 'Image attendue' });
+    if (file.size > MAX) return json(res, 413, { error: 'Photo trop grosse : 5 Mo au plus' });
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const type = IMAGES.find(([, magic]) => magic.test(bytes.subarray(0, 12).toString('latin1')))?.[0];
+    if (!type) return json(res, 422, { error: 'Image attendue : JPEG, PNG, GIF ou WebP' });
     const id = crypto.randomBytes(6).toString('hex');
-    fs.writeFileSync(path.join(MEDIA, id), Buffer.from(await file.arrayBuffer()));
-    fs.writeFileSync(path.join(MEDIA, id + '.type'), file.type);
+    fs.writeFileSync(path.join(MEDIA, id), bytes);
+    fs.writeFileSync(path.join(MEDIA, id + '.type'), type);
     json(res, 200, { id });
   },
 };
@@ -125,12 +145,14 @@ const server = http.createServer(async (req, res) => {
       if (!fs.existsSync(file)) return send(res, 404, 'text/plain', 'Introuvable');
       return send(res, 200, fs.readFileSync(file + '.type', 'utf8'), fs.readFileSync(file));
     }
-    // Fichiers du projet : jamais en dehors de ROOT, jamais dev/ ni .git/.
-    const file = path.resolve(ROOT, '.' + decodeURIComponent(url.pathname));
-    const inside = file.startsWith(ROOT + path.sep) && !/^(dev|\.git)(\/|$)/.test(path.relative(ROOT, file));
-    if (!inside || !fs.existsSync(file) || !fs.statSync(file).isFile()) return send(res, 404, 'text/plain', 'Introuvable');
-    send(res, 200, TYPES[path.extname(file)] || 'application/octet-stream', fs.readFileSync(file));
+    // Fichiers du projet : seulement ceux de la liste blanche.
+    const name = url.pathname.slice(1);
+    const file = path.join(ROOT, name);
+    if (!PUBLIC.test(name) || !fs.existsSync(file)) return send(res, 404, 'text/plain', 'Introuvable');
+    send(res, 200, TYPES[path.extname(file)], fs.readFileSync(file));
   } catch (error) {
+    // Erreur prévue (envoi trop gros…) : JSON { error }, comme les autres réponses de api/.
+    if (error.status) return json(res, error.status, { error: error.message });
     send(res, 500, 'text/plain', String(error.message));
   }
 });
