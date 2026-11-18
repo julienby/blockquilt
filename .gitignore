@@ -2,3 +2,4 @@ dev/data/
 dev/data-web/
 .*.swp
 .env
+archives/
