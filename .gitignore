@@ -3,3 +3,4 @@ dev/data-web/
 .*.swp
 .env
 archives/
+__pycache__/
