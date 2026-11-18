@@ -1067,6 +1067,13 @@ try {
     await ev(`(() => { const t = document.querySelector('[data-source-text]'); t.value = t.value + '\\n> [!astuce]\\n> Encadré inconnu\\n\\n## Ajouté à la main\\n'; t.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
     await waitFor(() => ev(`document.querySelector('[data-source-lint]').textContent.includes('encadré inconnu')`), 'alerte lint en direct');
     ok(await ev(`document.querySelector('[data-visual]').textContent.includes('Ajouté à la main')`), `${width} px : alerte lint et visuel mis à jour en direct`);
+    // Le texte saisi survit au bouton « Visuel à côté » (la zone est redessinée), dans les deux sens.
+    const kept = [];
+    for (let i = 0; i < 2; i++) {
+      await ev(`document.querySelector('[data-visual-toggle]').click()`);
+      kept.push(await ev(`document.querySelector('[data-source-text]').value.includes('## Ajouté à la main')`));
+    }
+    ok(kept.every(Boolean), `${width} px : vue source, le texte saisi reste après « Visuel à côté » (${kept})`);
     await ev(`document.querySelector('[data-source-line]').click()`);
     ok(await ev(`(() => { const t = document.querySelector('[data-source-text]'); return document.activeElement === t && t.value.slice(t.selectionStart, t.selectionEnd) === '> [!astuce]'; })()`), `${width} px : un clic sur l’alerte sélectionne la ligne`);
     await ev(`document.querySelector('[data-source-mode]').click()`);

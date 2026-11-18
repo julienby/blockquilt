@@ -8,6 +8,8 @@ export function installSource(ed) {
   let sourceText = '';
   ed.sourceArea = () => canvas.querySelector('[data-source-text]');
   ed.renderSource = () => {
+    // Redessin en vue source (« Visuel à côté »…) : le texte de la zone fait foi, pas celui lu à l'entrée.
+    sourceText = ed.sourceArea()?.value ?? sourceText;
     ed.hideBar();
     canvas.innerHTML = `<div data-source class="bq-column flex flex-col gap-2">
           <textarea data-source-text spellcheck="false" aria-label="Texte source (Markdown)" class="bq-source-text w-full rounded-xl border bg-transparent p-3 font-mono text-[13px] leading-6">${esc(sourceText)}</textarea>
