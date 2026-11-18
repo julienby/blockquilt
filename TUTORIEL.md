@@ -149,6 +149,7 @@ require __DIR__ . '/api.php';
 
 $text = str_replace("\r\n", "\n", $_POST['text'] ?? '');
 if (trim($text) === '') fail(422, 'Texte vide');
+if (!is_writable(__DIR__ . '/data')) fail(500, 'Le serveur ne peut pas écrire dans data/');
 
 file_put_contents(__DIR__ . '/data/page.md', $text);
 echo json_encode(['ok' => true]);
@@ -272,9 +273,8 @@ require __DIR__ . '/api.php';
 
 $photo = $_FILES['photo'] ?? null;
 if (!$photo) fail(422, 'Image attendue');
-if (in_array($photo['error'], [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE]) || $photo['size'] > 5 * 1024 * 1024) {
-  fail(413, 'Photo trop grosse : 5 Mo au plus');
-}
+if ($photo['error'] === UPLOAD_ERR_INI_SIZE) fail(413, 'Photo trop grosse pour PHP : voir upload_max_filesize dans php.ini');
+if ($photo['size'] > 5 * 1024 * 1024) fail(413, 'Photo trop grosse : 5 Mo au plus');
 if ($photo['error'] !== UPLOAD_ERR_OK) fail(422, 'Image attendue');
 
 // Le type est lu dans les premiers octets du fichier, pas dans ce que dit le navigateur.
@@ -287,15 +287,18 @@ $ext = match (true) {
   default => null,
 };
 if ($ext === null) fail(422, 'Image attendue : JPEG, PNG, GIF ou WebP');
+if (!is_writable(__DIR__ . '/media')) fail(500, 'Le serveur ne peut pas écrire dans media/');
 
 $id = bin2hex(random_bytes(6)) . '.' . $ext;
-move_uploaded_file($photo['tmp_name'], __DIR__ . '/media/' . $id);
+if (!move_uploaded_file($photo['tmp_name'], __DIR__ . '/media/' . $id)) fail(500, 'Photo non enregistrée');
 echo json_encode(['id' => $id]);
 ```
 
 Le serveur web sert `media/` directement, comme des fichiers statiques.
 
-**Piège** : PHP limite les envois à 2 Mo par défaut. Dans `php.ini` : `upload_max_filesize = 6M` et `post_max_size = 8M`. Si l'envoi dépasse `post_max_size`, PHP vide `$_POST` : la réponse est alors « Jeton invalide ».
+**Piège** : PHP limite les envois à 2 Mo par défaut, et une photo de téléphone dépasse souvent cette taille. Dans `php.ini` : `upload_max_filesize = 6M` et `post_max_size = 8M`. Si l'envoi dépasse `post_max_size`, PHP vide `$_POST` : la réponse est alors « Jeton invalide ».
+
+**Piège** : `data/` et `media/` doivent exister, et l'utilisateur du serveur web (souvent `www-data`) doit pouvoir y écrire. Sinon, `save.php` et `upload.php` le disent dans l'éditeur.
 
 ### Flask
 
@@ -432,6 +435,8 @@ La liste complète est dans le README, section « Apparence ». `blockquilt-cont
 | Polices ou emoji absents | `fonts/` ou `emoji.json` pas copiés | Copier tout le dossier de l'étape 1 |
 | Le fichier change à chaque enregistrement | Fins de ligne `\r\n` gardées | Les remplacer par `\n` |
 | La page casse quand le texte contient `</script>` | Texte inséré sans échappement | `JSON_HEX_TAG` en PHP, `tojson` en Flask |
+| « Photo trop grosse pour PHP » | Limite `upload_max_filesize` (2 Mo par défaut) | Monter `upload_max_filesize` et `post_max_size` |
+| « Le serveur ne peut pas écrire dans … » (PHP) | Dossier absent, ou droits manquants | Créer `data/` et `media/`, les donner à l'utilisateur du serveur web |
 | « Jeton invalide » sur une grosse photo (PHP) | Envoi au-delà de `post_max_size` | Monter `upload_max_filesize` et `post_max_size` |
 | Page publique blanche | Rien n'est encore enregistré, ou une erreur JavaScript | Enregistrer une fois depuis l'éditeur ; sinon, lire la console du navigateur (F12) : chemin de `blockquilt/` faux, ou erreur de syntaxe dans le `<script>` |
 | Photo enregistrée mais pas affichée | Option `media` différente de l'adresse qui sert `media/` | Même adresse des deux côtés |
