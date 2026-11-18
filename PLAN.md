@@ -181,7 +181,7 @@ Source : `AVIS-Billy.md`, `AVIS-Cod.md`. Écartés (voir `DECISIONS.md`) : tempo
 - [x] **V3 Vue source** : saisie, puis « Visuel à côté » → texte gardé. Test navigateur d'abord (saisir → basculer → enregistrer → relire), puis correctif.
 - [x] **V4 Demande IA périmée** : une demande par `AbortController`, annulée à la fermeture de la feuille ou à une nouvelle demande. Test d'abord.
 - [ ] **V5 Marge du carrousel** : marge haute différente des photos, textes, vidéos. Reproduire (où et à quelle largeur), puis aligner.
-- [ ] **V6 Docs** : `FORMAT.md` (`:::carousel`, `:::html` et sa condition) ; README (case « forcer », ChatGPT non validé, portée de « sans perte ») ; feuille IA : « le document est envoyé au service configuré ».
+- [x] **V6 Docs** : `FORMAT.md` (`:::carousel`, `:::html` et sa condition) ; README (case « forcer », ChatGPT non validé, portée de « sans perte ») ; feuille IA : « le document est envoyé au service configuré ».
 - [ ] **V7 Essais manuels (Julien)** : vrai modèle, iPhone, Android, Safari, Firefox, une intégration pilote.
 
 ## 5. IA — fait (I1 à I6)

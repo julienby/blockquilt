@@ -80,10 +80,12 @@ ssh maison.local
 | Citation | Chaque ligne commence par `> ` |
 | Encadré | Première ligne `> [!type]`, puis facultatifs un emoji et un titre : `> [!tip] 🔑 La clé`. Le texte suit, chaque ligne commençant par `> `. |
 | Photo | `![légende](media/<id>)` ou `![légende](https://…)`, seule sur sa ligne |
+| Carrousel | `:::carousel`, puis une photo `![légende](…)` par ligne (au moins une, rien d'autre), puis `:::`. Une photo à la fois, avec flèches et puces. |
 | Carte | `:::card`, puis, chacun facultatif et dans cet ordre : une photo `![…](…)`, un titre `### …`, du texte, un lien `[Lire](https://…)` seul sur la dernière ligne (rendu en bouton) ; puis `:::`. Remplace une carte écrite en HTML. |
 | Vidéo | Adresse YouTube ou Vimeo, seule sur sa ligne |
 | Ligne horizontale | `---` seul, entre deux lignes vides |
 | Code | Trois accents graves suivis du langage (` ```js `), le code, puis trois accents graves |
+| HTML | `:::html`, le HTML, puis `:::`. Seulement si on demande du HTML : l'application peut ne pas le proposer. Au rendu, seules les balises simples restent (texte, listes, liens, images, tableaux) ; script, style, iframe, SVG et formulaires sont retirés. Pour une carte, préférer `:::card`. |
 
 **Lignes composées.** Pour mettre des blocs côte à côte, écrire leur largeur en première ligne du bloc : `<!-- 1/3 -->`, `<!-- 1/2 -->` ou `<!-- 2/3 -->` (rien d'autre). Les blocs avec une largeur qui se suivent forment une ligne, fermée quand la somme fait 1 : `1/2 + 1/2`, `1/3 + 2/3`, `2/3 + 1/3`, `1/3 + 1/3 + 1/3`. Le commentaire seul est un bloc Espace : une place vide dans la ligne. Sur un écran étroit, les blocs s'empilent. Une ligne incomplète est signalée par `Blocks.lint` ; à l'affichage, ses blocs s'élargissent pour la remplir.
 
@@ -97,7 +99,7 @@ ssh maison.local
 
 - `####` et plus : seuls `#`, `##` et `###` sont des titres.
 - Un encadré dans un autre.
-- Du HTML brut, des tableaux : gardés tels quels, mais affichés comme du texte source.
+- Du HTML brut ou un tableau hors d'un bloc `:::html` : gardé tel quel, mais affiché comme du texte source.
 - Un bloc `:::` dans un autre bloc `:::`.
 
 ## Contrôle

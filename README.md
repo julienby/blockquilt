@@ -2,7 +2,7 @@
 
 Éditeur de contenu web par blocs : pages d'application, articles, posts, notes. On écrit dans des blocs colorés qui portent un sens (titre, texte, astuce, attention, photo, carrousel, code…) ; ce qui est enregistré est un texte Markdown lisible, modifiable à la main et productible par une IA.
 
-- **Le texte est la source.** Un seul format : Markdown + frontmatter + blocs sémantiques ([FORMAT.md](FORMAT.md)). L'éditeur le relit sans perte ; ce qu'il ne sait pas refaire à l'identique reste un bloc « texte source », intact.
+- **Le texte est la source.** Un seul format : Markdown + frontmatter + blocs sémantiques ([FORMAT.md](FORMAT.md)). L'éditeur le relit sans perte : aucun contenu n'est perdu, ce qu'il ne sait pas refaire à l'identique reste un bloc « texte source », intact. Une édition peut normaliser la mise en page du texte (lignes vides, espaces en fin de ligne) ; les écritures ciblées (`edit_block`, opérations de l'IA) ne touchent pas aux autres blocs.
 - **Un bloc = une entrée de registre.** Lecture, écriture, rendu HTML, carte d'édition : tout ce qui concerne un type est au même endroit (`Blocks.register`).
 - **Mobile d'abord.** Chaque écran est conçu et testé à 375 px.
 - **Aucune dépendance**, aucune étape de build pour le JS.
@@ -92,7 +92,7 @@ Tous en `POST multipart/form-data`, avec les champs de `fields`. Les fins de lig
 
 Photos : le serveur vérifie le contenu, pas le type déclaré par le navigateur. La démo accepte JPEG, PNG, GIF et WebP de 5 Mo au plus (413 au-delà, 422 sinon). Pas de SVG envoyé par un utilisateur : servi sur le même domaine, il peut exécuter du script. Erreur : JSON `{ "error": "…" }`, affiché par l'éditeur.
 | Aperçu (`previewUrl`) | `text` | Fragment HTML. |
-| IA (`aiUrl`) | `GET` → `{ uses: [{ id, label, scopes }] }`, les boutons de la feuille IA (facultatif : sans réponse, des boutons intégrés). `POST` : `scope` (`document` ou `block`), `use` (l'usage choisi, facultatif), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`), `blocks` (document, hors vue source : liste JSON, `[0]` = frontmatter, `[n]` = bloc n) | JSON `{ "operations": "…" }` ou `{ "markdown": "…" }`. **Opérations** (document) : une proposition par opération, avec les différences mot à mot, à cocher une à une ; « Appliquer » fait une seule étape annulable. Une proposition dont le bloc a changé depuis l'envoi est périmée, jamais appliquée. Une proposition en alerte `Blocks.lint` est décochée. **Markdown** : passé par `Blocks.lint`, montré à côté de l'actuel ; puis, au choix et annulable : document — remplacer, ajouter au début, à la fin ; bloc — remplacer, insérer au-dessus, dessous ; ou « Copier seulement » (rien ne change). |
+| IA (`aiUrl`) | `GET` → `{ uses: [{ id, label, scopes }] }`, les boutons de la feuille IA (facultatif : sans réponse, des boutons intégrés). `POST` : `scope` (`document` ou `block`), `use` (l'usage choisi, facultatif), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`), `blocks` (document, hors vue source : liste JSON, `[0]` = frontmatter, `[n]` = bloc n) | JSON `{ "operations": "…" }` ou `{ "markdown": "…" }`. **Opérations** (document) : une proposition par opération, avec les différences mot à mot, à cocher une à une ; « Appliquer » fait une seule étape annulable. Une proposition dont le bloc a changé depuis l'envoi est périmée, jamais appliquée. Une proposition en alerte `Blocks.lint` est décochée. **Markdown** : passé par `Blocks.lint`, montré à côté de l'actuel ; en alerte, les boutons d'application sont désactivés, la case « Appliquer malgré les alertes » les réactive ; puis, au choix et annulable : document — remplacer, ajouter au début, à la fin ; bloc — remplacer, insérer au-dessus, dessous ; ou « Copier seulement » (rien ne change). |
 
 L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le service désigné par `aiUrl` qui le fait. Un relais prêt à monter est fourni (« Relais IA » plus bas) ; la démo l'utilise, avec une transformation fixe (texte en majuscules) tant qu'aucune clé `AI_KEY` n'est donnée.
 
@@ -172,7 +172,7 @@ Le contrat (en tête du fichier) se réécrit en quelques lignes ailleurs, en PH
 
 La démo utilise ce relais : une clé dans `.env` (`AI_KEY=…`, fichier ignoré par git), puis `docker compose up -d` ; `AI_MODEL`, `AI_BASE_URL`, `AI_REASONING` (`low` par défaut) pour régler. Sans clé, elle met le texte en majuscules. Ses limites : 20 000 caractères, 50 000 jetons par personne (jeton, sinon adresse IP) et 500 000 pour tout le site, par jour.
 
-### Serveur MCP (Claude Code, ChatGPT…)
+### Serveur MCP (Claude Code)
 
 `mcp/blockquilt-mcp.js` (Node 22, sans dépendance) donne ces contenus à une IA, par-dessus le contrat ci-dessus et avec le jeton reçu : il ne stocke rien et ne décide d'aucun droit. Outils : `get_format`, `list_contents`, `read_content` (version et blocs numérotés `[n · empreinte · type]`), `edit_block` (`replace`, `before`, `after`, `remove`), `write_content` (`replace` avec la version lue, `prepend`, `append`), `lint`. Tout Markdown est contrôlé par `Blocks.lint` avant écriture ; une écriture sur un contenu changé depuis la lecture est refusée.
 
@@ -182,6 +182,8 @@ claude mcp add blockquilt -e BQ_URL=http://localhost:8080/ -e BQ_TOKEN=demo-user
 # En ligne (HTTP) : l'application monte httpHandler, ici la démo publique
 claude mcp add --transport http blockquilt https://web.byjulien.com/blockquilt/mcp --header "Authorization: Bearer demo-user1"
 ```
+
+Essayé avec Claude Code. Pas encore avec ChatGPT : son connecteur MCP distant demande une connexion OAuth, la démo n'a que des jetons.
 
 `mcp/SKILL.md` est le skill qui va avec (règles d'écriture, quand utiliser quel outil) : à copier dans `~/.claude/skills/blockquilt/`. Une application monte la version HTTP en quelques lignes : `const { httpHandler } = require('./mcp/blockquilt-mcp.js'); app.post('/mcp', httpHandler({ base: 'https://exemple.org/' }))`.
 
