@@ -184,6 +184,17 @@ Source : `archives/AVIS-Billy.md`, `archives/AVIS-Cod.md`. Écartés (voir `DECI
 - [x] **V6 Docs** : `FORMAT.md` (`:::carousel`, `:::html` et sa condition) ; README (case « forcer », ChatGPT non validé, portée de « sans perte ») ; feuille IA : « le document est envoyé au service configuré ».
 - [ ] **V7 Essais manuels (Julien)** : vrai modèle, iPhone, Android, Safari, Firefox, une intégration pilote.
 
+## 4f. Rendu HTML multi-langages & génération hybride
+
+Objectif : permettre à n'importe quel serveur (Node, PHP, Python) de générer des pages HTML indépendantes de l'éditeur à partir du seul Markdown, sans dérive entre les implémentations.
+
+- [x] **R1 Plan et décisions** : contrat `.bq-content`, rendu hybride par fragment en cache, parité JS / PHP / Python par fixtures (`DECISIONS.md`).
+- [x] **R2 Golden tests de rendu** (`tests/fixtures/*.md` ↔ `tests/fixtures/*.html`) : figer la sortie exacte de `Blocks.toHtml(md, { media: 'media/' })` pour toutes les fixtures et vérifier dans `tests/blocks_test.cjs`.
+- [x] **R3 Contrat HTML documenté** (`RENDER.md`) : balises, classes `.bq-*`, règle du `<h1>` frontmatter, liste blanche `:::html`, protocoles autorisés.
+- [x] **R4 Génération hybride côté serveur** (`dev/app.js`, `tests/contents_test.mjs`) : à l'écriture (ou à la première lecture), pré-rendre et mettre en cache le fragment `<article class="bq-content">…</article>` avec `ETag` ; servir le fragment directement pour HTMX (`HX-Request`) ou l'injecter dans le gabarit HTML complet (`blockquilt-content.css` + `blockquilt-content.js` facultatif).
+- [x] **R5 Moteur Python** (`renderers/python/blockquilt_render.py`, `test_render.py`) : parseur + `to_html` + sanitisation stricte `:::html`, validé à 100 % par les mêmes fixtures `*.md` / `*.html` (`unittest`).
+- [x] **R6 Moteur PHP** (`renderers/php/BlockquiltRender.php`, `test_render.php`) : parseur + `toHtml` + sanitisation stricte `:::html`, validé à 100 % par les mêmes fixtures `*.md` / `*.html` (`docker compose run --rm check-php`).
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

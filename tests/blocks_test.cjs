@@ -13,11 +13,14 @@ const expected = {
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
   'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
 };
-for (const file of fs.readdirSync(FIX).sort()) {
+for (const file of fs.readdirSync(FIX).filter((f) => f.endsWith('.md')).sort()) {
   const x = fs.readFileSync(path.join(FIX, file), 'utf8');
   const { meta, blocks } = Blocks.parse(x);
   ok(Blocks.serialize(meta, blocks) === x, `aller-retour exact : ${file}`);
   ok(types(x) === expected[file], `types lus : ${file} → ${types(x)}`);
+  const htmlFile = file.replace(/\.md$/, '.html');
+  const expectedHtml = fs.existsSync(path.join(FIX, htmlFile)) ? fs.readFileSync(path.join(FIX, htmlFile), 'utf8') : null;
+  ok(expectedHtml !== null && Blocks.toHtml(x, { media: 'media/' }) === expectedHtml, `rendu HTML exact : ${htmlFile}`);
 }
 ok(Object.keys(expected).every((f) => fs.existsSync(path.join(FIX, f))), 'fixtures : toutes présentes');
 

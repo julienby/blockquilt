@@ -37,6 +37,8 @@ try {
   ok((await get('contents/guide-1a', 'user1', 'text/markdown', { 'If-None-Match': tag })).status === 304, 'If-None-Match : 304 si inchangé');
   const html = await (await get('contents/guide-1a', 'user1', 'text/html', { 'HX-Request': 'true' })).text();
   ok(html.startsWith('<article class="bq-content">') && html.includes('<h1 id="arrivee">'), 'GET HTML : le rendu Blocks.toHtml (fragment pour htmx)');
+  const cachedPath = path.join(data, 'contents', 'guide-1a.html');
+  ok(fs.existsSync(cachedPath) && fs.readFileSync(cachedPath, 'utf8') === html, 'rendu hybride : fragment HTML mis en cache après GET');
   ok((await (await get('contents/guide-1a', 'user1', 'text/html')).text()).includes('<!doctype html>'), 'GET HTML sans htmx : page complète');
   ok((await get('contents/guide-2a', 'user1')).status === 403 && (await get('contents/inconnu', 'user1')).status === 403, 'contenu d’un autre (ou inexistant) : 403');
   ok((await get('contents/..%2Fdocument', 'user1')).status === 404, 'identifiant invalide : 404');
@@ -52,6 +54,10 @@ try {
   const after = await get('contents/guide-1a', 'user1', 'application/json');
   const c = await after.json();
   ok(c.markdown === next && c.updatedBy === 'user1 (via Claude)' && decodeURIComponent(after.headers.get('x-updated-by')) === 'user1 (via Claude)', 'auteur noté : la personne du jeton, et par quoi elle est passée');
+  ok(fs.readFileSync(cachedPath, 'utf8').includes('Ajouté par l’IA.'), 'rendu hybride : fragment HTML pré-rendu au PUT');
+  fs.writeFileSync(path.join(data, 'contents', 'guide-1a.md'), next + '\nModif disque.\n');
+  const diskHtml = await (await get('contents/guide-1a', 'user1', 'text/html', { 'HX-Request': 'true' })).text();
+  ok(diskHtml.includes('Modif disque.') && fs.readFileSync(cachedPath, 'utf8').includes('Modif disque.'), 'rendu hybride : cache régénéré si .md modifié sur disque');
 
   // Deux PUT en même temps sur la même version, corps envoyés en deux temps : un seul réussit.
   const slowPut = (body, ifMatch) => {

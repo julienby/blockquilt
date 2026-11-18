@@ -345,16 +345,18 @@ def media(name):
 
 ## 5. Afficher la page publique
 
-Le rendu HTML est fait par `Blocks.toHtml`, dans `blockquilt.js`. Sans Node, il tourne dans le navigateur du visiteur. Le texte est échappé et le bloc HTML est filtré : le résultat peut aller dans `innerHTML`.
+Le rendu HTML se fait **côté serveur**, directement en PHP ou en Python, sans charger `blockquilt.js` ni aucun fichier de l'éditeur sur la page publique. Le texte est échappé et le bloc `:::html` est filtré par liste blanche ([RENDER.md](RENDER.md)).
 
 ### PHP
 
-`index.php` :
+Copiez `renderers/php/BlockquiltRender.php` dans votre projet (nécessite l'extension PHP `intl`). Dans `index.php` :
 
 ```php
 <?php
+require __DIR__ . '/BlockquiltRender.php';
 $file = __DIR__ . '/data/page.md';
 $markdown = is_file($file) ? file_get_contents($file) : "---\ntitle: Ma page\n---\n\nBonjour.\n";
+$html = BlockquiltRender::toHtml($markdown, 'media/');
 ?>
 <!doctype html>
 <html lang="fr">
@@ -363,27 +365,25 @@ $markdown = is_file($file) ? file_get_contents($file) : "---\ntitle: Ma page\n--
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ma page</title>
   <link rel="stylesheet" href="blockquilt/blockquilt-content.css">
+  <script defer src="blockquilt/blockquilt-content.js"></script>
 </head>
 <body>
-  <main id="page"></main>
-  <script src="blockquilt/blockquilt.js"></script>
-  <script>
-    document.getElementById('page').innerHTML =
-      Blocks.toHtml(<?= json_encode($markdown, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>, { media: 'media/' });
-  </script>
-  <script src="blockquilt/blockquilt-content.js"></script>
+  <main id="page"><?= $html ?></main>
 </body>
 </html>
 ```
 
 ### Flask
 
-Dans `app.py` :
+Copiez `renderers/python/blockquilt_render.py` dans votre projet (zéro dépendance). Dans `app.py` :
 
 ```python
+import blockquilt_render as bq
+
 @app.get('/')
 def page():
-    return render_template('page.html', markdown=read_page())
+    html = bq.to_html(read_page(), media='/media/')
+    return render_template('page.html', content=html)
 ```
 
 `templates/page.html` :
@@ -396,21 +396,17 @@ def page():
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ma page</title>
   <link rel="stylesheet" href="/static/blockquilt/blockquilt-content.css">
+  <script defer src="/static/blockquilt/blockquilt-content.js"></script>
 </head>
 <body>
-  <main id="page"></main>
-  <script src="/static/blockquilt/blockquilt.js"></script>
-  <script>
-    document.getElementById('page').innerHTML = Blocks.toHtml({{ markdown|tojson }}, { media: '/media/' });
-  </script>
-  <script src="/static/blockquilt/blockquilt-content.js"></script>
+  <main id="page">{{ content|safe }}</main>
 </body>
 </html>
 ```
 
-**Vérifier** : la page affiche le contenu enregistré, photos comprises. Un carrousel a ses flèches et ses puces.
+**Vérifier** : la page affiche le contenu enregistré dès le HTML initial (lisible sans JavaScript, indexable par les moteurs de recherche). `blockquilt-content.js` est facultatif : il ajoute les flèches et puces aux carrousels.
 
-**Limite** : rendu dans le navigateur, la page est vide sans JavaScript, et les moteurs de recherche la lisent moins bien. Pour un rendu côté serveur, il faut appeler `Blocks.toHtml` sous Node (voir « Rendu côté serveur » dans le README).
+**Pour aller plus loin (approche hybride)** : vous pouvez mettre en cache le fragment `toHtml(...)` sur disque (ou en mémoire) indexé par le hash du `.md`, et ne le régénérer qu'à la sauvegarde ou quand le `.md` change (voir `dev/app.js`).
 
 ## 6. Adapter l'apparence
 

@@ -12,6 +12,8 @@
 ```sh
 docker compose up                 # démo sur http://localhost:8080/
 docker compose run --rm check     # tests Node (noyau, contrat, MCP, relais IA) + parcours dans Chromium ; code de sortie ≠ 0 si rouge
+docker compose run --rm check-python  # tests de conformité du moteur Python (renderers/python/)
+docker compose run --rm check-php     # tests de conformité du moteur PHP + intl (renderers/php/)
 ```
 
 La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, les photos dans `dev/data/media/`. Pour repartir du document de démo, supprimer `dev/data/`. Sans Docker : `node dev/server.js` (Node 22), puis `node tests/blocks_test.cjs`.
@@ -136,7 +138,9 @@ Blocks.combine(markdown, texteIA, 'append');                  // replace | prepe
 
 Sur la page publique, `blockquilt-content.js` (facultatif, sans dépendance) donne aux carrousels leurs flèches et leurs puces ; sans lui, un carrousel défile au doigt. Pour du contenu ajouté après le chargement : `BlockquiltContent.enhance(élément)`.
 
-Le HTML produit est sémantique (`<h2 id>`, `<aside role="note">`, `<figure>`, `<blockquote>`, `<pre><code class="language-js">`…) et porte des classes `bq-*`, sans Tailwind. La feuille `blockquilt-content.css` (écrite à la main, couleurs en variables CSS `--bq-…`) suffit à l'afficher. Tout le texte est échappé ; le bloc HTML passe par `Blocks.sanitize` (liste blanche, voir `DECISIONS.md`).
+Le HTML produit est sémantique (`<h2 id>`, `<aside role="note">`, `<figure>`, `<blockquote>`, `<pre><code class="language-js">`…) et porte des classes `bq-*`, sans Tailwind ([RENDER.md](RENDER.md)). La feuille `blockquilt-content.css` (écrite à la main, couleurs en variables CSS `--bq-…`) suffit à l'afficher. Tout le texte est échappé ; le bloc HTML passe par `Blocks.sanitize` (liste blanche, voir `DECISIONS.md`).
+
+**Sans Node côté serveur** : des moteurs de rendu autonomes en **Python** ([renderers/python/blockquilt_render.py](renderers/python/blockquilt_render.py)) et **PHP** ([renderers/php/BlockquiltRender.php](renderers/php/BlockquiltRender.php), extension `intl` requise) implémentent exactement le même contrat, validé contre les mêmes fixtures `tests/fixtures/*.md` ↔ `*.html`. L'application de référence (`dev/app.js`) illustre aussi le **rendu hybride** : le fragment `<article class="bq-content">` est pré-rendu et mis en cache sur disque par `ETag` à l'enregistrement ou à la première lecture.
 
 ## Contenus d'une application (pour les IA et les autres outils)
 

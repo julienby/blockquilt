@@ -28,8 +28,24 @@ module.exports = (DATA) => {
   }
 
   const file = (id) => path.join(DIR, id + '.md');
+  const htmlFile = (id) => path.join(DIR, id + '.html');
+  const cacheMetaFile = (id) => path.join(DIR, id + '.cache.json');
   const read = (id) => (ID.test(id) && fs.existsSync(file(id)) ? fs.readFileSync(file(id), 'utf8') : null);
   const etag = (md) => `"${Blocks.hash(md)}"`;
+  // Rendu hybride : fragment <article class="bq-content"> pré-rendu et mis en cache sur disque par ETag.
+  const writeHtmlCache = (id, md, tag) => {
+    const html = Blocks.toHtml(md, { media: '../media/' });
+    fs.writeFileSync(htmlFile(id), html);
+    fs.writeFileSync(cacheMetaFile(id), JSON.stringify({ etag: tag }));
+    return html;
+  };
+  const readHtmlCached = (id, md, tag) => {
+    try {
+      const meta = JSON.parse(fs.readFileSync(cacheMetaFile(id), 'utf8'));
+      if (meta.etag === tag && fs.existsSync(htmlFile(id))) return fs.readFileSync(htmlFile(id), 'utf8');
+    } catch {}
+    return writeHtmlCache(id, md, tag);
+  };
   const info = (id) => {
     const md = read(id);
     let log = {};
@@ -64,7 +80,7 @@ module.exports = (DATA) => {
   // marche aussi sous un préfixe (https://web.byjulien.com/blockquilt/).
   const page = (req, title, main, up = '') => (req.headers['hx-request'] ? main : `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)}</title><link rel="stylesheet" href="${up}blockquilt-content.css">
+<title>${esc(title)}</title><link rel="stylesheet" href="${up}blockquilt-content.css"><script defer src="${up}blockquilt-content.js"></script>
 <style>body{max-width:44rem;margin:2rem auto;padding:0 1rem;font-family:system-ui,sans-serif}nav{display:flex;gap:1rem;margin-bottom:1.5rem;font-size:.9rem}</style>
 </head><body><nav><a href="${up}app">Application de démo</a><a href="${up}contents">Contenus</a></nav>${main}</body></html>`);
 
@@ -93,7 +109,7 @@ module.exports = (DATA) => {
       if (req.headers['if-none-match'] === c.etag) return send(res, 304, head), true;
       if (wants(req, 'text/markdown')) return send(res, 200, { ...head, 'Content-Type': 'text/markdown; charset=utf-8' }, md), true;
       if (wants(req, 'application/json')) return send(res, 200, { ...head, 'Content-Type': 'application/json' }, JSON.stringify({ ...c, markdown: md })), true;
-      return send(res, 200, { ...head, 'Content-Type': 'text/html; charset=utf-8' }, page(req, c.title, Blocks.toHtml(md, { media: '../media/' }), '../')), true;
+      return send(res, 200, { ...head, 'Content-Type': 'text/html; charset=utf-8' }, page(req, c.title, readHtmlCached(id, md, c.etag), '../')), true;
     }
     if (req.method !== 'PUT') return text(res, 405, 'Méthode refusée'), true;
     const expected = req.headers['if-match'];
@@ -107,7 +123,9 @@ module.exports = (DATA) => {
     const via = String(req.headers['x-via'] || '').slice(0, 40).replace(/[^\p{L}\p{N} ._-]/gu, '');
     fs.writeFileSync(file(id), next);
     fs.writeFileSync(path.join(DIR, id + '.json'), JSON.stringify({ by: user.name + (via ? ` (via ${via})` : ''), at: new Date().toISOString() }));
-    return send(res, 204, { ETag: etag(next) }), true;
+    const nextTag = etag(next);
+    writeHtmlCache(id, next, nextTag);
+    return send(res, 204, { ETag: nextTag }), true;
   };
 
   // GET /app : la démo de l'application. ?login=<jeton> choisit l'utilisateur (cookie), ?c=<id> ouvre un contenu dans l'éditeur.
