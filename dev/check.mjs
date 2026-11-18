@@ -796,6 +796,17 @@ try {
     if (width === 1280) ok(r.sameTop && r.ratio >= 1.8 && r.ratio <= 2.2 && r.spaceShown && Math.abs(r.tRight) <= 1 && Math.abs(r.loneFull) <= 1 && !r.over, `1280 px, lignes : ⅓ + ⅔ côte à côte, Espace qui décale, ligne incomplète qui remplit la largeur (${JSON.stringify(r)})`);
     else ok(!r.sameTop && !r.spaceShown && Math.abs(r.loneFull) <= 1 && !r.over, `375 px, lignes : empilées, Espaces cachés, rien ne déborde (${JSON.stringify(r)})`);
   }
+  // Dans une ligne, chaque bloc commence en haut de sa colonne : aucune marge propre au type (carrousel, carte, HTML).
+  {
+    await viewport(1280);
+    const gaps = await ev(`(async () => { const el = document.createElement('div'); el.className = 'rowtop'; document.body.append(el);
+      const e = Blockquilt.mount(el, { source: '<!-- 1/3 -->\\n![Vert](media/de0000000003)\\n\\n<!-- 1/3 -->\\n:::carousel\\n![Bleu](media/de0000000002)\\n![Vert](media/de0000000003)\\n:::\\n\\n<!-- 1/3 -->\\n:::card\\n### Carte\\nTexte.\\n:::\\n\\n<!-- 1/2 -->\\n:::html\\n<p>HTML</p>\\n:::\\n\\n<!-- 1/2 -->\\nTexte.\\n' });
+      el.querySelector('[data-preview]').click();
+      for (let i = 0; i < 40 && el.querySelectorAll('.bq-row').length < 2; i++) await new Promise((r) => setTimeout(r, 50));
+      const out = [...el.querySelectorAll('.bq-col')].map((c) => Math.round(c.firstElementChild.getBoundingClientRect().top - c.getBoundingClientRect().top));
+      e.destroy(); el.remove(); return out; })()`);
+    ok(gaps.length === 5 && gaps.every((g) => g === 0), `1280 px, lignes : photo, carrousel, carte, HTML et texte collés au haut de leur colonne (${gaps})`);
+  }
 
   // ---- Lignes composées dans l'éditeur (L3) : blocs l'un sous l'autre, petite grille à côté du type, largeur au menu « ⋯ » ----
   for (const width of [375, 1280]) {

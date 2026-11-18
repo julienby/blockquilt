@@ -53,7 +53,8 @@
    incomplète s'élargit en gardant ses proportions (flex-grow), jamais de trou non voulu. */
 .bq-content .bq-row { container-type: inline-size; display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; margin: 1.25rem 0; }
 .bq-content .bq-col { flex: 1 1 100%; min-width: 0; display: flex; flex-direction: column; }
-.bq-content .bq-col > * { margin-top: 0; margin-bottom: 0; }
+/* .bq-row en plus : l'emporte sur la marge propre à chaque bloc (.bq-carousel, .bq-card, .bq-html…), écrite plus bas. */
+.bq-content .bq-row > .bq-col > * { margin-top: 0; margin-bottom: 0; }
 .bq-content .bq-col > .bq-card { flex: 1; }
 .bq-content .bq-space { display: none; }
 @container (min-width: 36rem) {
