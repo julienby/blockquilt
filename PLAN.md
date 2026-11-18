@@ -195,6 +195,11 @@ Objectif : permettre à n'importe quel serveur (Node, PHP, Python) de générer 
 - [x] **R5 Moteur Python** (`renderers/python/blockquilt_render.py`, `test_render.py`) : parseur + `to_html` + sanitisation stricte `:::html`, validé à 100 % par les mêmes fixtures `*.md` / `*.html` (`unittest`).
 - [x] **R6 Moteur PHP** (`renderers/php/BlockquiltRender.php`, `test_render.php`) : parseur + `toHtml` + sanitisation stricte `:::html`, validé à 100 % par les mêmes fixtures `*.md` / `*.html` (`docker compose run --rm check-php`).
 
+## 4g. Photo : taille et format (validé le 2026-11-18)
+
+- [x] **P1** `{size=small|medium}`, `{ratio=16:9|4:3|1:1}` sur le bloc Photo seul : noyau JS, moteurs PHP et Python, fixture commune `photo-options`, carte d'édition (deux listes), `blockquilt-content.css`, FORMAT / RENDER / DECISIONS.
+- Écart connu, hors tâche : une ligne « image dans du texte » (`Texte ![x](media/a) fin`) est un bloc source en JS, un paragraphe en PHP et Python.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

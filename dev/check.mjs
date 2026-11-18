@@ -127,6 +127,11 @@ try {
   await setFiles('input[data-file]', [png]);
   await waitFor(async () => (await cards()).length === 7, 'bloc photo');
   ok(true, 'photo : envoyée, un bloc photo apparaît');
+  // Taille et format : choisis dans la carte, écrits {size=… ratio=…} à l'enregistrement.
+  await ev(`(() => {
+    const pick = (sel, v) => { const s = document.querySelector(sel); s.value = v; s.dispatchEvent(new Event('input', { bubbles: true })); };
+    pick('[data-photo-size]', 'medium'); pick('[data-photo-ratio]', '1:1');
+  })()`);
 
   await ev(`document.querySelector('[data-save]').click()`);
   let md = await saved((x) => x.includes('media/'), 'enregistrement');
@@ -137,6 +142,7 @@ try {
   if (failed) console.log('--- document.md ---\n' + md + '\n---');
   const media = /\]\(media\/([a-f0-9]{12})\)/.exec(md);
   ok(media !== null, 'enregistrement : la photo est dans le texte');
+  ok(/\]\(media\/[a-f0-9]{12}\)\{size=medium ratio=1:1\}/.test(md), 'enregistrement : taille et format de la photo écrits');
   const img = media ? await fetch(`${BASE}/media/${media[1]}`) : null;
   ok(img?.ok && img.headers.get('content-type') === 'image/png', 'photo : servie par /media/<id>');
   await waitFor(() => ev(`document.querySelector('[data-save]').getAttribute('aria-label') === 'Enregistré'`), 'état enregistré');
@@ -152,6 +158,7 @@ try {
   ok(await ev(`getComputedStyle(document.querySelector('aside.bq-callout-tip')).backgroundColor !== 'rgba(0, 0, 0, 0)'`), 'aperçu : feuille blockquilt-content.css chargée');
   await waitFor(() => ev(`(() => { const i = document.querySelector('[data-canvas] img[src*="media/"]'); return !!i && i.complete && i.naturalWidth > 0; })()`), 'photo dans l’aperçu');
   ok(true, 'aperçu : la photo envoyée s’affiche');
+  ok(await ev(`(() => { const i = document.querySelector('[data-canvas] figure.bq-photo-medium.bq-ratio-1x1 img'); return !!i && getComputedStyle(i).aspectRatio === '1 / 1' && getComputedStyle(i).objectFit === 'cover'; })()`), 'aperçu : photo moyenne, recadrée en carré');
 
   // Registre : un type enregistré à la volée apparaît dans le menu d'ajout et s'ajoute (carte de repli : son texte).
   await open();

@@ -10,7 +10,7 @@ const types = (md) => Blocks.parse(md).blocks.map((b) => b.type).join();
 const FIX = path.join(__dirname, 'fixtures');
 const expected = {
   'h1.md': 'h1', 't.md': 't1,t2,t3', 'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
-  'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
+  'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'photo-options.md': 'photo,photo,photo','video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
   'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
 };
 for (const file of fs.readdirSync(FIX).filter((f) => f.endsWith('.md')).sort()) {
@@ -351,6 +351,24 @@ for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'edit
   ok(Blocks.keepWidth(b, Blocks.parse('TEXTE.').blocks)[0].width === '1/2', 'IA sur un bloc : un bloc rendu sans largeur garde la sienne');
   ok(Blocks.keepWidth(b, Blocks.parse('<!-- 1/3 -->\nTEXTE.').blocks)[0].width === '1/3', 'IA sur un bloc : une largeur écrite par l’IA l’emporte');
   ok(Blocks.keepWidth(b, Blocks.parse('A\n\nB').blocks).every((x) => !x.width), 'IA sur un bloc : plusieurs blocs rendus → pas de largeur imposée');
+}
+
+// ---- Photo : taille et format, {size=… ratio=…} ----
+{
+  const p = Blocks.fromMarkdown('![Le portail](media/aabbccddeeff){size=medium ratio=4:3}');
+  ok(p.type === 'photo' && p.src === 'media/aabbccddeeff' && p.alt === 'Le portail' && p.size === 'medium' && p.ratio === '4:3', 'photo : taille et format lus');
+  ok(Blocks.fromMarkdown('![x](media/aabbccddeeff)').size === '' && Blocks.fromMarkdown('![x](media/aabbccddeeff)').ratio === '', 'photo sans options : taille et format par défaut');
+  const blank = Blocks.blank('photo');
+  ok(blank.size === '' && blank.ratio === '', 'photo neuve : taille et format par défaut');
+  const md = (o) => Blocks.toMarkdown({ type: 'photo', src: 'media/aabbccddeeff', alt: 'x', size: '', ratio: '', ...o });
+  ok(md({}) === '![x](media/aabbccddeeff)', 'photo : rien écrit pour les valeurs par défaut');
+  ok(md({ size: 'small' }) === '![x](media/aabbccddeeff){size=small}' && md({ ratio: '1:1' }) === '![x](media/aabbccddeeff){ratio=1:1}', 'photo : une seule option écrite');
+  ok(md({ ratio: '16:9', size: 'medium' }) === '![x](media/aabbccddeeff){size=medium ratio=16:9}', 'photo : toujours size puis ratio');
+  for (const bad of ['{size=big}', '{ratio=3:2}', '{foo=1}', '{}', '{ratio=1:1 size=small}', '{size=small  ratio=1:1}', '{ size=small}'])
+    ok(Blocks.fromMarkdown('![x](media/aabbccddeeff)' + bad).type === 'raw', `photo : ${bad} non reconnu → texte source`);
+  ok(Blocks.parse('<!-- 1/2 -->\n![x](media/aabbccddeeff){size=small}').blocks[0].size === 'small', 'photo : options lues dans une ligne composée');
+  ok(Blocks.fromMarkdown(':::carousel\n![x](media/aabbccddeeff){size=small}\n:::').type === 'raw', 'carrousel : pas d’options sur ses photos');
+  ok(Blocks.toHtml('![x](media/a){size=medium}').includes('<figure class="bq-photo-medium"><img'), 'rendu : classe de taille sur <figure>');
 }
 
 process.exit(failed ? 1 : 0);

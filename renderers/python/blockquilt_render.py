@@ -17,6 +17,8 @@ CALLOUTS = {
 }
 VIDEO_RE = re.compile(r"^https?://(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)/\S+$", re.I)
 PHOTO_RE = re.compile(r"^!\[((?:\\.|[^\]\\])*)\]\(((?:media/|https://)[^)\s]+)\)$")
+# Taille et format d'une photo seule, sous une seule forme : {size=…}, {ratio=…} ou {size=… ratio=…}.
+PHOTO_OPTS_RE = re.compile(r"^(.+)\{(?:size=(small|medium)|ratio=(16:9|4:3|1:1)|size=(small|medium) ratio=(16:9|4:3|1:1))\}$")
 LINK_RE = re.compile(r"^\[([^\]]+)\]\(((?:https?://|mailto:|tel:)[^)\s]+)\)$")
 LEAD_RE = re.compile(r"^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)")
 INLINE_RE = re.compile(
@@ -361,6 +363,17 @@ def _first_emoji(text: str) -> str:
     return ""
 
 
+def _photo(t: str) -> dict[str, Any] | None:
+    """Bloc photo : l'image, puis sa taille et son format facultatifs."""
+    o = PHOTO_OPTS_RE.match(t)
+    m = PHOTO_RE.match(o.group(1) if o else t)
+    if not m:
+        return None
+    size = (o.group(2) or o.group(4)) if o else ""
+    ratio = (o.group(3) or o.group(5)) if o else ""
+    return {"type": "photo", "src": m.group(2), "alt": plain(m.group(1)), "size": size or "", "ratio": ratio or ""}
+
+
 def _parse_block(md: str) -> dict[str, Any]:
     lines = _tidy(md).split("\n")
     w = WIDTH_RE.match(lines[0])
@@ -383,7 +396,7 @@ def _parse_block(md: str) -> dict[str, Any]:
         if m and not any(LEAD_RE.match(l) for l in m.group(1).split("\n")):
             return {"type": f"t{n}", "lines": m.group(1).split("\n")}
     # text
-    if not any(LEAD_RE.match(l) for l in lines) and not PHOTO_RE.match(t) and not VIDEO_RE.match(t):
+    if not any(LEAD_RE.match(l) for l in lines) and not _photo(t) and not VIDEO_RE.match(t):
         return {"type": "text", "lines": lines}
     # quote
     if all(l.startswith(">") for l in lines) and not re.match(r"^> ?\[!", t):
@@ -402,9 +415,9 @@ def _parse_block(md: str) -> dict[str, Any]:
             "lines": [re.sub(r"^> ?", "", l) for l in rest],
         }
     # photo
-    pm = PHOTO_RE.match(t)
-    if pm:
-        return {"type": "photo", "src": pm.group(2), "alt": plain(pm.group(1))}
+    photo = _photo(t)
+    if photo:
+        return photo
     # carousel
     if len(lines) >= 3 and lines[0] == ":::carousel" and lines[-1] == ":::":
         items = [PHOTO_RE.match(l) for l in lines[1:-1]]
@@ -500,7 +513,9 @@ def _render_block(b: dict[str, Any], media: str, ids: set[str]) -> str:
         return f'<aside class="bq-callout bq-callout-{t}" role="note" aria-label="{attr(label)}">{head}{flow_html(b["lines"])}</aside>'
     if t == "photo":
         cap = f"<figcaption>{esc(b['alt'])}</figcaption>" if b["alt"] else ""
-        return f'<figure><img src="{attr(media_url(b["src"], media))}" alt="{attr(b["alt"])}" loading="lazy">{cap}</figure>'
+        cls = " ".join(x for x in [b["size"] and "bq-photo-" + b["size"], b["ratio"] and "bq-ratio-" + b["ratio"].replace(":", "x")] if x)
+        cls_attr = f' class="{cls}"' if cls else ""
+        return f'<figure{cls_attr}><img src="{attr(media_url(b["src"], media))}" alt="{attr(b["alt"])}" loading="lazy">{cap}</figure>'
     if t == "carousel":
         items = [x for x in b["items"] if x["src"]]
         figs = "".join(

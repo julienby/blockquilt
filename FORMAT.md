@@ -79,7 +79,7 @@ ssh maison.local
 | Liste | Lignes `- élément` ou `1. élément`, dans un bloc texte. Sous-liste : indenter de la largeur de la puce du parent (2 espaces sous `- `, 3 sous `1. `). |
 | Citation | Chaque ligne commence par `> ` |
 | Encadré | Première ligne `> [!type]`, puis facultatifs un emoji et un titre : `> [!tip] 🔑 La clé`. Le texte suit, chaque ligne commençant par `> `. |
-| Photo | `![légende](media/<id>)` ou `![légende](https://…)`, seule sur sa ligne |
+| Photo | `![légende](media/<id>)` ou `![légende](https://…)`, seule sur sa ligne. Facultatif, collé derrière : `{size=small}` ou `{size=medium}` (taille, centrée), `{ratio=16:9}`, `{ratio=4:3}` ou `{ratio=1:1}` (format, recadré), ou les deux dans cet ordre : `{size=medium ratio=4:3}`. Sans rien : pleine largeur, format d'origine. Pas d'options dans un carrousel ni une carte. |
 | Carrousel | `:::carousel`, puis une photo `![légende](…)` par ligne (au moins une, rien d'autre), puis `:::`. Une photo à la fois, avec flèches et puces. |
 | Carte | `:::card`, puis, chacun facultatif et dans cet ordre : une photo `![…](…)`, un titre `### …`, du texte, un lien `[Lire](https://…)` seul sur la dernière ligne (rendu en bouton) ; puis `:::`. Remplace une carte écrite en HTML. |
 | Vidéo | Adresse YouTube ou Vimeo, seule sur sa ligne |

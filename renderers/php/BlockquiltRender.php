@@ -17,6 +17,8 @@ final class BlockquiltRender
     ];
     private const VIDEO_RE = '/^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+$/i';
     private const PHOTO_RE = '/^!\[((?:\\\\.|[^\]\\\\])*)\]\(((?:media\/|https:\/\/)[^)\s]+)\)$/';
+    // Taille et format d'une photo seule, sous une seule forme : {size=…}, {ratio=…} ou {size=… ratio=…}.
+    private const PHOTO_OPTS_RE = '/^(.+)\{(?:size=(small|medium)|ratio=(16:9|4:3|1:1)|size=(small|medium) ratio=(16:9|4:3|1:1))\}$/';
     private const LINK_RE = '/^\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:)[^)\s]+)\)$/';
     private const LEAD_RE = '/^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)/';
     private const INLINE_RE = '/\\\\([\\\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:)[^)\s]+)\)/u';
@@ -405,6 +407,18 @@ final class BlockquiltRender
         return '';
     }
 
+    /** Bloc photo : l'image, puis sa taille et son format facultatifs ; null si ce n'est pas une photo. */
+    private static function photo(string $t): ?array
+    {
+        $hasOpts = preg_match(self::PHOTO_OPTS_RE, $t, $o) === 1;
+        if (!preg_match(self::PHOTO_RE, $hasOpts ? $o[1] : $t, $m)) {
+            return null;
+        }
+        $size = $hasOpts ? (($o[2] ?? '') ?: ($o[4] ?? '')) : '';
+        $ratio = $hasOpts ? (($o[3] ?? '') ?: ($o[5] ?? '')) : '';
+        return ['type' => 'photo', 'src' => $m[2], 'alt' => self::plain($m[1]), 'size' => $size, 'ratio' => $ratio];
+    }
+
     private static function parseBlock(string $md): array
     {
         $lines = explode("\n", self::tidy($md));
@@ -437,7 +451,7 @@ final class BlockquiltRender
                 }
             }
         }
-        $isText = !preg_match(self::PHOTO_RE, $t) && !preg_match(self::VIDEO_RE, $t);
+        $isText = self::photo($t) === null && !preg_match(self::VIDEO_RE, $t);
         if ($isText) {
             foreach ($lines as $l) {
                 if (preg_match(self::LEAD_RE, $l)) {
@@ -483,8 +497,9 @@ final class BlockquiltRender
                 ];
             }
         }
-        if (preg_match(self::PHOTO_RE, $t, $pm)) {
-            return ['type' => 'photo', 'src' => $pm[2], 'alt' => self::plain($pm[1])];
+        $photo = self::photo($t);
+        if ($photo !== null) {
+            return $photo;
         }
         if (count($lines) >= 3 && $lines[0] === ':::carousel' && $lines[count($lines) - 1] === ':::') {
             $items = [];
@@ -581,7 +596,11 @@ final class BlockquiltRender
         }
         if ($t === 'photo') {
             $cap = $b['alt'] !== '' ? '<figcaption>' . self::esc($b['alt']) . '</figcaption>' : '';
-            return '<figure><img src="' . self::attr(self::mediaUrl($b['src'], $media)) . '" alt="' . self::attr($b['alt']) . '" loading="lazy">' . $cap . '</figure>';
+            $cls = implode(' ', array_filter([
+                $b['size'] !== '' ? 'bq-photo-' . $b['size'] : '',
+                $b['ratio'] !== '' ? 'bq-ratio-' . str_replace(':', 'x', $b['ratio']) : '',
+            ]));
+            return '<figure' . ($cls !== '' ? ' class="' . $cls . '"' : '') . '><img src="' . self::attr(self::mediaUrl($b['src'], $media)) . '" alt="' . self::attr($b['alt']) . '" loading="lazy">' . $cap . '</figure>';
         }
         if ($t === 'carousel') {
             $items = array_values(array_filter($b['items'], static fn($x) => $x['src'] !== ''));

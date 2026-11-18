@@ -32,6 +32,17 @@
 .bq-content blockquote { margin: 1rem 0; padding: 0.1rem 0 0.1rem 1rem; border-left: 3px solid var(--bq-border, color-mix(in srgb, currentColor 15%, transparent)); color: var(--bq-muted, color-mix(in srgb, currentColor 68%, transparent)); font-style: italic; }
 .bq-content figure { margin: 1.25rem 0; }
 .bq-content figure img { display: block; width: 100%; height: auto; border-radius: var(--bq-radius, 0.9rem); }
+/* Photo : {size=small|medium} centrée ; sur mobile, petite = moitié, moyenne = pleine largeur. {ratio=…} recadre. */
+.bq-content figure.bq-photo-small,
+.bq-content figure.bq-photo-medium { margin-inline: auto; }
+.bq-content figure.bq-photo-small { max-width: 50%; }
+@media (min-width: 640px) {
+  .bq-content figure.bq-photo-small { max-width: 33.333%; }
+  .bq-content figure.bq-photo-medium { max-width: 66.667%; }
+}
+.bq-content .bq-ratio-16x9 img { aspect-ratio: 16 / 9; object-fit: cover; }
+.bq-content .bq-ratio-4x3 img { aspect-ratio: 4 / 3; object-fit: cover; }
+.bq-content .bq-ratio-1x1 img { aspect-ratio: 1; object-fit: cover; }
 .bq-content figcaption { margin-top: 0.4rem; font-size: 0.85rem; color: var(--bq-muted, color-mix(in srgb, currentColor 68%, transparent)); text-align: center; }
 .bq-content .bq-video { aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--bq-radius, 0.9rem); background: #e7e5e4; }
 .bq-content .bq-video iframe { width: 100%; height: 100%; border: 0; display: block; }

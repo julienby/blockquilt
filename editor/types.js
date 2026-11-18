@@ -26,10 +26,21 @@ Blocks.editable = editable;
   for (const [k, cls, ph] of [['h1', 'text-2xl font-extrabold', 'Titre principal'], ['h2', 'text-xl font-bold', 'Titre de section'], ['h3', 'text-[17px] font-bold', 'Sous-titre']]) {
     Object.assign(Blocks.types[k], { edit: (b) => editable(`${cls} leading-snug tracking-tight`, b.html, ph, 'data-body data-plain aria-label="Titre"'), read: readHtml });
   }
+  // Photo : taille et format choisis dans une liste (valeur '' = par défaut, rien n'est écrit dans le texte).
+  const PHOTO_SIZES = [['', 'Pleine largeur'], ['medium', 'Moyenne'], ['small', 'Petite']];
+  const PHOTO_RATIOS = [['', 'Format d’origine'], ['16:9', '16:9'], ['4:3', '4:3'], ['1:1', '1:1 (carré)']];
+  const options = (list, value) => list.map(([v, label]) => `<option value="${v}"${v === value ? ' selected' : ''}>${label}</option>`).join('');
+  const pick = 'h-11 min-w-0 flex-1 rounded-xl border border-stone-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
   Object.assign(Blocks.types.photo, {
     edit: (b, ui) => `<figure class="space-y-2">${b.src ? `<img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="max-h-72 w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">` : ''}
-        ${editable('text-sm italic opacity-75', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}</figure>`,
-    read: (card, b) => { b.alt = card.querySelector('[data-body]').textContent; },
+        ${editable('text-sm italic opacity-75', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}
+        <div class="flex gap-2"><select data-photo-size aria-label="Taille de la photo" class="${pick}">${options(PHOTO_SIZES, b.size || '')}</select>
+          <select data-photo-ratio aria-label="Format de la photo" class="${pick}">${options(PHOTO_RATIOS, b.ratio || '')}</select></div></figure>`,
+    read: (card, b) => {
+      b.alt = card.querySelector('[data-body]').textContent;
+      b.size = card.querySelector('[data-photo-size]').value;
+      b.ratio = card.querySelector('[data-photo-ratio]').value;
+    },
   });
   // Carrousel : une photo par ligne (poignée pour glisser, vignette, légende, suppression), « Ajouter des photos » dessous.
   // Replié (bouton à côté du type) : une seule ligne, les miniatures et le nombre de photos.

@@ -40,6 +40,8 @@ const Blocks = {
   ENTITIES: { '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" },
   VIDEO: /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)\/\S+$/i,
   PHOTO: /^!\[((?:\\.|[^\]\\])*)\]\(((?:media\/|https:\/\/)[^)\s]+)\)$/,
+  // Taille et format d'une photo seule, sous une seule forme : {size=…}, {ratio=…} ou {size=… ratio=…}.
+  PHOTO_OPTS: /^(.+)\{(?:size=(small|medium)|ratio=(16:9|4:3|1:1)|size=(small|medium) ratio=(16:9|4:3|1:1))\}$/,
 
   // ---- Document : frontmatter + blocs ----
 
@@ -739,10 +741,22 @@ const Blocks = {
   Blocks.register('photo', {
     label: 'Photo', short: 'Photo', icon: 'image', group: 'media',
     tone: tone('bq-tone', 'bq-badge'),
-    match: (t) => { const m = Blocks.PHOTO.exec(t); return m ? { src: m[2], alt: Blocks.plain(m[1]) } : null; },
-    toMarkdown: (b) => (b.src ? `![${Blocks.htmlToMd(Blocks.esc(b.alt)).replace(/\n/g, ' ')}](${b.src})` : ''),
-    toHtml: (b, ctx) => `<figure><img src="${Blocks.attr(Blocks.mediaUrl(b.src, ctx.media))}" alt="${Blocks.attr(b.alt)}" loading="lazy">${b.alt ? `<figcaption>${Blocks.esc(b.alt)}</figcaption>` : ''}</figure>`,
-    blank: () => ({ src: '', alt: '' }),
+    match: (t) => {
+      const [, line = t, size1, ratio1, size2, ratio2] = Blocks.PHOTO_OPTS.exec(t) || [];
+      const m = Blocks.PHOTO.exec(line);
+      return m ? { src: m[2], alt: Blocks.plain(m[1]), size: size1 || size2 || '', ratio: ratio1 || ratio2 || '' } : null;
+    },
+    // Le carrousel écrit et rend ses photos par ces deux fonctions : elles n'ont ni taille ni format.
+    toMarkdown: (b) => {
+      if (!b.src) return '';
+      const opts = [b.size && 'size=' + b.size, b.ratio && 'ratio=' + b.ratio].filter(Boolean).join(' ');
+      return `![${Blocks.htmlToMd(Blocks.esc(b.alt)).replace(/\n/g, ' ')}](${b.src})` + (opts ? `{${opts}}` : '');
+    },
+    toHtml: (b, ctx) => {
+      const cls = [b.size && 'bq-photo-' + b.size, b.ratio && 'bq-ratio-' + b.ratio.replace(':', 'x')].filter(Boolean).join(' ');
+      return `<figure${cls ? ` class="${cls}"` : ''}><img src="${Blocks.attr(Blocks.mediaUrl(b.src, ctx.media))}" alt="${Blocks.attr(b.alt)}" loading="lazy">${b.alt ? `<figcaption>${Blocks.esc(b.alt)}</figcaption>` : ''}</figure>`;
+    },
+    blank: () => ({ src: '', alt: '', size: '', ratio: '' }),
   });
 
   // Carrousel : `:::carousel`, une photo par ligne, `:::`. Rendu : une photo à la fois (scroll-snap), flèches et puces avec blockquilt-content.js.
