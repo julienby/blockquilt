@@ -2,6 +2,7 @@
 // Lance dev/server.js sur un dossier jetable. node tests/contents_test.mjs → exit 1 si une étape échoue.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -51,6 +52,27 @@ try {
   const after = await get('contents/guide-1a', 'user1', 'application/json');
   const c = await after.json();
   ok(c.markdown === next && c.updatedBy === 'user1 (via Claude)' && decodeURIComponent(after.headers.get('x-updated-by')) === 'user1 (via Claude)', 'auteur noté : la personne du jeton, et par quoi elle est passée');
+
+  // Deux PUT en même temps sur la même version, corps envoyés en deux temps : un seul réussit.
+  const slowPut = (body, ifMatch) => {
+    const req = http.request(BASE + 'contents/guide-1a', { method: 'PUT', headers: as('user1', { 'Content-Type': 'text/markdown; charset=utf-8', 'If-Match': ifMatch }) });
+    const done = new Promise((resolve) => req.on('response', (r) => { r.resume(); resolve(r.statusCode); }));
+    req.write(body.slice(0, 10));
+    return { finish: () => { req.end(body.slice(10)); return done; } };
+  };
+  const now = (await get('contents/guide-1a', 'user1')).headers.get('etag');
+  const a = slowPut(next + '\nVersion A.\n', now);
+  const b = slowPut(next + '\nVersion B.\n', now);
+  await new Promise((r) => setTimeout(r, 200));
+  const codes = (await Promise.all([a.finish(), b.finish()])).sort().join(' ');
+  ok(codes === '204 412', 'deux PUT simultanés sur la même version : un 204, un 412 (' + codes + ')');
+  // Envoi trop gros : le serveur répond 413 et coupe avant la fin de l'envoi (fetch le verrait comme une panne).
+  const tooBig = (method, p, headers, body) => new Promise((resolve) => {
+    const req = http.request(BASE + p, { method, headers }, (r) => { r.resume(); resolve(r.statusCode); });
+    req.on('error', () => {});
+    req.end(body);
+  });
+  ok(await tooBig('PUT', 'contents/guide-1a', as('user1', { 'If-Match': '*' }), 'a'.repeat(2 * 1024 * 1024)) === 413, 'PUT de plus de 1 Mo : 413');
 
   // Page de l'application : utilisateur choisi par cookie, contenu ouvert dans l'éditeur.
   const login = await fetch(BASE + 'app?login=demo-user2', { redirect: 'manual' });

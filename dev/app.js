@@ -48,7 +48,17 @@ module.exports = (DATA) => {
   const send = (res, code, headers, body = '') => { res.writeHead(code, { 'Cache-Control': 'no-cache', Vary: 'Accept, Authorization, Cookie, HX-Request', ...headers }); res.end(body); };
   const text = (res, code, message) => send(res, code, { 'Content-Type': 'text/plain; charset=utf-8' }, message + '\n');
   const wants = (req, type) => (req.headers.accept || '').includes(type);
-  const body = async (req) => { const parts = []; for await (const p of req) parts.push(p); return Buffer.concat(parts).toString('utf8'); };
+  // Corps reçu, arrêté au-delà de 1 Mo (413) : jamais chargé en entier en mémoire.
+  const body = async (req) => {
+    const parts = [];
+    let size = 0;
+    for await (const p of req) {
+      size += p.length;
+      if (size > 1024 * 1024) throw Object.assign(new Error('Texte trop gros : 1 Mo au plus'), { status: 413 });
+      parts.push(p);
+    }
+    return Buffer.concat(parts).toString('utf8');
+  };
 
   // Page complète (navigateur) ou fragment (htmx). `up` remonte à la racine de la démo : les liens restent relatifs, la démo
   // marche aussi sous un préfixe (https://web.byjulien.com/blockquilt/).
@@ -88,8 +98,10 @@ module.exports = (DATA) => {
     if (req.method !== 'PUT') return text(res, 405, 'Méthode refusée'), true;
     const expected = req.headers['if-match'];
     if (!expected) return text(res, 428, 'If-Match obligatoire : l’ETag lu avec GET (ou * pour écraser)'), true;
-    if (expected !== '*' && expected !== etag(md)) return send(res, 412, { 'Content-Type': 'text/plain; charset=utf-8', ETag: etag(md) }, 'Le contenu a changé depuis la lecture : le relire\n'), true;
     const next = (await body(req)).replace(/\r\n/g, '\n');
+    // Version relue après le corps, puis comparée et écrite sans attente entre les deux : un seul PUT par version passe.
+    const current = read(id);
+    if (expected !== '*' && expected !== etag(current)) return send(res, 412, { 'Content-Type': 'text/plain; charset=utf-8', ETag: etag(current) }, 'Le contenu a changé depuis la lecture : le relire\n'), true;
     if (next.trim() === '') return text(res, 422, 'Texte vide'), true;
     // L'auteur est la personne du jeton ; X-Via dit par quoi elle est passée (Claude, ChatGPT…).
     const via = String(req.headers['x-via'] || '').slice(0, 40).replace(/[^\p{L}\p{N} ._-]/gu, '');
