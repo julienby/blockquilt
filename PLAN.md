@@ -174,7 +174,7 @@ Objectif : à la restitution, mettre des blocs côte à côte (une photo à 1/3 
 
 ## 4e. Avant la V1 : retours de Billy et Cod (validé le 2026-11-18)
 
-Source : `AVIS-Billy.md`, `AVIS-Cod.md`. Écartés (voir `DECISIONS.md`) : temporisateurs, `syncFromDom` en N², délai du visuel, JSDoc de `ed`, découpage de `check.mjs`, contrôle du CSS généré.
+Source : `archives/AVIS-Billy.md`, `archives/AVIS-Cod.md`. Écartés (voir `DECISIONS.md`) : temporisateurs, `syncFromDom` en N², délai du visuel, JSDoc de `ed`, découpage de `check.mjs`, contrôle du CSS généré.
 
 - [x] **V1 Sécurité du serveur de démo** (`dev/server.js`) : fichiers servis par liste blanche (pas de `.env`, ni fichier caché, ni document interne) ; corps reçu limité en octets (413) ; photos limitées en taille et à JPEG, PNG, WebP, GIF (pas de SVG envoyé) ; délai maximal de l'appel au fournisseur dans `ai/blockquilt-ai.js`. Tests.
 - [x] **V2 Écritures concurrentes** (`dev/app.js`) : lire le corps, puis relire la version, comparer, écrire sans attente. Test : deux PUT avec le même ETag → un 204, un 412.
