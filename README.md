@@ -20,6 +20,8 @@ La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, l
 
 ## Intégrer
 
+Pas à pas, avec un serveur PHP ou Flask : [TUTORIEL.md](TUTORIEL.md).
+
 ```html
 <link rel="stylesheet" href="blockquilt.css">          <!-- l'éditeur -->
 <link rel="stylesheet" href="blockquilt-content.css">  <!-- le rendu (aperçu) -->
