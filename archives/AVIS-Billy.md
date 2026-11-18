@@ -188,3 +188,125 @@ Non vérifiés : le déploiement public et son proxy, un appel à un vrai modèl
 6. Valider un parcours dans une vraie application, avec un vrai modèle et sur téléphone.
 
 **Billy : je suis favorable à cette V1 après ces points. Le projet n’a pas besoin de devenir plus gros pour devenir crédible. Il doit surtout garantir que l’utilisateur comprend ce qui change, garde son travail et peut utiliser l’IA sans mauvaise surprise.**
+
+## Complément du 18 novembre — structure, performance et maintenance
+
+Lecture du code au commit `ae21c96`. Ce complément porte sur la version actuelle. L’avis du 17 novembre reste une photographie de la version précédente : depuis, les quotas IA, les opérations ciblées, le bloc Carte et les lignes composées ont été ajoutés. Les constats antérieurs ne constituent donc pas un état actualisé de tous ces sujets.
+
+### Verdict sur la structure
+
+**La structure est adaptée à la taille du projet. Je ne vois aucune raison de changer de framework ou de multiplier les couches. Je vois en revanche quelques défauts concrets à corriger, et une limite à poser à la croissance du contexte partagé.**
+
+Le noyau fait environ 880 lignes. L’assemblage de l’éditeur en fait moins de 100. Les modules de l’éditeur restent courts, généralement entre 30 et 175 lignes. La séparation noyau / écran / relais IA / MCP / application de démonstration est compréhensible.
+
+Les bons choix à conserver :
+
+- Les opérations de format restent dans le noyau et se testent sans navigateur.
+- Le registre de blocs évite un grand branchement différent dans chaque partie du produit.
+- Les événements passent principalement par délégation, sans poser un écouteur sur chaque bouton de chaque carte.
+- `AbortController` regroupe la suppression des écouteurs et l’arrêt des requêtes lors de `destroy()`.
+- La frappe ne redessine pas toutes les cartes à chaque caractère. Le visuel et l’historique attendent une courte pause.
+- Les instantanés Markdown de l’historique sont simples à comprendre. Cinquante copies peuvent coûter de la mémoire sur de gros documents, mais ne justifient pas encore un historique par différences.
+
+La longueur du noyau n’est pas à elle seule un problème. Il contient plusieurs responsabilités liées au format, mais elles restent identifiables. Le découper uniquement pour obtenir de petits fichiers ferait perdre une partie de sa simplicité de distribution.
+
+### Rouge : le redessin de la vue source peut perdre le texte saisi
+
+`editor/source.js` garde une variable `sourceText`, initialisée à l’entrée dans la vue source. Pendant la saisie, le texte réel vit dans le `textarea`. `renderSource()` reconstruit ce champ depuis `sourceText`, sans reprendre la valeur courante.
+
+Dans `editor/render.js`, `toggleSplit()` appelle `syncFromDom()` puis `render()`. Or `syncFromDom()` ne fait rien en vue source. Le bouton « Visuel à côté » peut donc reconstruire la zone avec le texte d’avant la saisie.
+
+**Scénario :** passer en source, modifier le Markdown, cliquer sur « Visuel à côté ». La nouvelle saisie risque de disparaître. Les tests actuels vérifient le bouton et la saisie séparément, mais pas cette succession.
+
+Reproduction ciblée avec le vrai module `source.js`, chargé dans Node avec une zone de texte simulée, puis saisie et redessin :
+
+```text
+Source après redessin : PERDUE
+```
+
+Ce test isole le défaut du module ; ce n’est pas une reproduction dans un navigateur réel. Le chemin du bouton a été vérifié par lecture de ses appelants.
+
+**Recommandation :** conserver la valeur courante avant de remplacer le champ. Clarifier la règle : en vue source, le champ courant fait foi ; en vue blocs, synchroniser les champs avant une mutation ou un redessin. Ajouter le parcours navigateur « saisir → basculer le visuel → enregistrer → relire ». C’est une correction locale, pas une raison de créer un nouveau gestionnaire d’état.
+
+### Orange : la synchronisation de tous les blocs est quadratique
+
+Dans `editor/document.js`, `syncFromDom()` parcourt les cartes et fait un `ed.blocks.find(...)` pour chacune. Pour N blocs, le nombre de comparaisons peut donc croître comme N². Le visuel utilise `ed.markdown()`, qui déclenche cette synchronisation, puis sérialise et rend le document entier. L’historique appelle aussi `ed.markdown()`.
+
+Comptage du même parcours de recherches, sur des identifiants en ordre :
+
+```text
+syncFromDom, 100 blocs : 5050 comparaisons d’identifiant
+syncFromDom, 500 blocs : 125250 comparaisons d’identifiant
+syncFromDom, 1000 blocs : 500500 comparaisons d’identifiant
+```
+
+Ce sont des comptes d’opérations, pas des temps mesurés dans le navigateur. Ils ne prouvent pas que les documents habituels sont lents.
+
+**Première amélioration simple :** construire une `Map` des blocs par identifiant une fois dans cet appel. Le parcours devient linéaire, sans cache permanent à invalider. Ne pas transformer chaque `find()` isolé du projet : c’est la recherche répétée dans une boucle qui pose ici problème.
+
+Le remplacement complet du HTML du visuel et des cartes lors des actions de structure reste acceptable pour des documents courts. Avant d’introduire du rendu partiel, mesurer la saisie avec visuel, le déplacement, l’annulation et l’ouverture sur 100 puis 500 blocs, avec du texte réaliste. Les blocs repliés restent dans le DOM ; leur repli ne réduit donc pas autant le coût qu’un retrait du DOM.
+
+### Orange : les temporisateurs annulés restent référencés
+
+Dans `blockquilt-editor.js`, `ed.later()` ajoute chaque temporisateur dans un `Set`. Il le retire quand la fonction s’exécute. Mais les appels directs à `clearTimeout()` dans l’historique, la vue source, les notifications et la barre ne retirent pas la référence du `Set`.
+
+Pendant une longue session, les temporisateurs remplacés s’accumulent jusqu’à `destroy()`. Le nombre de références gardées n’est donc pas borné par le nombre de temporisateurs encore actifs.
+
+Reproduction en mémoire du mécanisme exact d’ajout et d’annulation :
+
+```text
+Temporisateurs référencés après 10000 remplacements : 10000
+```
+
+**Recommandation :** une petite fonction d’annulation qui fait `clearTimeout()` et retire la référence du `Set`, utilisée avec `ed.later()`. C’est une correction de durée de vie, sans nouvelle dépendance. Vérifier qu’une rafale de saisie laisse seulement les temporisateurs actifs référencés, puis que la destruction les libère.
+
+### Orange : `ed` est pratique, mais ses contrats deviennent implicites
+
+Chaque module ajoute des fonctions et de l’état à un même objet. Cela évite beaucoup de code de raccordement. Mais un module appelle des fonctions installées ailleurs sans déclarer ses besoins. L’ordre d’installation est centralisé dans `mount()`, et certaines références ne sont valides qu’une fois tous les modules installés.
+
+Ce n’est pas un motif suffisant pour réécrire le projet. Le risque apparaît quand une nouvelle fonction modifie directement `blocks`, `meta`, le DOM ou l’historique sans suivre les mêmes règles que les autres.
+
+**Recommandation :** garder `ed`, mais décrire brièvement son contrat avec des types JSDoc pour les parties partagées et les entrées publiques. Nommer le module propriétaire de l’état du document, du rendu et des requêtes. Garder les mutations annulables derrière `ed.change()` et les remplacements de document derrière les fonctions prévues. Ne pas installer TypeScript ni une couche d’injection pour ce seul besoin.
+
+Les détails internes de la feuille IA n’ont pas tous besoin de devenir des méthodes de `ed`. Lors d’une prochaine modification de ces modules, privilégier un petit objet retourné entre `ai.js` et `ai-ops.js` si cela rend leurs échanges plus lisibles. Pas de chantier transversal juste pour réduire le nombre de propriétés.
+
+### Jaune : un format simple exige des frontières strictes
+
+Le noyau contient un parseur Markdown limité, un filtre HTML et un moteur de différences maison. Leur absence de dépendance est utile, mais leur maintenance revient au projet. Les expressions régulières ne sont pas en elles-mêmes un défaut : le risque serait d’étendre progressivement ces outils vers tout Markdown, tout HTML ou un langage de mise en page complet.
+
+**Recommandation :** maintenir un sous-ensemble explicite. Pour chaque nouvelle syntaxe, un exemple lu puis réécrit, un exemple invalide conservé et un rendu attendu. Tester notamment les interactions des largeurs avec les blocs source, le code et les opérations IA. Garder le bloc HTML facultatif et sa liste de balises courte. Je ne recommande pas de remplacer ces composants maintenant ; je ne considère pas non plus cette lecture comme un audit complet de leur sécurité ou de leur complexité.
+
+Le registre mélange volontairement description du format et données d’affichage. `editor/types.js` enrichit globalement ses entrées avec `edit` et `read`. C’est acceptable pour une bibliothèque chargée une fois dans une page. Documenter que le registre est partagé par les instances ; une option propre à un éditeur ne doit pas modifier globalement un type pour les autres.
+
+### Jaune : le CSS généré doit suivre les sources
+
+Le binaire Tailwind est fixé à une version et le CSS généré est livré : c’est raisonnable. En revanche, la commande `check` ne reconstruit pas le CSS. Une nouvelle classe dans un module peut donc être présente dans le JS et absente de la feuille distribuée, malgré des tests fonctionnels verts.
+
+**Recommandation :** vérifier avant livraison qu’une génération ne produit aucun diff inattendu. Actualiser aussi le commentaire de `build-css`, qui cite seulement certains fichiers alors que la configuration parcourt tout `editor/*.js`. Pas besoin de remplacer la chaîne CSS.
+
+### Jaune : garder les tests lisibles à mesure que le produit grandit
+
+`dev/check.mjs` dépasse maintenant mille lignes et regroupe beaucoup de parcours dans un même programme CDP. C’est efficace pour démarrer. À terme, l’état laissé par un scénario rendra les pannes plus difficiles à isoler. Les ports fixes limitent aussi l’exécution de plusieurs contrôles dans un même environnement réseau.
+
+**Recommandation :** à la prochaine extension importante, regrouper les scénarios par sujet en gardant un lanceur unique et le même outil. Donner aux scénarios leur document de départ explicite. Priorité aux transitions qui croisent plusieurs fonctions : source et visuel, IA et fermeture de feuille, suppression et annulation, plusieurs éditeurs et raccourcis. Ne pas ajouter un framework de test pour ce seul rangement.
+
+### Ce que je ferais, dans cet ordre
+
+1. Corriger la conservation du texte source lors d’un changement d’affichage.
+2. Corriger le suivi des temporisateurs annulés.
+3. Supprimer la recherche quadratique dans `syncFromDom()`.
+4. Mesurer quelques documents longs avant de décider d’autres optimisations.
+5. Préciser les contrats de `ed` et vérifier le CSS livré, au fil des changements utiles.
+
+Je n’ajouterais ni DOM virtuel, ni bus d’événements, ni gestionnaire d’état, ni découpage supplémentaire du noyau à ce stade. Je ne remplacerais pas non plus l’API d’édition du navigateur pendant la préparation de la V1 sans défaut reproduit qui l’exige.
+
+**Conclusion de Billy sur la maintenance :** le code est encore à une taille où des corrections locales suffisent. Les vrais signaux rouges sont la perte possible du texte et les états qui peuvent diverger. Le reste appelle surtout des limites claires et quelques mesures, pas une refonte.
+
+Validation du complément : la suite complète a été relancée sur cette version avec `docker compose -p blockquilt-billy-review run --rm check`. Code de sortie : **0**. Extrait exact :
+
+```text
+ok   app : revérification sans changement : rien (304)
+ok   contentUrl sans source : texte et version lus par l’éditeur
+```
+
+`git diff --check` ne signale aucune erreur. Aucun code applicatif modifié. Les reproductions ciblées ci-dessus complètent la suite ; aucun temps de réponse ni consommation mémoire réelle du navigateur n’a été mesuré dans cette revue.
