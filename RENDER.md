@@ -45,6 +45,8 @@ Tout document rendu produit un fragment autonome :
 
 ## 3. Blocs
 
+**Reconnaissance d'un bloc.** Les types sont essayés dans l'ordre de `Blocks.order`. Un type est retenu seulement si son `toMarkdown` redonne exactement le texte du bloc (après `tidy`). Sinon, on passe au type suivant, et à la fin le bloc est `raw`. Exemple : `a [b] c` donne `raw`, car l'éditeur réécrirait `a \[b\] c`. Les moteurs PHP et Python portent pour cela `escText`, `safeHref`, `htmlToMd` et le `toMarkdown` de chaque type. La fixture `edge` fige ces cas limites.
+
 | Bloc | Sortie HTML |
 |---|---|
 | `h1`, `h2`, `h3` | `<h1 id="slug">…</h1>` (`h2`, `h3`). `slug` en minuscules sans accents (`a-z0-9` et `-`, défaut `'section'`), dédupliqué sur la page (`slug-2`, `slug-3`…). |

@@ -10,8 +10,10 @@ const types = (md) => Blocks.parse(md).blocks.map((b) => b.type).join();
 const FIX = path.join(__dirname, 'fixtures');
 const expected = {
   'h1.md': 'h1', 't.md': 't1,t2,t3', 'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
-  'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'photo-options.md': 'photo,photo,photo','video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
+  'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'photo-options.md': 'photo,photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
   'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
+  // Cas limites : un bloc dont la réécriture ne redonne pas le texte reste « texte source » (raw), dans les trois moteurs.
+  'edge.md': 'raw,raw,raw,text,raw,raw,text,raw,raw,raw,raw,raw,raw,raw,raw,raw,text,text,text,text,raw,text,text,raw,raw,tip,raw,raw,raw,raw,html,raw,raw,raw,text,text,quote,info,t2,warning,text,raw,h1,text,raw',
 };
 for (const file of fs.readdirSync(FIX).filter((f) => f.endsWith('.md')).sort()) {
   const x = fs.readFileSync(path.join(FIX, file), 'utf8');

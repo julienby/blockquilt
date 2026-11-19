@@ -419,6 +419,251 @@ final class BlockquiltRender
         return ['type' => 'photo', 'src' => $m[2], 'alt' => self::plain($m[1]), 'size' => $size, 'ratio' => $ratio];
     }
 
+    // ---- Réécriture en Markdown : ports de blockquilt.js, pour savoir si un bloc se relit sans perte ----
+
+    private const MD_MARKS = ['b' => '**', 'strong' => '**', 'i' => '*', 'em' => '*', 'u' => '++', 'mark' => '==', 'a' => 'a', 'code' => '`'];
+
+    /** Blocks.linesToHtml : lignes séparées par <br>, listes en <ul> / <ol>. */
+    private static function linesToHtml(array $lines): string
+    {
+        $out = [];
+        foreach (self::listTree($lines) as $n) {
+            $out[] = isset($n['list']) ? self::listHtml($n['list']) : self::inlineHtml($n['line']);
+        }
+        return implode('<br>', $out);
+    }
+
+    /** Blocks.escText : les signes qui changeraient le sens sont protégés par « \ ». */
+    private static function escText(string $s): string
+    {
+        $s = str_replace('\\', '\\\\', $s);
+        $s = (string) preg_replace('/[*[\]`]/', '\\\\$0', $s);
+        $s = str_replace(['++', '=='], ['\\+\\+', '\\=\\='], $s);
+        return (string) preg_replace_callback('/(^|\W)_|_(?=\W|$)/D', static fn($m) => (string) preg_replace('/_/', '\\\\_', $m[0], 1), $s);
+    }
+
+    /** Blocks.safeHref : adresse acceptée pour un lien, sinon chaîne vide. */
+    private static function safeHref(string $href): string
+    {
+        $h = trim(self::unesc($href));
+        if (preg_match('/^(https?:\/\/|mailto:|tel:)/i', $h)) {
+            $full = $h;
+        } elseif (preg_match('/^[\w-]+(\.[\w-]+)+(\/\S*)?$/D', $h)) {
+            $full = 'https://' . $h;
+        } else {
+            $full = '';
+        }
+        return str_replace([' ', '(', ')'], ['%20', '%28', '%29'], $full);
+    }
+
+    /** Blocks.htmlToMd : HTML d'un champ → Markdown (listes, mises en forme, signes protégés). */
+    private static function htmlToMd(string $html, bool $bullets = false): string
+    {
+        $lines = [];
+        $lists = [];
+        $frames = [];
+        $cur = '';
+        $liPrefix = '';
+        $start = $bullets ? '/^(#{1,6} |\+ |>|:::|~~~|\|)/' : '/^(#{1,6} |[-+] |>|:::|~~~|\|)/';
+        $put = static function (string $x) use (&$frames, &$cur): void {
+            if ($frames) {
+                $frames[count($frames) - 1]['buf'] .= $x;
+            } else {
+                $cur .= $x;
+            }
+        };
+        $flush = static function () use (&$lines, &$cur, &$liPrefix, $start): void {
+            if ($liPrefix !== '') {
+                $clean = trim((string) preg_replace('/\n+/', ' ', $cur));
+                if ($clean !== '') {
+                    $lines[] = $liPrefix . $clean;
+                }
+                $cur = '';
+                $liPrefix = '';
+                return;
+            }
+            $line = (string) preg_replace($start, '\\\\$1', $cur, 1);
+            $line = (string) preg_replace('/^(\d+)([.)]) /', '$1\\\\$2 ', $line, 1);
+            $lines[] = (string) preg_replace('/^(-{3,}\s*)$/D', '\\\\$1', $line);
+            $cur = '';
+        };
+        preg_match_all('/<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:\s[^>]*)?)>|([^<]+)/', $html, $all, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
+        foreach ($all as $m) {
+            if ($m[4] !== null) {
+                $text = str_replace("\u{00a0}", ' ', self::unesc($m[4]));
+                $inCode = $frames && $frames[count($frames) - 1]['tag'] === 'code';
+                $put($inCode ? $text : self::escText($text));
+                continue;
+            }
+            $closing = $m[1] === '/';
+            $tag = strtolower($m[2]);
+            if (isset(self::MD_MARKS[$tag])) {
+                if (!$closing) {
+                    $href = '';
+                    if ($tag === 'a') {
+                        $href = self::safeHref(preg_match('/href\s*=\s*"([^"]*)"/i', $m[3] ?? '', $hm) ? $hm[1] : '');
+                    }
+                    $frames[] = ['mark' => self::MD_MARKS[$tag], 'href' => $href, 'tag' => $tag, 'buf' => ''];
+                } elseif ($frames) {
+                    $f = array_pop($frames);
+                    preg_match('/^(\s*)([\s\S]*?)(\s*)$/D', $f['buf'], $parts);
+                    [, $lead, $core, $trail] = $parts;
+                    if ($core === '') {
+                        $put($lead . $trail);
+                    } elseif ($f['tag'] === 'a') {
+                        $put($f['href'] !== '' ? $lead . '[' . $core . '](' . $f['href'] . ')' . $trail : $lead . $core . $trail);
+                    } elseif ($f['tag'] === 'code') {
+                        $put(str_contains($core, '`') ? $lead . self::escText($core) . $trail : $lead . '`' . $core . '`' . $trail);
+                    } else {
+                        $put($lead . $f['mark'] . $core . $f['mark'] . $trail);
+                    }
+                }
+            } elseif ($tag === 'ul' || $tag === 'ol') {
+                if ($cur !== '' || $liPrefix !== '') {
+                    $flush();
+                }
+                if (!$closing) {
+                    $lists[] = ['tag' => $tag, 'n' => 0, 'width' => 2];
+                } else {
+                    array_pop($lists);
+                }
+            } elseif ($tag === 'li') {
+                if ($cur !== '' || $liPrefix !== '') {
+                    $flush();
+                }
+                if (!$closing) {
+                    $k = count($lists) - 1;
+                    if ($k >= 0 && $lists[$k]['tag'] === 'ol') {
+                        $lists[$k]['n']++;
+                        $marker = $lists[$k]['n'] . '. ';
+                    } else {
+                        $marker = '- ';
+                    }
+                    if ($k >= 0) {
+                        $lists[$k]['width'] = strlen($marker);
+                    }
+                    $indent = 0;
+                    for ($i = 0; $i < $k; $i++) {
+                        $indent += $lists[$i]['width'];
+                    }
+                    $liPrefix = str_repeat(' ', $indent) . $marker;
+                }
+            } elseif ($tag === 'br') {
+                if ($liPrefix === '') {
+                    $flush();
+                }
+            } elseif (($tag === 'div' || $tag === 'p') && $cur !== '') {
+                $flush();
+            }
+        }
+        if ($cur !== '' || $liPrefix !== '') {
+            $flush();
+        }
+        return str_replace('****', '', (string) preg_replace('/^\n+|\n+$/D', '', implode("\n", $lines)));
+    }
+
+    /** Texte d'un bloc tel que l'éditeur le réécrit : Blocks.htmlToMd(Blocks.linesToHtml(lignes), true). */
+    private static function body(array $lines): string
+    {
+        return self::htmlToMd(self::linesToHtml($lines), true);
+    }
+
+    private static function quoted(string $x): string
+    {
+        return implode("\n", array_map(static fn($l) => $l !== '' ? '> ' . $l : '>', explode("\n", $x)));
+    }
+
+    /** Espaces réduits à un seul, comme `.replace(/\s+/g, ' ').trim()`. */
+    private static function oneSpace(string $s): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', $s));
+    }
+
+    private static function photoMd(array $b): string
+    {
+        if ($b['src'] === '') {
+            return '';
+        }
+        $opts = implode(' ', array_filter([
+            ($b['size'] ?? '') !== '' ? 'size=' . $b['size'] : '',
+            ($b['ratio'] ?? '') !== '' ? 'ratio=' . $b['ratio'] : '',
+        ]));
+        $alt = str_replace("\n", ' ', self::htmlToMd(self::esc($b['alt'])));
+        return '![' . $alt . '](' . $b['src'] . ')' . ($opts !== '' ? '{' . $opts . '}' : '');
+    }
+
+    /** Les toMarkdown de blockquilt.js : le texte que l'éditeur écrirait pour ce bloc. */
+    private static function toMarkdown(array $b): string
+    {
+        $t = $b['type'];
+        if (in_array($t, ['h1', 'h2', 'h3'], true)) {
+            $x = trim((string) preg_replace('/\n+/', ' ', self::htmlToMd(self::esc($b['text']))));
+            return $x !== '' ? str_repeat('#', (int) $t[1]) . ' ' . $x : '';
+        }
+        if ($t === 'text') {
+            $x = self::body($b['lines']);
+            // Comme le bloc texte de blockquilt.js : si les listes ne se relisent pas, les lignes telles quelles.
+            if ($x !== implode("\n", $b['lines'])) {
+                $x = self::htmlToMd(implode('<br>', array_map([self::class, 'inlineHtml'], $b['lines'])), true);
+            }
+            return $x;
+        }
+        if (in_array($t, ['t1', 't2', 't3'], true)) {
+            $x = self::body($b['lines']);
+            return trim($x) !== '' ? ":::{$t}\n{$x}\n:::" : '';
+        }
+        if ($t === 'quote') {
+            $x = self::body($b['lines']);
+            return trim($x) !== '' ? self::quoted($x) : '';
+        }
+        if (isset(self::CALLOUTS[$t])) {
+            $x = self::body($b['lines']);
+            $title = self::oneSpace($b['title']);
+            if (trim($x) === '' && $title === '') {
+                return '';
+            }
+            $head = "> [!{$t}]" . ($b['icon'] !== '' ? ' ' . $b['icon'] : '') . ($title !== '' ? ' ' . $title : '');
+            return trim($x) === '' ? $head : $head . "\n" . self::quoted($x);
+        }
+        if ($t === 'photo') {
+            return self::photoMd($b);
+        }
+        if ($t === 'carousel') {
+            $items = array_values(array_filter($b['items'], static fn($x) => $x['src'] !== ''));
+            return $items ? implode("\n", [':::carousel', ...array_map([self::class, 'photoMd'], $items), ':::']) : '';
+        }
+        if ($t === 'card') {
+            $x = $b['lines'] ? self::body($b['lines']) : '';
+            $title = self::oneSpace($b['title']);
+            $label = self::oneSpace($b['label']);
+            $parts = array_values(array_filter([
+                self::photoMd($b),
+                $title !== '' ? '### ' . self::htmlToMd(self::esc($title)) : '',
+                trim($x) !== '' ? $x : '',
+                $label !== '' && trim($b['href']) !== '' ? '[' . self::htmlToMd(self::esc($label)) . '](' . trim($b['href']) . ')' : '',
+            ], static fn($p) => $p !== ''));
+            return $parts ? implode("\n", [':::card', ...$parts, ':::']) : '';
+        }
+        if ($t === 'video') {
+            return trim($b['url']);
+        }
+        if ($t === 'html') {
+            return trim($b['html']) !== '' ? ":::html\n" . preg_replace('/^(:::)/m', ' $1', $b['html']) . "\n:::" : '';
+        }
+        if ($t === 'hr') {
+            return '---';
+        }
+        if ($t === 'code') {
+            if (trim($b['code']) === '') {
+                return '';
+            }
+            preg_match_all('/^`{3,}/m', $b['code'], $fm);
+            $fence = str_repeat('`', max([2, ...array_map('strlen', $fm[0])]) + 1);
+            return $fence . $b['lang'] . "\n" . $b['code'] . "\n" . $fence;
+        }
+        return '';
+    }
+
     private static function parseBlock(string $md): array
     {
         $lines = explode("\n", self::tidy($md));
@@ -431,9 +676,20 @@ final class BlockquiltRender
             return $b;
         }
         $t = implode("\n", $lines);
+        foreach (self::candidates($t, $lines) as $b) {
+            if (self::tidy(self::toMarkdown($b)) === $t) {
+                return $b;
+            }
+        }
+        return ['type' => 'raw', 'md' => $md];
+    }
+
+    /** Les types dont la forme correspond, dans l'ordre de blockquilt.js (Blocks.order). */
+    private static function candidates(string $t, array $lines): \Generator
+    {
         foreach ([1, 2, 3] as $lvl) {
             if (count($lines) === 1 && preg_match('/^#{' . $lvl . '} (.+)$/', $t, $m)) {
-                return ['type' => 'h' . $lvl, 'text' => self::plain($m[1])];
+                yield ['type' => 'h' . $lvl, 'text' => self::plain($m[1])];
             }
         }
         foreach ([1, 2, 3] as $n) {
@@ -447,7 +703,7 @@ final class BlockquiltRender
                     }
                 }
                 if ($ok) {
-                    return ['type' => 't' . $n, 'lines' => $bodyLines];
+                    yield ['type' => 't' . $n, 'lines' => $bodyLines];
                 }
             }
         }
@@ -461,7 +717,7 @@ final class BlockquiltRender
             }
         }
         if ($isText) {
-            return ['type' => 'text', 'lines' => $lines];
+            yield ['type' => 'text', 'lines' => $lines];
         }
         if (!preg_match('/^> ?\[!/', $t)) {
             $allQuote = true;
@@ -472,7 +728,7 @@ final class BlockquiltRender
                 }
             }
             if ($allQuote) {
-                return ['type' => 'quote', 'lines' => array_map(static fn($l) => (string) preg_replace('/^> ?/', '', $l), $lines)];
+                yield ['type' => 'quote', 'lines' => array_map(static fn($l) => (string) preg_replace('/^> ?/', '', $l), $lines)];
             }
         }
         $first = $lines[0];
@@ -489,7 +745,7 @@ final class BlockquiltRender
                 $head = trim($cm[2] ?? '');
                 $icon = self::firstEmoji($head);
                 $title = trim(substr($head, strlen($icon)));
-                return [
+                yield [
                     'type' => $cm[1],
                     'icon' => $icon,
                     'title' => $title,
@@ -499,7 +755,7 @@ final class BlockquiltRender
         }
         $photo = self::photo($t);
         if ($photo !== null) {
-            return $photo;
+            yield $photo;
         }
         if (count($lines) >= 3 && $lines[0] === ':::carousel' && $lines[count($lines) - 1] === ':::') {
             $items = [];
@@ -513,7 +769,7 @@ final class BlockquiltRender
                 }
             }
             if ($ok) {
-                return ['type' => 'carousel', 'items' => $items];
+                yield ['type' => 'carousel', 'items' => $items];
             }
         }
         if (count($lines) >= 3 && $lines[0] === ':::card' && $lines[count($lines) - 1] === ':::') {
@@ -538,7 +794,7 @@ final class BlockquiltRender
                 }
             }
             if ($ok) {
-                return [
+                yield [
                     'type' => 'card',
                     'src' => $photo ? $photo[2] : '',
                     'alt' => $photo ? self::plain($photo[1]) : '',
@@ -550,18 +806,17 @@ final class BlockquiltRender
             }
         }
         if (preg_match(self::VIDEO_RE, $t)) {
-            return ['type' => 'video', 'url' => $t];
+            yield ['type' => 'video', 'url' => $t];
         }
         if (preg_match('/^:::html\n([\s\S]*)\n:::$/', $t, $hm) && !preg_match('/^:::/m', $hm[1])) {
-            return ['type' => 'html', 'html' => $hm[1]];
+            yield ['type' => 'html', 'html' => $hm[1]];
         }
         if ($t === '---') {
-            return ['type' => 'hr'];
+            yield ['type' => 'hr'];
         }
         if (preg_match('/^(`{3,})([\w+#.-]*)\n([\s\S]*?)\n?\1$/', $t, $km)) {
-            return ['type' => 'code', 'lang' => $km[2], 'code' => $km[3]];
+            yield ['type' => 'code', 'lang' => $km[2], 'code' => $km[3]];
         }
-        return ['type' => 'raw', 'md' => $md];
     }
 
     private static function renderBlock(array $b, string $media, array &$ids): string

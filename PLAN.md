@@ -198,7 +198,7 @@ Objectif : permettre à n'importe quel serveur (Node, PHP, Python) de générer 
 ## 4g. Photo : taille et format (validé le 2026-11-18)
 
 - [x] **P1** `{size=small|medium}`, `{ratio=16:9|4:3|1:1}` sur le bloc Photo seul : noyau JS, moteurs PHP et Python, fixture commune `photo-options`, carte d'édition (deux listes), `blockquilt-content.css`, FORMAT / RENDER / DECISIONS.
-- Écart connu, hors tâche : une ligne « image dans du texte » (`Texte ![x](media/a) fin`) est un bloc source en JS, un paragraphe en PHP et Python.
+- [x] **P2** Parité JS / PHP / Python sur les cas limites : les moteurs PHP et Python vérifient la réécriture comme `Blocks.fromMarkdown` (fixture `edge`, 45 cas ; essai aléatoire de 3 000 textes identique dans les trois moteurs, contre 1 226 avant).
 
 ## 5. IA — fait (I1 à I6)
 

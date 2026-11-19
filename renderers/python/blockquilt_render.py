@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from typing import Any
+from typing import Any, Iterator
 
 WIDTH_RE = re.compile(r"^<!-- (1/3|1/2|2/3) -->$")
 SIXTHS = {"1/3": 2, "1/2": 3, "2/3": 4}
@@ -173,6 +173,123 @@ def flow_html(lines: list[str]) -> str:
             para.append(node["line"])
     flush()
     return "".join(out)
+
+
+# ---- Réécriture en Markdown : ports de blockquilt.js, pour savoir si un bloc se relit sans perte ----
+
+HTML_TOKEN_RE = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)((?:\s[^>]*)?)>|([^<]+)")
+MD_MARKS = {"b": "**", "strong": "**", "i": "*", "em": "*", "u": "++", "mark": "==", "a": "a", "code": "`"}
+
+
+def lines_to_html(lines: list[str]) -> str:
+    """Blocks.linesToHtml : lignes séparées par <br>, listes en <ul> / <ol>."""
+    return "<br>".join(list_html(n["list"]) if "list" in n else inline_html(n["line"]) for n in list_tree(lines))
+
+
+def esc_text(s: str) -> str:
+    """Blocks.escText : les signes qui changeraient le sens sont protégés par « \\ ». \\W comme en JS : ASCII."""
+    s = s.replace("\\", "\\\\")
+    s = re.sub(r"[*[\]`]", lambda m: "\\" + m.group(0), s)
+    s = s.replace("++", "\\+\\+").replace("==", "\\=\\=")
+    return re.sub(r"(^|\W)_|_(?=\W|\Z)", lambda m: m.group(0).replace("_", "\\_", 1), s, flags=re.ASCII)
+
+
+def safe_href(href: str) -> str:
+    """Blocks.safeHref : adresse acceptée pour un lien, sinon chaîne vide."""
+    h = unesc(href).strip()
+    if re.match(r"^(https?://|mailto:|tel:)", h, re.I):
+        full = h
+    elif re.match(r"^[\w-]+(\.[\w-]+)+(/\S*)?\Z", h, re.ASCII):
+        full = "https://" + h
+    else:
+        full = ""
+    return full.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+
+
+def html_to_md(html: str, bullets: bool = False) -> str:
+    """Blocks.htmlToMd : HTML d'un champ → Markdown (listes, mises en forme, signes protégés)."""
+    lines: list[str] = []
+    lists: list[dict[str, Any]] = []
+    frames: list[dict[str, str]] = []
+    cur = ""
+    li_prefix = ""
+    start = re.compile(r"^(#{1,6} |\+ |>|:::|~~~|\|)" if bullets else r"^(#{1,6} |[-+] |>|:::|~~~|\|)")
+
+    def put(x: str) -> None:
+        nonlocal cur
+        if frames:
+            frames[-1]["buf"] += x
+        else:
+            cur += x
+
+    def flush() -> None:
+        nonlocal cur, li_prefix
+        if li_prefix != "":
+            clean = re.sub(r"\n+", " ", cur).strip()
+            if clean != "":
+                lines.append(li_prefix + clean)
+            cur = ""
+            li_prefix = ""
+            return
+        line = start.sub(r"\\\1", cur, count=1)
+        line = re.sub(r"^(\d+)([.)]) ", r"\1\\\2 ", line, count=1)
+        lines.append(re.sub(r"^(-{3,}\s*)\Z", r"\\\1", line))
+        cur = ""
+
+    for m in HTML_TOKEN_RE.finditer(html):
+        if m.group(4) is not None:
+            text = unesc(m.group(4)).replace("\u00a0", " ")
+            in_code = bool(frames) and frames[-1]["tag"] == "code"
+            put(text if in_code else esc_text(text))
+            continue
+        closing = m.group(1) == "/"
+        tag = m.group(2).lower()
+        if tag in MD_MARKS:
+            if not closing:
+                href = ""
+                if tag == "a":
+                    hm = re.search(r'href\s*=\s*"([^"]*)"', m.group(3), re.I)
+                    href = safe_href(hm.group(1) if hm else "")
+                frames.append({"mark": MD_MARKS[tag], "href": href, "tag": tag, "buf": ""})
+            elif frames:
+                f = frames.pop()
+                lead, core, trail = re.match(r"^(\s*)([\s\S]*?)(\s*)\Z", f["buf"]).groups()
+                if core == "":
+                    put(lead + trail)
+                elif f["tag"] == "a":
+                    put(f"{lead}[{core}]({f['href']}){trail}" if f["href"] else lead + core + trail)
+                elif f["tag"] == "code":
+                    put(lead + esc_text(core) + trail if "`" in core else lead + "`" + core + "`" + trail)
+                else:
+                    put(lead + f["mark"] + core + f["mark"] + trail)
+        elif tag in ("ul", "ol"):
+            if cur != "" or li_prefix != "":
+                flush()
+            if not closing:
+                lists.append({"tag": tag, "n": 0, "width": 2})
+            elif lists:
+                lists.pop()
+        elif tag == "li":
+            if cur != "" or li_prefix != "":
+                flush()
+            if not closing:
+                top = lists[-1] if lists else None
+                if top and top["tag"] == "ol":
+                    top["n"] += 1
+                    marker = f"{top['n']}. "
+                else:
+                    marker = "- "
+                if top:
+                    top["width"] = len(marker)
+                li_prefix = " " * sum(x["width"] for x in lists[:-1]) + marker
+        elif tag == "br":
+            if li_prefix == "":
+                flush()
+        elif tag in ("div", "p") and cur != "":
+            flush()
+    if cur != "" or li_prefix != "":
+        flush()
+    return re.sub(r"^\n+|\n+\Z", "", "\n".join(lines)).replace("****", "")
 
 
 def _decode_entities(v: str) -> str:
@@ -374,7 +491,82 @@ def _photo(t: str) -> dict[str, Any] | None:
     return {"type": "photo", "src": m.group(2), "alt": plain(m.group(1)), "size": size or "", "ratio": ratio or ""}
 
 
+def _body(lines: list[str]) -> str:
+    """Texte d'un bloc tel que l'éditeur le réécrit : Blocks.htmlToMd(Blocks.linesToHtml(lignes), true)."""
+    return html_to_md(lines_to_html(lines), True)
+
+
+def _quoted(x: str) -> str:
+    return "\n".join("> " + l if l else ">" for l in x.split("\n"))
+
+
+def _photo_md(b: dict[str, Any]) -> str:
+    if not b["src"]:
+        return ""
+    opts = " ".join(x for x in [b.get("size") and "size=" + b["size"], b.get("ratio") and "ratio=" + b["ratio"]] if x)
+    alt = html_to_md(esc(b["alt"])).replace("\n", " ")
+    return f"![{alt}]({b['src']})" + (f"{{{opts}}}" if opts else "")
+
+
+def _to_markdown(b: dict[str, Any]) -> str:
+    """Les toMarkdown de blockquilt.js : le texte que l'éditeur écrirait pour ce bloc."""
+    t = b["type"]
+    if t in ("h1", "h2", "h3"):
+        x = re.sub(r"\n+", " ", html_to_md(esc(b["text"]))).strip()
+        return "#" * int(t[1]) + " " + x if x else ""
+    if t == "text":
+        x = _body(b["lines"])
+        # Comme le bloc texte de blockquilt.js : si les listes ne se relisent pas, les lignes telles quelles.
+        if x != "\n".join(b["lines"]):
+            x = html_to_md("<br>".join(inline_html(l) for l in b["lines"]), True)
+        return x
+    if t in ("t1", "t2", "t3"):
+        x = _body(b["lines"])
+        return f":::{t}\n{x}\n:::" if x.strip() else ""
+    if t == "quote":
+        x = _body(b["lines"])
+        return _quoted(x) if x.strip() else ""
+    if t in CALLOUTS:
+        x = _body(b["lines"])
+        title = re.sub(r"\s+", " ", b["title"]).strip()
+        if x.strip() == "" and not title:
+            return ""
+        head = f"> [!{t}]" + (" " + b["icon"] if b["icon"] else "") + (" " + title if title else "")
+        return head if x.strip() == "" else head + "\n" + _quoted(x)
+    if t == "photo":
+        return _photo_md(b)
+    if t == "carousel":
+        items = [x for x in b["items"] if x["src"]]
+        return "\n".join([":::carousel", *(_photo_md(x) for x in items), ":::"]) if items else ""
+    if t == "card":
+        x = _body(b["lines"]) if b["lines"] else ""
+        title = re.sub(r"\s+", " ", b["title"]).strip()
+        label = re.sub(r"\s+", " ", b["label"]).strip()
+        parts = [
+            _photo_md(b),
+            "### " + html_to_md(esc(title)) if title else "",
+            x if x.strip() else "",
+            f"[{html_to_md(esc(label))}]({b['href'].strip()})" if label and b["href"].strip() else "",
+        ]
+        parts = [p for p in parts if p]
+        return "\n".join([":::card", *parts, ":::"]) if parts else ""
+    if t == "video":
+        return b["url"].strip()
+    if t == "html":
+        return ":::html\n" + re.sub(r"^(:::)", r" \1", b["html"], flags=re.M) + "\n:::" if b["html"].strip() else ""
+    if t == "hr":
+        return "---"
+    if t == "code":
+        if b["code"].strip() == "":
+            return ""
+        longest = max([2, *(len(x) for x in re.findall(r"^`{3,}", b["code"], re.M))])
+        fence = "`" * (longest + 1)
+        return f"{fence}{b['lang']}\n{b['code']}\n{fence}"
+    return ""
+
+
 def _parse_block(md: str) -> dict[str, Any]:
+    """Comme Blocks.fromMarkdown : le premier type qui se réécrit à l'identique ; sinon « texte source » (raw)."""
     lines = _tidy(md).split("\n")
     w = WIDTH_RE.match(lines[0])
     if w:
@@ -383,24 +575,31 @@ def _parse_block(md: str) -> dict[str, Any]:
         b = _parse_block("\n".join(lines[1:]))
         b["width"] = w.group(1)
         return b
-
     t = "\n".join(lines)
+    for b in _candidates(t, lines):
+        if _tidy(_to_markdown(b)) == t:
+            return b
+    return {"type": "raw", "md": md}
+
+
+def _candidates(t: str, lines: list[str]) -> Iterator[dict[str, Any]]:
+    """Les types dont la forme correspond, dans l'ordre de blockquilt.js (Blocks.order)."""
     # h1, h2, h3
     for level in (1, 2, 3):
         m = re.match(rf"^#{{{level}}} (.+)$", t)
         if m and "\n" not in t:
-            return {"type": f"h{level}", "text": plain(m.group(1))}
+            yield {"type": f"h{level}", "text": plain(m.group(1))}
     # t1, t2, t3
     for n in (1, 2, 3):
         m = re.match(rf"^:::t{n}\n([\s\S]+)\n:::$", t)
         if m and not any(LEAD_RE.match(l) for l in m.group(1).split("\n")):
-            return {"type": f"t{n}", "lines": m.group(1).split("\n")}
+            yield {"type": f"t{n}", "lines": m.group(1).split("\n")}
     # text
     if not any(LEAD_RE.match(l) for l in lines) and not _photo(t) and not VIDEO_RE.match(t):
-        return {"type": "text", "lines": lines}
+        yield {"type": "text", "lines": lines}
     # quote
     if all(l.startswith(">") for l in lines) and not re.match(r"^> ?\[!", t):
-        return {"type": "quote", "lines": [re.sub(r"^> ?", "", l) for l in lines]}
+        yield {"type": "quote", "lines": [re.sub(r"^> ?", "", l) for l in lines]}
     # callouts
     first, rest = lines[0], lines[1:]
     cm = re.match(r"^> \[!(\w+)\](?: (.*))?$", first)
@@ -408,7 +607,7 @@ def _parse_block(md: str) -> dict[str, Any]:
         head = (cm.group(2) or "").strip()
         icon = _first_emoji(head)
         title = head[len(icon) :].strip()
-        return {
+        yield {
             "type": cm.group(1),
             "icon": icon,
             "title": title,
@@ -417,12 +616,12 @@ def _parse_block(md: str) -> dict[str, Any]:
     # photo
     photo = _photo(t)
     if photo:
-        return photo
+        yield photo
     # carousel
     if len(lines) >= 3 and lines[0] == ":::carousel" and lines[-1] == ":::":
         items = [PHOTO_RE.match(l) for l in lines[1:-1]]
         if all(items):
-            return {
+            yield {
                 "type": "carousel",
                 "items": [{"src": m.group(2), "alt": plain(m.group(1))} for m in items if m],
             }
@@ -439,7 +638,7 @@ def _parse_block(md: str) -> dict[str, Any]:
         if c_link:
             body_lines.pop()
         if not any(LEAD_RE.match(l) or PHOTO_RE.match(l) for l in body_lines):
-            return {
+            yield {
                 "type": "card",
                 "src": c_photo.group(2) if c_photo else "",
                 "alt": plain(c_photo.group(1)) if c_photo else "",
@@ -450,19 +649,18 @@ def _parse_block(md: str) -> dict[str, Any]:
             }
     # video
     if VIDEO_RE.match(t):
-        return {"type": "video", "url": t}
+        yield {"type": "video", "url": t}
     # html
     hm = re.match(r"^:::html\n([\s\S]*)\n:::$", t)
     if hm and not re.search(r"^:::", hm.group(1), re.M):
-        return {"type": "html", "html": hm.group(1)}
+        yield {"type": "html", "html": hm.group(1)}
     # hr
     if t == "---":
-        return {"type": "hr"}
+        yield {"type": "hr"}
     # code
     km = re.match(r"^(`{3,})([\w+#.-]*)\n([\s\S]*?)\n?\1$", t)
     if km:
-        return {"type": "code", "lang": km.group(2), "code": km.group(3)}
-    return {"type": "raw", "md": md}
+        yield {"type": "code", "lang": km.group(2), "code": km.group(3)}
 
 
 def _rows(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
