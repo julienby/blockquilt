@@ -627,6 +627,23 @@ try {
   await ev(`editor.undo()`);
   await ev(`editor.undo()`);
   ok((await carOrder()) === 'Deux,Un,Trois', `carrousel : Ctrl+Z annule les déplacements faits en plein écran (${await carOrder()})`);
+  // Plein écran, avec le visuel à côté (défaut sur grand écran) : une légende tapée dans le dialogue suit sa photo quand elle descend
+  const splitWas = await ev(`document.querySelector('[data-visual-toggle]').getAttribute('aria-pressed')`);
+  if (splitWas !== 'true') await ev(`document.querySelector('[data-visual-toggle]').click()`);
+  await ev(`document.querySelector('[data-car-list]').closest('[data-id]').querySelector('[data-expand]').click()`);
+  const pairs = () => ev(`[...document.querySelectorAll('[data-block-full] [data-car-item]')].map((r) => r.querySelector('img').getAttribute('src').slice(-12) + '=' + r.querySelector('[data-car-alt]').value).join()`);
+  await ev(`(() => { const x = document.querySelector('[data-block-full] [data-car-item="0"] [data-car-alt]'); x.focus(); x.value = 'Neuf'; x.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
+  const pBefore = (await pairs()).split(',');
+  await ev(`document.querySelector('[data-block-full] [data-car-item="0"] [data-car-grip]').focus()`);
+  await key('ArrowDown', 'ArrowDown', 40);
+  const pAfter = (await pairs()).split(',');
+  ok(pAfter.join() === [pBefore[1], pBefore[0], pBefore[2]].join() && pAfter[1].endsWith('=Neuf'), `carrousel en plein écran : la légende tapée suit sa photo (${pBefore} → ${pAfter})`);
+  await ev(`document.querySelector('[data-block-full] [data-block-full-close]').click()`);
+  await waitFor(() => ev(`!document.querySelector('[data-block-full] [data-car-list]')`), 'plein écran du carrousel fermé');
+  ok((await carOrder()) === 'Un,Neuf,Trois', `carrousel en plein écran : à la fermeture, la légende tapée reste avec sa photo (${await carOrder()})`);
+  await ev(`editor.undo()`);
+  await ev(`editor.undo()`);
+  if (splitWas !== 'true') await ev(`document.querySelector('[data-visual-toggle]').click()`);
   // Replier : une seule ligne (miniatures et nombre de photos), gardée d'un dessin à l'autre
   const fold = await ev(`(async () => {
     const card = document.querySelector('[data-car-list]').closest('[data-id]');
