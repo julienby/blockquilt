@@ -60,7 +60,7 @@ export function installMedia(ed) {
     if (!b || to < 0 || to >= b.items.length || to === from) return;
     ed.syncFromDom();
     ed.change(() => b.items.splice(to, 0, ...b.items.splice(from, 1)));
-    canvas.querySelector(`[data-id="${id}"] [data-car-item="${to}"] [data-car-grip]`)?.focus({ preventScroll: true });
+    ed.app.querySelector(`[data-id="${id}"] [data-car-item="${to}"] [data-car-grip]`)?.focus({ preventScroll: true }); // la page ou le plein écran
   };
   ed.carousel = (el, id) => {
     const b = ed.blocks.find((x) => x.id === id);
@@ -68,7 +68,7 @@ export function installMedia(ed) {
     const i = Number(el.closest('[data-car-item]').dataset.carItem);
     ed.syncFromDom();
     ed.change(() => b.items.splice(i, 1));
-    canvas.querySelector(`[data-id="${id}"] [data-car-item="${Math.max(0, i - 1)}"] [data-car-act]`)?.focus({ preventScroll: true });
+    ed.app.querySelector(`[data-id="${id}"] [data-car-item="${Math.max(0, i - 1)}"] [data-car-act]`)?.focus({ preventScroll: true });
   };
   ed.on(ed.app, 'keydown', (e) => {
     const grip = e.target.closest?.('[data-car-grip]');

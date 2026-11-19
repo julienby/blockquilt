@@ -56,23 +56,33 @@ export function installFullscreen(ed) {
     const next = neighbour(blockFull.querySelector('[data-id]').dataset.id, step);
     if (next) ed.openBlockFull(next.id);
   };
-  ed.openBlockFull = (id) => {
-    if (blockFull.open) ed.checkpoint(); // lit le bloc quitté dans le dialogue
-    ed.syncFromDom();
+  // Dessine le bloc dans le dialogue ; sa carte dans la page perd data-id. Renvoie false si le bloc n'existe plus.
+  const draw = (id) => {
     const b = ed.blocks.find((x) => x.id === id);
     const cardEl = ed.canvas.querySelector(`[data-id="${id}"], [data-away="${id}"]`);
-    if (!b || !cardEl) return;
+    if (!b || !cardEl) return false;
     cardEl.removeAttribute('data-id');
     cardEl.dataset.away = id;
     const view = ed.viewOf(b) === 'collapsed' ? 'edit' : ed.viewOf(b); // le plein écran montre toujours le bloc en entier
     const tools = ed.tools(b, view) ? `<div class="-mt-2 mb-2 flex">${ed.tools(b, view)}</div>` : '';
     $('[data-block-full-label]', blockFull).textContent = ed.def(b).label;
     $('[data-block-full-body]', blockFull).innerHTML = `<div data-id="${id}" data-view="${view}" class="bq-focus">${tools}${ed.editorOf(b).edit(b, ed.ui)}</div>`;
+    $('[data-full-prev]', blockFull).disabled = !neighbour(id, -1);
+    $('[data-full-next]', blockFull).disabled = !neighbour(id, 1);
+    return true;
+  };
+  // Après un redessin de la page (ordre ou retrait d'une photo…), le dialogue montre le bloc à jour.
+  ed.redrawBlockFull = () => {
+    const id = blockFull.querySelector('[data-block-full-body] [data-id]')?.dataset.id;
+    if (id && !draw(id)) blockFull.close();
+  };
+  ed.openBlockFull = (id) => {
+    if (blockFull.open) ed.checkpoint(); // lit le bloc quitté dans le dialogue
+    ed.syncFromDom();
+    if (!draw(id)) return;
     blockFull.style.setProperty('--bq-width', app.style.getPropertyValue('--bq-width') || '');
     inner(blockFull).append(ed.bar, ed.toastEl.parentElement); // la barre et les messages doivent être dans la couche du dialogue
     if (!blockFull.open) enter(blockFull);
-    $('[data-full-prev]', blockFull).disabled = !neighbour(id, -1);
-    $('[data-full-next]', blockFull).disabled = !neighbour(id, 1);
     blockFull.querySelector('[contenteditable], textarea, input')?.focus();
   };
   ed.on(blockFull, 'close', () => {

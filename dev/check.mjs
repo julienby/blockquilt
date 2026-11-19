@@ -609,6 +609,24 @@ try {
   ok((await carOrder()) === 'Trois,Deux,Un' && !(await ev(`!!document.querySelector('[data-car-list] .bq-drop')`)), 'carrousel : Échap annule le glissement');
   await ev(`editor.undo()`);
   ok((await carOrder()) === 'Deux,Un,Trois', 'carrousel : Ctrl+Z annule le déplacement');
+  // Plein écran du bloc : le nouvel ordre se voit dans le dialogue et reste à la fermeture
+  await ev(`document.querySelector('[data-car-list]').closest('[data-id]').querySelector('[data-expand]').click()`);
+  const fullOrder = () => ev(`[...document.querySelectorAll('[data-block-full] [data-car-alt]')].map((x) => x.value).join()`);
+  await ev(`document.querySelector('[data-block-full] [data-car-item="0"] [data-car-grip]').focus()`);
+  await key('ArrowDown', 'ArrowDown', 40);
+  ok((await fullOrder()) === 'Un,Deux,Trois' && await ev(`document.activeElement.matches('[data-block-full] [data-car-item="1"] [data-car-grip]')`), `carrousel en plein écran : flèche bas, la photo descend dans le dialogue, focus gardé (${await fullOrder()})`);
+  let fg2 = await ev(`(() => { const b = document.querySelector('[data-block-full] [data-car-item="2"] [data-car-grip]').getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+  const fg0 = await ev(`(() => { const b = document.querySelector('[data-block-full] [data-car-item="0"] [data-car-grip]').getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+  await mouse('mousePressed', fg2.x, fg2.y);
+  for (let y = fg2.y; y >= fg0.y - 20; y -= 15) await mouse('mouseMoved', fg2.x, y);
+  await mouse('mouseReleased', fg2.x, fg0.y - 20, 0);
+  ok((await fullOrder()) === 'Trois,Un,Deux', `carrousel en plein écran : glisser change l’ordre dans le dialogue (${await fullOrder()})`);
+  await ev(`document.querySelector('[data-block-full] [data-block-full-close]').click()`);
+  await waitFor(() => ev(`!document.querySelector('[data-block-full] [data-car-list]')`), 'plein écran du carrousel fermé');
+  ok((await carOrder()) === 'Trois,Un,Deux' && /!\[Trois\]\(media\/\w+\)\n!\[Un\]\(media\/\w+\)\n!\[Deux\]\(media\/\w+\)/.test(await ev(`editor.getMarkdown()`)) && await ev(`document.querySelectorAll('[data-car-list]').length === 1`), `carrousel en plein écran : à la fermeture, l’ordre est gardé (${await carOrder()})`);
+  await ev(`editor.undo()`);
+  await ev(`editor.undo()`);
+  ok((await carOrder()) === 'Deux,Un,Trois', `carrousel : Ctrl+Z annule les déplacements faits en plein écran (${await carOrder()})`);
   // Replier : une seule ligne (miniatures et nombre de photos), gardée d'un dessin à l'autre
   const fold = await ev(`(async () => {
     const card = document.querySelector('[data-car-list]').closest('[data-id]');

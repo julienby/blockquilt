@@ -135,6 +135,7 @@ export function installRender(ed) {
     if (ed.mode === 'preview') return renderPreview();
     if (ed.mode === 'source') ed.renderSource(); else renderEdit();
     if (ed.sideBySide) addVisual();
+    if (ed.blockFull.open) ed.redrawBlockFull();
   };
 
   ed.focusCard = (id) => {
