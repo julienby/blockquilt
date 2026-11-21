@@ -53,7 +53,7 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 | `storageKey` | Nom du contenu pour garder, dans le navigateur (`localStorage`), l'affichage choisi par bloc (texte ou carrousel replié, aperçu du HTML). Par défaut `contentUrl`. Sans l'un ni l'autre, l'affichage est gardé le temps de la session seulement. Jamais écrit dans le Markdown. L'état suit la place et le type du bloc : il est réécrit à chaque dessin. |
 | `collapseLines` | Replie au premier affichage un bloc texte, liste, citation, code, texte source ou carrousel de plus de N lignes de Markdown : N lignes visibles, un fondu, « … +X lignes » et « Déplier ». Défaut `5` ; `0` ne replie rien. Les encadrés ne sont pas concernés. Le choix de l'utilisateur prime et est gardé (`storageKey`). Un carrousel replié montre sa ligne de vignettes, avec son propre bouton. |
 | `pollSeconds` | Avec `contentUrl` : revérifier toutes les N secondes (30 par défaut, `0` jamais) et au retour sur la page ; un changement d'ailleurs affiche un bandeau « Modifié par … il y a … », sans rien changer à l'écran. `checkRemote()` revérifie à la demande (par exemple sur un événement htmx). |
-| `uploadUrl` | Envoi des photos. Sans elle, pas de photo. |
+| `uploadUrl` | Envoi des photos. Sans elle, pas de photo. Sert aussi à rapatrier les photos d'une page collée (champ `url`, voir « Coller »). |
 | `media` | Adresse des photos : `media/<id>` du texte devient `media + id` à l'écran (`media/` par défaut). |
 | `previewUrl` | Aperçu rendu par le serveur. Sans elle, l'éditeur rend lui-même avec `Blocks.toHtml`. Le visuel à côté reste rendu par l'éditeur. |
 | `aiUrl` | Assistant IA. Sans elle, aucun bouton IA. |
@@ -92,11 +92,13 @@ Tous en `POST multipart/form-data`, avec les champs de `fields`. Les fins de lig
 | Action | Champs envoyés | Réponse attendue |
 |---|---|---|
 | Enregistrer (`saveUrl`) | `text` | Code 2xx. Sinon JSON `{ "error": "…" }`, affiché. |
-| Photo (`uploadUrl`) | `photo` (fichier) | JSON `{ "id": "…" }` (le texte écrit `media/<id>`) ou `{ "src": "https://…" }`. |
-
-Photos : le serveur vérifie le contenu, pas le type déclaré par le navigateur. La démo accepte JPEG, PNG, GIF et WebP de 5 Mo au plus (413 au-delà, 422 sinon). Pas de SVG envoyé par un utilisateur : servi sur le même domaine, il peut exécuter du script. Erreur : JSON `{ "error": "…" }`, affiché par l'éditeur.
+| Photo (`uploadUrl`) | `photo` (fichier), ou `url` (adresse `https` d'une image à télécharger) | JSON `{ "id": "…" }` (le texte écrit `media/<id>`) ou `{ "src": "https://…" }`. Erreur : JSON `{ "error": "…" }`, affiché. Un serveur qui ne gère pas `url` répond 422 : l'adresse externe reste, rien ne casse. |
 | Aperçu (`previewUrl`) | `text` | Fragment HTML. |
 | IA (`aiUrl`) | `GET` → `{ uses: [{ id, label, scopes }] }`, les boutons de la feuille IA (facultatif : sans réponse, des boutons intégrés). `POST` : `scope` (`document` ou `block`), `use` (l'usage choisi, facultatif), `instruction`, `text` (document complet), `block` (Markdown du bloc si `scope=block`), `blocks` (document, hors vue source : liste JSON, `[0]` = frontmatter, `[n]` = bloc n) | JSON `{ "operations": "…" }` ou `{ "markdown": "…" }`. **Opérations** (document) : une proposition par opération, avec les différences mot à mot, à cocher une à une ; « Appliquer » fait une seule étape annulable. Une proposition dont le bloc a changé depuis l'envoi est périmée, jamais appliquée. Une proposition en alerte `Blocks.lint` est décochée. **Markdown** : passé par `Blocks.lint`, montré à côté de l'actuel ; en alerte, les boutons d'application sont désactivés, la case « Appliquer malgré les alertes » les réactive ; puis, au choix et annulable : document — remplacer, ajouter au début, à la fin ; bloc — remplacer, insérer au-dessus, dessous ; ou « Copier seulement » (rien ne change). |
+
+Photos : le serveur vérifie le contenu, pas le type déclaré par le navigateur. La démo accepte JPEG, PNG, GIF et WebP de 5 Mo au plus (413 au-delà, 422 sinon). Pas de SVG envoyé par un utilisateur : servi sur le même domaine, il peut exécuter du script.
+
+Photo par `url` (photos d'une page collée) : le serveur télécharge l'image lui-même, donc il doit se protéger contre les adresses internes (SSRF). L'éditeur n'envoie que des adresses `https`. Règles de `fetchImage` dans `dev/server.js`, à reprendre : `https` sur le port 443, sans identifiants ; seules les adresses IP publiques, vérifiées au moment de la connexion (dans le `lookup`, contre le « DNS rebinding ») ; 3 redirections au plus, revérifiées ; 10 s ; 5 Mo ; type reconnu aux premiers octets.
 
 L'éditeur n'appelle aucun modèle d'IA et ne contient aucune clé : c'est le service désigné par `aiUrl` qui le fait. Un relais prêt à monter est fourni (« Relais IA » plus bas) ; la démo l'utilise, avec une transformation fixe (texte en majuscules) tant qu'aucune clé `AI_KEY` n'est donnée.
 
@@ -108,9 +110,32 @@ L'éditeur garde dans `localStorage` seulement des préférences d'affichage. Sa
 - `blockquilt.split` : visuel à côté (`true` ou `false`). Sans choix gardé, deux panneaux dès 1024 px.
 - `blockquilt.emoji` : emoji récents.
 
+### Coller
+
+Copier une partie d'une page web (ou d'un Google Docs), puis coller. Le HTML du presse-papiers devient des blocs :
+
+- titres (h4 à h6 deviennent h3), paragraphes avec gras, italique et liens ;
+- listes imbriquées, citations, code, lignes ;
+- photos `https` avec leur légende, vidéos YouTube et Vimeo intégrées.
+
+Retirés : scripts, styles, menus de navigation, images `data:` ou relatives, petites icônes (moins de 48 px). Le gras fait par un style CSS (Google Docs) est perdu : seul le gras balisé reste.
+
+Où coller :
+
+- menu ⋯ d'un bloc : « Coller au-dessus » ou « Coller dessous ». Le menu lit le HTML, sinon le texte ;
+- Ctrl+V dans un bloc plein : les blocs vont dessous. Dans un bloc vide : ils le remplacent ;
+- menu d'ajout « Ajouter un bloc » : bouton « Coller » en tête. C'est la seule façon de coller dans un document vide sur mobile ;
+- Ctrl+V d'une simple phrase : texte simple, au curseur. Ctrl+V ne marche que si le focus est dans l'éditeur.
+
+Capture d'écran : Ctrl+V d'une image du presse-papiers ajoute un bloc photo, envoyé comme une photo choisie. Il va sous le bloc en cours, ou remplace un bloc vide.
+
+Photos d'une page collée : chaque photo `https` est envoyée à `uploadUrl` (champ `url`), que le serveur télécharge. Elle devient `media/…`. Message, par exemple : « 3 photos importées · 1 photo gardée en lien externe ». Une photo refusée reste en lien externe. « Annuler » remet les adresses externes ; un second « Annuler » défait le collage.
+
+Limite : sur Firefox et Safari, le menu « Coller » peut demander une permission. Refusée, il colle du texte simple. Ctrl+V n'a pas cette limite.
+
 ### Au clavier
 
-Ctrl+S enregistre, Ctrl+Z annule, Ctrl+Maj+Z ou Ctrl+Y rétablit (50 étapes), Ctrl+B / I / U mettent en forme, Alt+F10 donne le focus à la barre de mise en forme, les flèches haut et bas sur la poignée déplacent un bloc, Échap ferme un menu, le plein écran ou annule un glissement.
+Ctrl+S enregistre, Ctrl+Z annule, Ctrl+Maj+Z ou Ctrl+Y rétablit (50 étapes), Ctrl+B / I / U mettent en forme, Ctrl+V colle (voir « Coller »), Alt+F10 donne le focus à la barre de mise en forme, les flèches haut et bas sur la poignée déplacent un bloc, Échap ferme un menu, le plein écran ou annule un glissement.
 
 ## Format
 
@@ -125,6 +150,7 @@ const Blocks = require('./blockquilt.js');
 const html = Blocks.toHtml(markdown, { media: '/media/' });   // <article class="bq-content">…</article>
 const { meta, blocks } = Blocks.parse(markdown);              // meta.title, meta.icon, autres clés
 const problems = Blocks.lint(markdown);                       // [{ line, message }]
+const md = Blocks.fromHtml(pageHtml);                         // HTML collé (page web) → Markdown blockquilt, sans DOM
 ```
 
 Modifier un contenu bloc par bloc (pour une IA, un serveur MCP…) sans identifiant dans le texte : un bloc est désigné par sa place et l'empreinte de son texte. Une écriture sur un bloc qui a changé depuis la lecture est refusée, jamais écrasée ; le reste du texte est gardé à l'identique.

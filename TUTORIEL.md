@@ -263,6 +263,8 @@ Règles de sécurité, appliquées dans les deux exemples :
 - Le nom du fichier est tiré au hasard. L'extension vient du type reconnu.
 - 5 Mo au plus. Au-delà : 413.
 
+Photos d'une page collée : l'éditeur envoie l'adresse `https` d'une photo dans le champ `url`, au lieu de `photo`. Le serveur doit alors télécharger l'image lui-même, avec les garde-fous décrits dans le [README](README.md) (« Échanges avec le serveur »). Ce tutoriel ne code pas ce cas. Sans lui, le serveur répond 422 : la photo reste un lien externe, rien ne casse.
+
 ### PHP
 
 `upload.php` :
@@ -436,6 +438,7 @@ La liste complète est dans le README, section « Apparence ». `blockquilt-cont
 | « Jeton invalide » sur une grosse photo (PHP) | Envoi au-delà de `post_max_size` | Monter `upload_max_filesize` et `post_max_size` |
 | Page publique blanche | Rien n'est encore enregistré, ou une erreur JavaScript | Enregistrer une fois depuis l'éditeur ; sinon, lire la console du navigateur (F12) : chemin de `blockquilt/` faux, ou erreur de syntaxe dans le `<script>` |
 | Photo enregistrée mais pas affichée | Option `media` différente de l'adresse qui sert `media/` | Même adresse des deux côtés |
+| Photos d'une page collée restent en lien externe | `uploadUrl` ne gère pas `url` (422, voulu) | Ajouter le cas `url` (README, « Échanges avec le serveur »), ou laisser tel quel |
 
 ## Aller plus loin
 
