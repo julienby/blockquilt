@@ -33,10 +33,27 @@ export function installRender(ed) {
   // colonne de droite : monter, poignée, descendre. Une action = un seul endroit.
   // Le contenu est centré verticalement sous le badge : un titre court occupe harmonieusement la hauteur donnée par la colonne.
   // Long bloc texte : replié, il montre ses premières lignes, un fondu et « … +X lignes » ; un clic dessus le déplie.
-  const foldFooter = (hidden) => `<div class="mt-1 flex min-h-11 items-center gap-2 text-sm">
+  const foldFooter = (hidden) => `<div data-fold-footer class="mt-1 flex min-h-11 items-center gap-2 text-sm">
           <span class="bq-view-collapsed opacity-70">… +${hidden} ligne${hidden > 1 ? 's' : ''}</span>
           <button type="button" data-toggle-view="collapsed" class="bq-view-collapsed min-h-11 px-2 font-bold underline">Déplier</button>
           <button type="button" data-toggle-view="collapsed" class="bq-view-expanded min-h-11 px-2 font-bold underline opacity-70">Replier</button></div>`;
+  // Pendant la frappe, sans redessiner la carte (le curseur reste) : le pied suit le nombre de lignes.
+  // Un bloc qui devient long reste ouvert : on ne replie pas sous le curseur.
+  ed.refreshFold = (cardEl, b) => {
+    const body = cardEl.querySelector(':scope > div > [data-card-body]');
+    if (!body || b.type === 'carousel') return;
+    const hidden = ed.hiddenLines(b);
+    if (hidden && !ed.views.has(b.id)) ed.views.set(b.id, cardEl.dataset.view);
+    cardEl.querySelector('[data-fold-footer]')?.remove();
+    if (hidden) {
+      body.dataset.fold = 'collapsed';
+      body.style.setProperty('--bq-fold', ed.foldLimit);
+      body.insertAdjacentHTML('afterend', foldFooter(hidden));
+    } else {
+      body.removeAttribute('data-fold');
+      body.style.removeProperty('--bq-fold');
+    }
+  };
   // Ligne composée : petite grille à côté du type, la case du bloc pleine. Ligne incomplète : orange, pointillés pour la place libre.
   let place = new Map(); // identifiant → { row, k, sum }
   const colGrid = (b) => {

@@ -79,7 +79,10 @@ export function installEvents(ed) {
     ed.typed();
     const c = e.target.closest?.('[data-id]');
     const b = c && ed.blocks.find((x) => x.id === c.dataset.id);
-    if (b) ed.def(b).onInput?.(c, ed.ui);
+    if (!b) return;
+    ed.def(b).onInput?.(c, ed.ui);
+    ed.editorOf(b).read(c, b);
+    ed.refreshFold(c, b);
   });
   ed.on(app, 'focusin', (e) => { const c = e.target.closest?.('[data-id]'); if (c) ed.activeId = c.dataset.id; });
   ed.on(app, 'focusout', (e) => { if (e.target.classList?.contains('bq-edit')) ed.clean(e.target); });

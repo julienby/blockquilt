@@ -778,6 +778,24 @@ try {
   ok(f2again.view === 'edit', 'repli auto : le bloc reste déplié après rechargement (choix gardé)');
   const f2off = await autoFold({ collapseLines: 0, storageKey: 'f2off' });
   ok(f2off.view === 'edit' && f2off.h > f2.h, 'repli auto : collapseLines: 0 ne replie rien');
+  const f2info = await ev(`(() => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: '> [!info]\\n' + ${JSON.stringify(longText)}.split('\\n').map((l) => '> ' + l).join('\\n') });
+    const card = el.querySelector('[data-id]');
+    const out = { view: card.dataset.view, footer: !!card.querySelector('button.bq-view-collapsed')?.offsetParent };
+    e.destroy(); el.remove(); return out;
+  })()`);
+  ok(f2info.view === 'collapsed' && f2info.footer, `repli auto : un long encadré info est replié aussi (${JSON.stringify(f2info)})`);
+  const f2typed = await ev(`(() => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Court' });
+    const card = el.querySelector('[data-id]'); const field = card.querySelector('[data-rich]');
+    field.innerHTML = Array.from({ length: 12 }, (_, i) => 'Ligne ' + (i + 1)).join('<br>');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    const out = { view: card.dataset.view, fold: card.textContent.includes('Replier') && !!card.querySelector('button.bq-view-expanded')?.offsetParent, field: document.contains(field) };
+    e.destroy(); el.remove(); return out;
+  })()`);
+  ok(f2typed.view === 'edit' && f2typed.fold && f2typed.field, `repli auto : un bloc qui devient long à la frappe montre « Replier » sans rechargement ni se replier sous le curseur (${JSON.stringify(f2typed)})`);
   const f2full = await ev(`(async () => {
     localStorage.removeItem('blockquilt.views.f2');
     const el = document.createElement('div'); document.body.append(el);
