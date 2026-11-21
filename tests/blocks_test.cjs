@@ -373,4 +373,35 @@ for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'edit
   ok(Blocks.toHtml('![x](media/a){size=medium}').includes('<figure class="bq-photo-medium"><img'), 'rendu : classe de taille sur <figure>');
 }
 
+// ---- Coller une page web : HTML → Markdown blockquilt, au mieux ----
+{
+  const f = Blocks.fromHtml;
+  const same = (html, md, name) => { const got = f(html); ok(got === md, `coller du HTML : ${name}` + (got === md ? '' : ` → ${JSON.stringify(got)}`)); };
+  same('<h1>A</h1><h2>B</h2><h4>C</h4><h6>D</h6><p>E</p>', '# A\n\n## B\n\n### C\n\n### D\n\nE', 'titres h1 à h6, h4 à h6 → h3');
+  same('<p>Un <b class="x">gras</b>, <em>penché</em>, <a href="https://e.fr/a?x=1&amp;y=2">lien</a> et <a href="javascript:alert(1)">piège</a>.</p>', 'Un **gras**, *penché*, [lien](https://e.fr/a?x=1&y=2) et piège.', 'mise en forme et liens, javascript: retiré');
+  same('<p>a<br>b</p><div>c</div>', 'a\nb\n\nc', 'retour à la ligne dans un paragraphe, un bloc par paragraphe');
+  same('<p>  a\n   b  </p>', 'a b', 'blancs du HTML repliés');
+  same('<ul><li>a<ul><li>b</li></ul></li><li><p>c</p></li></ul><ol><li>x</li><li>y</li></ol>', '- a\n  - b\n- c\n\n1. x\n2. y', 'listes imbriquées, puces et numéros');
+  same('<blockquote><p>Une</p><p>Deux</p></blockquote>', '> Une\n> Deux', 'citation sur plusieurs paragraphes');
+  same('<pre><code class="language-js">a &lt; b\n  c</code></pre>', '```\na < b\n  c\n```', 'code : texte brut, espaces gardés');
+  same('<figure><img src="https://e.fr/p.jpg" alt="alt"><figcaption>La <b>plage</b></figcaption></figure>', '![La plage](https://e.fr/p.jpg)', 'photo : la légende remplace le texte alternatif');
+  same('<p>Avant</p><img src="https://e.fr/a b.jpg" alt="Vue [1]"><p>Après</p>', 'Avant\n\n![Vue \\[1\\]](https://e.fr/a%20b.jpg)\n\nAprès', 'photo entre deux paragraphes, adresse et texte protégés');
+  same('<img src="data:image/png;base64,AAA"><img src="/rel.png"><img src="http://e.fr/x.png"><img src="https://e.fr/i.png" width="16" height="16"><p>Reste</p>', 'Reste', 'images ignorées : data:, relative, http, icône');
+  same('<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ?si=x"></iframe><iframe src="https://player.vimeo.com/video/76979871"></iframe><iframe src="https://e.fr/pub"></iframe>', 'https://youtu.be/dQw4w9WgXcQ\n\nhttps://vimeo.com/76979871', 'vidéo intégrée YouTube et Vimeo, autre iframe retirée');
+  same('<!DOCTYPE html><html><head><title>T</title><style>p{}</style></head><body><!--StartFragment--><script>alert(1)</script><nav><a href="/">Accueil</a></nav><p>Reste</p><embed src="x"><p>Fin</p></body></html>', 'Reste\n\nFin', 'script, style, nav, commentaires retirés ; balise sans fin sans perte');
+  same('<p># pas un titre *ni* [lien]</p><p>- pas une liste</p>', '\\# pas un titre \\*ni\\* \\[lien\\]\n\n\\- pas une liste', 'signes Markdown du texte protégés');
+  same('<p>L&#8217;été &amp; l&rsquo;hiver&nbsp;! &#x1F600; &#99999999;</p>', 'L’été & l’hiver ! 😀 �', 'entités décodées');
+  same('<hr><h2>Titre <b>gras</b></h2>', '---\n\n## Titre gras', 'ligne, titre sans mise en forme');
+  same('<p><b>a</p><p>b</b> <i>c</p>', '**a**\n\nb *c*', 'balises mal fermées : aucun texte perdu');
+  same('<table><tr><th>a</th><td>b</td></tr><tr><td>c</td></tr></table>', 'a b\n\nc', 'tableau : une ligne = un paragraphe');
+  // Google Docs : tout est enveloppé dans un <b style="font-weight:normal">, et chaque morceau dans un <span>.
+  same('<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-1"><h1 dir="ltr"><span style="font-size:20pt">Titre</span></h1><p dir="ltr"><span style="font-weight:700">Gras</span><span> normal</span></p></b>', '# Titre\n\nGras normal', 'Google Docs');
+  same('', '', 'rien');
+  const article = `<article><h1>Un article</h1><p>Intro avec <a href="https://e.fr">un lien</a>.</p><h2>Partie</h2><ul><li>un</li><li>deux</li></ul>
+    <figure><img src="https://e.fr/p.jpg" alt=""><figcaption>Une photo</figcaption></figure><blockquote>Une citation</blockquote>
+    <pre>npm test</pre><hr><p>Fin.</p></article>`;
+  const parsed = Blocks.parse(f(article)).blocks;
+  ok(parsed.map((b) => b.type).join() === 'h1,text,h2,text,photo,quote,code,hr,text', `coller du HTML : article complet → ${parsed.map((b) => b.type).join()}`);
+}
+
 process.exit(failed ? 1 : 0);

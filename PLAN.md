@@ -200,6 +200,14 @@ Objectif : permettre à n'importe quel serveur (Node, PHP, Python) de générer 
 - [x] **P1** `{size=small|medium}`, `{ratio=16:9|4:3|1:1}` sur le bloc Photo seul : noyau JS, moteurs PHP et Python, fixture commune `photo-options`, carte d'édition (deux listes), `blockquilt-content.css`, FORMAT / RENDER / DECISIONS.
 - [x] **P2** Parité JS / PHP / Python sur les cas limites : les moteurs PHP et Python vérifient la réécriture comme `Blocks.fromMarkdown` (fixture `edge`, 45 cas ; essai aléatoire de 3 000 textes identique dans les trois moteurs, contre 1 226 avant).
 
+## 4h. Coller une page web (validé le 2026-11-21)
+
+- [x] **C1** `Blocks.fromHtml` (noyau, sans DOM) ; menu « Coller » lit le HTML du presse-papiers ; Ctrl+V d'une page → blocs dessous, ou à la place d'un bloc vide. Tests : `blocks_test.cjs` (20 cas), `check.mjs` (5 cas).
+- [ ] **C2** « Coller » dans le menu d'ajout (mobile, document vide).
+- [ ] **C3** Rapatrier les images : option serveur `importUrl` (http(s) seulement, pas d'IP privée, taille et type limités) ; images `data:` par `upload`.
+- [ ] **C4** IA sur la plage collée, avec une consigne.
+- [ ] **C5** Lien « Source » quand l'adresse d'origine est connue.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

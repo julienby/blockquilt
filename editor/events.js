@@ -84,9 +84,23 @@ export function installEvents(ed) {
   ed.on(app, 'focusin', (e) => { const c = e.target.closest?.('[data-id]'); if (c) ed.activeId = c.dataset.id; });
   ed.on(app, 'focusout', (e) => { if (e.target.classList?.contains('bq-edit')) ed.clean(e.target); });
   ed.on(titleEl, 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
-  // Coller dans un champ : texte simple seulement (pas de styles venus d'ailleurs).
+  // Coller une page web (plusieurs blocs, ou un titre, une photo, une liste…) : des blocs sous le bloc en cours ; un bloc vide est remplacé.
+  // Sinon, dans un champ : texte simple seulement (pas de styles venus d'ailleurs). Les autres champs (titre, légende, code) collent seuls.
   ed.on(app, 'paste', (e) => {
-    if (!e.target.closest?.('.bq-edit')) return;
+    const field = e.target.closest?.('.bq-edit');
+    if (inSheet(e.target) || (!field && e.target.matches?.('input, textarea, [contenteditable]'))) return;
+    const html = e.clipboardData.getData('text/html');
+    const md = html ? Blocks.fromHtml(html) : '';
+    const found = Blocks.parse(md).blocks.filter((b) => !Blocks.isEmpty(b));
+    if (found.length > 1 || (found.length === 1 && found[0].type !== 'text') || /^ *(?:-|\d+\.) /m.test(md)) {
+      e.preventDefault();
+      ed.syncFromDom();
+      const i = ed.blocks.findIndex((b) => b.id === ed.activeId);
+      if (i < 0) return ed.pasteBlocks(md, ed.blocks.length);
+      const empty = Blocks.isEmpty(ed.blocks[i]);
+      return ed.pasteBlocks(md, empty ? i : i + 1, empty);
+    }
+    if (!field) return;
     e.preventDefault();
     document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
   });

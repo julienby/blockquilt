@@ -143,15 +143,24 @@ export function installActions(ed) {
     shared.clipboard = text;
     navigator.clipboard?.writeText(text).catch(() => {});
   };
-  const paste = async (id, offset) => {
+  // Presse-papiers → Markdown : le HTML d'une page web d'abord, sinon le texte, sinon la copie interne.
+  const readClipboard = async () => {
+    try {
+      const item = (await navigator.clipboard.read()).find((x) => x.types.includes('text/html'));
+      const md = item ? Blocks.fromHtml(await (await item.getType('text/html')).text()) : '';
+      if (md.trim()) return md;
+    } catch { /* refusé ou non pris en charge : texte */ }
     let text = '';
     try { text = await navigator.clipboard.readText(); } catch { /* refusé : copie interne */ }
-    if (!text.trim()) text = shared.clipboard || '';
-    const parsed = Blocks.parse(text).blocks.filter((b) => !Blocks.isEmpty(b));
-    if (!parsed.length) return ed.toast('Presse-papiers vide');
-    const i = ed.blocks.findIndex((b) => b.id === id);
-    const fresh = parsed.map((b) => ({ id: ed.newId(), ...b }));
-    ed.change(() => ed.blocks.splice(i + offset, 0, ...fresh));
+    return text.trim() ? text : shared.clipboard || '';
+  };
+  // Markdown collé → blocs à la place `at`. `replace` : le bloc à cette place (vide) est remplacé. Un seul « Annuler ».
+  ed.pasteBlocks = (md, at, replace = false) => {
+    const fresh = Blocks.parse(md).blocks.filter((b) => !Blocks.isEmpty(b)).map((b) => ({ id: ed.newId(), ...b }));
+    if (!fresh.length) return ed.toast('Presse-papiers vide');
+    ed.change(() => ed.blocks.splice(at, replace ? 1 : 0, ...fresh));
+    ed.focusCard(fresh[fresh.length - 1].id);
     ed.toast(fresh.length > 1 ? `${fresh.length} blocs collés` : 'Bloc collé');
   };
+  const paste = async (id, offset) => ed.pasteBlocks(await readClipboard(), ed.blocks.findIndex((b) => b.id === id) + offset);
 }

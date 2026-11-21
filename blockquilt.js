@@ -453,6 +453,137 @@ const Blocks = {
     return lines.join('\n').replace(/^\n+|\n+$/g, '').replace(/\*\*\*\*/g, '');
   },
 
+  /**
+   * HTML collé (page web, traitement de texte) → Markdown blockquilt, au mieux. Sans DOM.
+   * Seul le texte est gardé : titres, paragraphes, listes, citations, code, photos https, vidéos YouTube et Vimeo, lignes.
+   * La mise en forme du texte passe par htmlToMd. Ce que le noyau ne relit pas à l'identique deviendra un bloc « texte source ».
+   */
+  fromHtml(html) {
+    const char = (n) => (n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '�');
+    const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', laquo: '«', raquo: '»', hellip: '…', ndash: '–', mdash: '—' };
+    const decode = (s) => s.replace(/&#x([0-9a-f]+);?|&#(\d+);?|&([a-z]+);/gi, (m, hex, dec, name) =>
+      (hex ? char(parseInt(hex, 16)) : dec ? char(Number(dec)) : NAMED[name.toLowerCase()] ?? m));
+    const attrOf = (attrs, name) => {
+      const m = new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(attrs);
+      return m ? decode(m[1] ?? m[2] ?? m[3]).trim() : '';
+    };
+    const INLINE = { b: 'b', strong: 'b', i: 'i', em: 'i', u: 'u', mark: 'mark', code: 'code', a: 'a' };
+    const BLOCK = /^(p|div|section|article|main|header|footer|h[1-6]|blockquote|pre|figure|figcaption|table|tr|dl|dt|dd|address|details|summary|center)$/;
+    const DROP = [...Blocks.DROP_TAGS, 'nav', 'aside'];
+
+    const out = [];
+    let kind = 'text'; // segment en cours : text, h1…h6, list, quote, caption
+    let buf = ''; // HTML propre du segment : texte échappé et balises sans attributs
+    let open = []; // balises de mise en forme ouvertes dans buf
+    let lists = 0;
+    let quotes = 0;
+    let pre = null; // texte du bloc <pre> en cours
+    let lastPhoto = null; // { i, src } : la photo qu'une <figcaption> peut légender
+    const photo = (alt, src) => `![${Blocks.htmlToMd(Blocks.esc(alt)).replace(/\n/g, ' ')}](${src})`;
+    const plain = () => Blocks.htmlToMd(Blocks.esc(Blocks.stripTags(buf))).replace(/\n+/g, ' ').trim();
+    const flush = () => {
+      while (open.length) buf += `</${open.pop()}>`;
+      const lines = Blocks.htmlToMd(buf, kind === 'list' || kind === 'quote').split('\n')
+        .map((l) => (kind === 'list' ? l.trimEnd() : l.trim())).filter((l) => l !== '');
+      if (lines.length) {
+        if (kind[0] === 'h') out.push('#'.repeat(Math.min(Number(kind[1]), 3)) + ' ' + plain());
+        else if (kind === 'caption' && lastPhoto && lastPhoto.i === out.length - 1) out[lastPhoto.i] = photo(plain(), lastPhoto.src);
+        else if (kind === 'quote') out.push(lines.map((l) => '> ' + l).join('\n'));
+        else out.push(lines.join('\n'));
+      }
+      buf = '';
+      kind = 'text';
+    };
+    const push = (md) => { flush(); out.push(md); };
+    const code = () => { push(Blocks.toMarkdown({ type: 'code', lang: '', code: pre.replace(/^\n/, '').replace(/\s+$/, '') })); pre = null; };
+
+    const re = /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[^\s"'>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*\/?>/g;
+    let at = 0;
+    let m;
+    const text = (t) => {
+      if (pre !== null) pre += decode(t);
+      else buf += Blocks.esc(decode(t).replace(/[ \t\n\r\f]+/g, ' '));
+    };
+    while ((m = re.exec(html))) {
+      text(html.slice(at, m.index));
+      at = re.lastIndex;
+      if (!m[2]) continue; // commentaire, <!DOCTYPE>
+      const close = m[1] === '/';
+      const tag = m[2].toLowerCase();
+      const attrs = m[3] || '';
+      if (tag === 'iframe' && !close) {
+        const src = attrOf(attrs, 'src');
+        const yt = /youtube(?:-nocookie)?\.com\/embed\/([\w-]{11})/i.exec(src);
+        const vimeo = /player\.vimeo\.com\/video\/(\d+)/i.exec(src);
+        if (yt) push('https://youtu.be/' + yt[1]);
+        else if (vimeo) push('https://vimeo.com/' + vimeo[1]);
+      }
+      if (DROP.includes(tag)) {
+        // Retirée avec son contenu. Sans balise de fin (<embed>…), seule la balise part.
+        if (!close) {
+          const end = new RegExp('</' + tag + '\\s*>', 'ig');
+          end.lastIndex = at;
+          if (end.exec(html)) at = re.lastIndex = end.lastIndex;
+        }
+        continue;
+      }
+      if (pre !== null) {
+        if (tag === 'pre' && close) code();
+        else if (tag === 'br') pre += '\n';
+        continue;
+      }
+      if (INLINE[tag]) {
+        const t = INLINE[tag];
+        if (!close) {
+          open.push(t);
+          buf += t === 'a' ? `<a href="${Blocks.attr(attrOf(attrs, 'href'))}">` : `<${t}>`;
+        } else if (open.includes(t)) {
+          const i = open.lastIndexOf(t);
+          while (open.length > i) buf += `</${open.pop()}>`;
+        }
+      } else if (tag === 'ul' || tag === 'ol') {
+        if (!close && !lists && !quotes) { flush(); kind = 'list'; }
+        lists = Math.max(lists + (close ? -1 : 1), 0);
+        buf += close ? `</${tag}>` : `<${tag}>`;
+        if (close && !lists && !quotes) flush();
+      } else if (tag === 'li') {
+        if (lists) buf += close ? '</li>' : '<li>';
+      } else if (tag === 'blockquote') {
+        if (!close && !quotes && !lists) { flush(); kind = 'quote'; }
+        quotes = Math.max(quotes + (close ? -1 : 1), 0);
+        if (close && !quotes && !lists) flush();
+      } else if (tag === 'pre' && !close && !lists && !quotes) {
+        flush();
+        pre = '';
+      } else if (tag === 'br') {
+        buf += lists ? ' ' : '<br>';
+      } else if (tag === 'td' || tag === 'th') {
+        if (!close) buf += ' ';
+      } else if (tag === 'hr') {
+        if (!lists && !quotes) push('---');
+      } else if (tag === 'img') {
+        const src = attrOf(attrs, 'src').replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
+        const tiny = ['width', 'height'].some((a) => /^\d+$/.test(attrOf(attrs, a)) && Number(attrOf(attrs, a)) < 48);
+        if (!lists && !quotes && !tiny && /^https:\/\/\S+$/i.test(src)) {
+          push(photo(attrOf(attrs, 'alt'), src));
+          lastPhoto = { i: out.length - 1, src };
+        }
+      } else if (BLOCK.test(tag)) {
+        if (lists) buf += ' ';
+        else if (quotes) buf += '<br>';
+        else {
+          flush();
+          if (!close && /^h[1-6]$/.test(tag)) kind = tag;
+          if (!close && tag === 'figcaption') kind = 'caption';
+        }
+      }
+    }
+    text(html.slice(at));
+    if (pre !== null) code();
+    flush();
+    return out.join('\n\n');
+  },
+
   // ---- Filtre HTML (bloc :::html) : sans DOM, liste blanche courte et figée. L'allonger demande une ligne dans DECISIONS.md. ----
   SAFE_TAGS: ['div', 'span', 'p', 'br', 'hr', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'strong', 'em', 'u', 'mark', 'small', 'a', 'img', 'figure', 'figcaption', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
   // Balises retirées avec tout leur contenu.

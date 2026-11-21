@@ -399,6 +399,27 @@ try {
   await waitFor(async () => (await cards()).length === n0 + 4, 'collage de trois paragraphes');
   ok(true, 'coller un texte de trois paragraphes : trois blocs');
 
+  // Coller une page web : le HTML du presse-papiers devient des blocs
+  await ev(`navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob(['<h2>Depuis le web</h2><p>Un <b>texte</b>.</p>'], { type: 'text/html' }), 'text/plain': new Blob(['Depuis le web Un texte.'], { type: 'text/plain' }) })])`);
+  await ev(`document.querySelectorAll('[data-bq] [data-id] [data-menu]')[0].click()`);
+  await ev(`document.querySelector('[data-sheet="menu"] [data-act="paste-above"]').click()`);
+  await waitFor(async () => (await cards()).length === n0 + 6, 'collage HTML par le menu');
+  ok((await ev(`Blocks.parse(editor.getMarkdown()).blocks.slice(0, 2).map(Blocks.toMarkdown).join('|')`)) === '## Depuis le web|Un **texte**.', 'menu « Coller au-dessus » : le HTML d’une page devient un titre et un paragraphe, en tête');
+  // Ctrl+V dans un champ : un ClipboardEvent porte le HTML.
+  const pasteIn = (n, html, text) => ev(`(() => { const f = [...document.querySelectorAll('[data-bq] [data-id] .bq-edit')][${n}]; f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd();
+    const dt = new DataTransfer(); dt.setData('text/html', ${JSON.stringify(html)}); dt.setData('text/plain', ${JSON.stringify(text)});
+    f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+  await ev(`editor.setMarkdown('Premier\\n\\nSecond')`);
+  await pasteIn(0, '<h3>Collé</h3><ul><li>a</li><li>b</li></ul>', 'Collé a b');
+  ok((await mdNow()) === 'Premier\n\n### Collé\n\n- a\n- b\n\nSecond\n', 'Ctrl+V d’une page dans un champ plein : les blocs vont dessous, le bloc reste intact');
+  await ev(`document.querySelector('[data-undo]').click()`);
+  ok((await mdNow()) === 'Premier\n\nSecond\n', 'collage d’une page : un seul « Annuler » le défait');
+  await ev(`(() => { const f = [...document.querySelectorAll('[data-bq] [data-id] .bq-edit')][1]; f.textContent = ''; })()`);
+  await pasteIn(1, '<p>Un</p><p>Deux</p>', 'Un Deux');
+  ok((await mdNow()) === 'Premier\n\nUn\n\nDeux\n', 'Ctrl+V d’une page dans un champ vide : les blocs le remplacent');
+  await pasteIn(0, '<span style="color:red">juste un mot</span>', ' juste un mot');
+  ok((await mdNow()) === 'Premier juste un mot\n\nUn\n\nDeux\n', 'Ctrl+V d’une phrase : texte simple au curseur, sans nouveau bloc');
+
   // Glisser-déposer
   await open();
   const order = () => ev(`[...document.querySelectorAll('[data-bq] [data-id]')].map((c) => c.dataset.id).join()`);
