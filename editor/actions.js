@@ -69,7 +69,9 @@ export function installActions(ed) {
       if (t.group === 'none' || t.hidden || (k === 'html' && !o.html)) continue;
       (groups[t.group] = groups[t.group] || []).push(k);
     }
-    $('[data-add-list]', sheets.add).innerHTML = Object.entries(groups).map(([g, keys]) => `<p class="mb-1 mt-3 px-1 text-[11px] font-bold uppercase tracking-wider text-stone-400 first:mt-0">${esc(GROUPS[g] || g)}</p>
+    // « Coller » : la seule façon de coller dans un document vide, sans clavier (mobile).
+    $('[data-add-list]', sheets.add).innerHTML = `<button type="button" data-pick="paste" class="flex min-h-11 w-full items-center gap-2 rounded-xl border px-2.5 text-left text-sm font-semibold ${Blocks.types.text.tone.card}">
+      <span class="flex size-7 shrink-0 items-center justify-center rounded-lg border ${Blocks.types.text.tone.badge}">${ic('paste', 'size-4')}</span>Coller</button>` + Object.entries(groups).map(([g, keys]) => `<p class="mb-1 mt-3 px-1 text-[11px] font-bold uppercase tracking-wider text-stone-400 first:mt-0">${esc(GROUPS[g] || g)}</p>
       <div class="grid grid-cols-2 gap-1.5 sm:grid-cols-3">${keys.map((k) => `<button type="button" data-pick="${k}" class="flex min-h-11 items-center gap-2 rounded-xl border px-2.5 text-left text-sm font-semibold ${Blocks.types[k].tone.card}">
         <span class="flex size-7 shrink-0 items-center justify-center rounded-lg border ${Blocks.types[k].tone.badge}">${ic(Blocks.types[k].icon, 'size-4')}</span><span class="min-w-0 truncate">${esc(Blocks.types[k].label)}</span></button>`).join('')}</div>`).join('');
     ed.openSheet('add');
@@ -79,6 +81,7 @@ export function installActions(ed) {
     if (!pick) return;
     sheets.add.close();
     const type = pick.dataset.pick;
+    if (type === 'paste') return paste(insertAt === null ? ed.blocks.length : insertAt);
     if (type === 'photo' || type === 'carousel') return ed.pickFiles({ type, at: insertAt });
     ed.add(type, insertAt);
   });
@@ -118,7 +121,7 @@ export function installActions(ed) {
     if (i < 0) return;
     if (act === 'duplicate') { const copy = { ...structuredClone(ed.blocks[i]), id: ed.newId() }; ed.change(() => ed.blocks.splice(i + 1, 0, copy)); ed.toast('Bloc dupliqué'); }
     else if (act === 'copy') { copyText(Blocks.toMarkdown(ed.blocks[i])); ed.toast('Bloc copié'); }
-    else if (act === 'paste' || act === 'paste-above') paste(id, act === 'paste' ? 1 : 0);
+    else if (act === 'paste' || act === 'paste-above') paste(ed.blocks.findIndex((b) => b.id === id) + (act === 'paste' ? 1 : 0));
     else if (act === 'ai') ed.openAi(id);
   });
 
@@ -148,19 +151,21 @@ export function installActions(ed) {
     try {
       const item = (await navigator.clipboard.read()).find((x) => x.types.includes('text/html'));
       const md = item ? Blocks.fromHtml(await (await item.getType('text/html')).text()) : '';
-      if (md.trim()) return md;
+      if (md.trim()) return { md, web: true };
     } catch { /* refusé ou non pris en charge : texte */ }
     let text = '';
     try { text = await navigator.clipboard.readText(); } catch { /* refusé : copie interne */ }
-    return text.trim() ? text : shared.clipboard || '';
+    return { md: text.trim() ? text : shared.clipboard || '', web: false };
   };
   // Markdown collé → blocs à la place `at`. `replace` : le bloc à cette place (vide) est remplacé. Un seul « Annuler ».
-  ed.pasteBlocks = (md, at, replace = false) => {
+  // `web` : collage d'une page web, ses photos sont ensuite rapatriées (ed.importPhotos).
+  ed.pasteBlocks = (md, at, { replace = false, web = false } = {}) => {
     const fresh = Blocks.parse(md).blocks.filter((b) => !Blocks.isEmpty(b)).map((b) => ({ id: ed.newId(), ...b }));
     if (!fresh.length) return ed.toast('Presse-papiers vide');
     ed.change(() => ed.blocks.splice(at, replace ? 1 : 0, ...fresh));
     ed.focusCard(fresh[fresh.length - 1].id);
     ed.toast(fresh.length > 1 ? `${fresh.length} blocs collés` : 'Bloc collé');
+    if (web) ed.importPhotos(fresh);
   };
-  const paste = async (id, offset) => ed.pasteBlocks(await readClipboard(), ed.blocks.findIndex((b) => b.id === id) + offset);
+  const paste = async (at) => { const c = await readClipboard(); ed.pasteBlocks(c.md, at, { web: c.web }); };
 }

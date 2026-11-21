@@ -420,6 +420,51 @@ try {
   await pasteIn(0, '<span style="color:red">juste un mot</span>', ' juste un mot');
   ok((await mdNow()) === 'Premier juste un mot\n\nUn\n\nDeux\n', 'Ctrl+V d’une phrase : texte simple au curseur, sans nouveau bloc');
 
+  // Photos collées rapatriées : le fetch de la page est remplacé pour les envois `url` (pas d'Internet dans le conteneur).
+  await ev(`(() => { const real = window.fetch; window.realFetch = real; window.fetch = (u, init) => { const url = init?.body?.get?.('url');
+    if (!url) return real(u, init);
+    return Promise.resolve(new Response(JSON.stringify(url.includes('/ok') ? { id: 'de0000000001' } : { error: 'non' }), { status: url.includes('/ok') ? 200 : 422 })); }; })()`);
+  await ev(`editor.setMarkdown('Premier\\n\\nSecond')`);
+  await pasteIn(1, '<p>Texte</p><img src="https://e.fr/ok.jpg" alt="A"><img src="https://e.fr/ko.jpg" alt="B">', 'Texte');
+  await waitFor(async () => (await mdNow()).includes('media/de0000000001'), 'import des photos');
+  ok((await mdNow()) === 'Premier\n\nSecond\n\nTexte\n\n![A](media/de0000000001)\n\n![B](https://e.fr/ko.jpg)\n', 'collage d’une page : une photo rapatriée, l’autre gardée en lien externe');
+  ok(await ev(`document.querySelector('[data-toast]')?.textContent.includes('1 photo gardée en lien externe')`), 'import des photos : un message dit ce qui reste externe');
+  await ev(`document.querySelector('[data-undo]').click()`);
+  ok((await mdNow()).includes('![A](https://e.fr/ok.jpg)'), 'import des photos : un « Annuler » remet l’adresse externe');
+  await ev(`window.fetch = window.realFetch`);
+
+  // Menu d'ajout : « Coller » dans un document vide.
+  await ev(`editor.setMarkdown('')`);
+  await ev(`navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob(['<h2>Vide</h2><p>Rempli</p>'], { type: 'text/html' }) })])`);
+  await ev(`document.querySelector('[data-bq] [data-insert="end"]').click()`);
+  await ev(`document.querySelector('[data-sheet="add"] [data-pick="paste"]').click()`);
+  await waitFor(async () => (await mdNow()) === '## Vide\n\nRempli\n', 'coller depuis le menu d’ajout');
+  ok(true, 'menu d’ajout « Coller » : un document vide reçoit les blocs');
+
+  // Ctrl+V d'une capture d'écran : envoyée par uploadUrl, un bloc photo.
+  const pasteShot = (text) => ev(`(() => { const f = [...document.querySelectorAll('[data-bq] [data-id] .bq-edit')].find((x) => x.textContent === ${JSON.stringify(text)}); f.focus();
+    const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])], 'capture.png', { type: 'image/png' }));
+    f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); })()`);
+  await pasteShot('Vide');
+  await waitFor(async () => /!\[\]\(media\/[a-f0-9]{12}\)/.test(await mdNow()), 'capture d’écran collée');
+  const shotMd = await mdNow();
+  ok(/^## Vide\n\n!\[\]\(media\/[a-f0-9]{12}\)\n\nRempli\n$/.test(shotMd), `Ctrl+V d’une capture d’écran : un bloc photo sous le bloc en cours → ${JSON.stringify(shotMd)}`);
+  const nShot = (await cards()).length;
+  await pasteShot('');
+  await waitFor(async () => ((await mdNow()).match(/media\//g) || []).length === 2, 'capture d’écran dans un bloc vide');
+  ok((await cards()).length === nShot && /^!\[\]\(media\/[a-f0-9]{12}\)\n\n## Vide/.test(await mdNow()), 'Ctrl+V d’une capture d’écran dans un bloc vide : la photo le remplace');
+
+  // Import par adresse : le serveur refuse ce qui n'est pas une image publique en https (SSRF).
+  const mediaCount = () => fs.readdirSync(path.join(data, 'media')).length;
+  const mediaBefore = mediaCount();
+  for (const bad of ['https://127.0.0.1/x.png', 'https://localhost/x.png', 'https://10.0.0.1/x.png', 'https://[::1]/x.png', 'https://[::ffff:127.0.0.1]/x.png', 'https://169.254.169.254/latest', 'http://exemple.fr/x.png', 'https://exemple.fr:8443/x.png', 'https://u:p@exemple.fr/x.png', 'file:///etc/passwd', 'pas une adresse']) {
+    const fd = new FormData();
+    fd.set('url', bad);
+    const r = await fetch(BASE + '/api/upload', { method: 'POST', body: fd });
+    ok(r.status === 422 && (await r.json()).error, `import par adresse refusé : ${bad}`);
+  }
+  ok(mediaCount() === mediaBefore, 'import refusé : aucun fichier écrit');
+
   // Glisser-déposer
   await open();
   const order = () => ev(`[...document.querySelectorAll('[data-bq] [data-id]')].map((c) => c.dataset.id).join()`);

@@ -2,23 +2,45 @@
 export function installMedia(ed) {
   const { o, fileInput, canvas } = ed;
 
-  const upload = async (file) => {
+  // Envoi à uploadUrl : un fichier (`photo`) ou l'adresse d'une image que le serveur télécharge (`url`). Renvoie le src à écrire.
+  const send = async (fields) => {
     if (!o.uploadUrl) throw new Error('Envoi de photos non configuré');
-    const r = await fetch(o.uploadUrl, { method: 'POST', body: ed.form({ photo: file }), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
+    const r = await fetch(o.uploadUrl, { method: 'POST', body: ed.form(fields), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !(j.id || j.src)) throw new Error(j.error || 'Envoi impossible');
     return j.src || 'media/' + j.id;
+  };
+  const upload = (file) => send({ photo: file });
+
+  // Photos d'une page collée : rapatriées une à une ; celles que le serveur refuse gardent leur adresse externe.
+  // Un seul ed.change à la fin : « Annuler » remet les adresses externes.
+  ed.importPhotos = async (blocks) => {
+    const photos = blocks.filter((b) => b.type === 'photo' && b.src.startsWith('https://'));
+    if (!o.uploadUrl || !photos.length) return;
+    const done = [];
+    for (const b of photos) {
+      try { done.push({ id: b.id, src: await send({ url: b.src }) }); } catch { /* refusée : adresse externe gardée */ }
+    }
+    ed.syncFromDom();
+    const found = done.map((d) => ({ ...d, b: ed.blocks.find((x) => x.id === d.id) })).filter((d) => d.b);
+    if (found.length) ed.change(() => { for (const d of found) d.b.src = d.src; });
+    const kept = photos.length - done.length;
+    ed.toast([found.length && `${found.length} photo${found.length > 1 ? 's importées' : ' importée'}`,
+      kept && `${kept} photo${kept > 1 ? 's gardées' : ' gardée'} en lien externe`].filter(Boolean).join(' · '));
   };
 
   // Selon la demande : un bloc photo par fichier ({ type: 'photo', at }), un carrousel neuf ({ type: 'carousel', at }),
   // ou des photos ajoutées à un carrousel existant ({ add: id }).
   let target = null;
   ed.pickFiles = (t) => { target = t; fileInput.click(); };
-  ed.on(fileInput, 'change', async () => {
+  ed.on(fileInput, 'change', () => {
     const files = [...fileInput.files];
     const t = target || { type: 'photo', at: null };
     fileInput.value = '';
     target = null;
+    ed.addPhotos(files, t);
+  });
+  ed.addPhotos = async (files, t) => {
     if (!files.length) return;
     ed.toast(files.length > 1 ? `Envoi de ${files.length} photos…` : 'Envoi de la photo…');
     try {
@@ -37,14 +59,14 @@ export function installMedia(ed) {
       else {
         const at = t.at === null ? ed.blocks.length : t.at;
         const fresh = items.map((x) => ({ id: ed.newId(), ...Blocks.blank('photo'), ...x }));
-        ed.change(() => ed.blocks.splice(at, 0, ...fresh));
+        ed.change(() => ed.blocks.splice(at, t.replace ? 1 : 0, ...fresh)); // replace : un bloc vide où l'on a collé
         ed.focusCard(fresh[0].id);
       }
       ed.toast(srcs.length > 1 ? `${srcs.length} photos ajoutées` : 'Photo ajoutée');
     } catch (error) {
       ed.toast(error.message);
     }
-  });
+  };
 
   // ---- Carte : une seule photo (la première si plusieurs fichiers sont choisis) ----
   ed.cardPhoto = (act, id) => {

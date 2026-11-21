@@ -6,6 +6,9 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const dns = require('node:dns');
+const https = require('node:https');
+const net = require('node:net');
 const Blocks = require('../blockquilt.js');
 const application = require('./app.js');
 const { httpHandler } = require('../mcp/blockquilt-mcp.js');
@@ -46,6 +49,52 @@ const read = async (req, max) => {
 };
 // Formulaire multipart reçu → FormData (le parseur de fetch, intégré à Node). 1 Mo au plus, sauf photo.
 const form = async (req, max = 1024 * 1024) => new Request('http://local' + req.url, { method: 'POST', headers: req.headers, body: await read(req, max) }).formData();
+
+// ---- Import d'une image par son adresse : garde-fous contre le SSRF (le serveur ne doit atteindre que l'Internet public) ----
+const MAX_PHOTO = 5 * 1024 * 1024;
+// Adresse IP publique : ni locale, ni privée, ni réservée (IPv4, IPv6, IPv4 dans IPv6).
+const publicIp = (ip) => {
+  const v4 = net.isIPv4(ip) ? ip : (/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip) || [])[1];
+  if (v4) {
+    const [a, b] = v4.split('.').map(Number);
+    return !(a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b < 128) || (a === 169 && b === 254)
+      || (a === 172 && b >= 16 && b < 32) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)));
+  }
+  const x = ip.toLowerCase();
+  return net.isIPv6(x) && !(x === '::' || x === '::1' || x.startsWith('::ffff:') || /^(f[cd]|fe[89ab]|ff)/.test(x));
+};
+// Résolution DNS vérifiée : la connexion se fait vers l'adresse contrôlée ici (pas de seconde résolution, pas de « DNS rebinding »).
+const lookup = (host, opts, cb) => dns.lookup(host, { all: true }, (err, list) => {
+  if (err) return cb(err);
+  if (!list.length || !list.every((a) => publicIp(a.address))) return cb(Object.assign(new Error('Adresse non publique'), { code: 'EPRIVATE' }));
+  if (opts.all) cb(null, list); else cb(null, list[0].address, list[0].family);
+});
+// Image téléchargée : https sur le port 443, sans identifiants, 3 redirections, 10 s et 5 Mo au plus. Erreur : status 422.
+const fetchImage = (raw, hops = 3) => new Promise((resolve, reject) => {
+  const fail = (message) => reject(Object.assign(new Error(message), { status: 422 }));
+  let u;
+  try { u = new URL(raw); } catch { return fail('Adresse invalide'); }
+  const host = u.hostname.replace(/^\[|\]$/g, '');
+  if (u.protocol !== 'https:' || u.port || u.username || u.password) return fail('Adresse https attendue, sans port ni identifiant');
+  if (net.isIP(host) && !publicIp(host)) return fail('Adresse non publique'); // une adresse IP écrite ne passe pas par lookup
+  const req = https.get(u, { lookup, signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'blockquilt', Accept: 'image/*' } }, (res) => {
+    if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+      res.resume();
+      if (!hops) return fail('Trop de redirections');
+      return fetchImage(new URL(res.headers.location, u).href, hops - 1).then(resolve, reject);
+    }
+    if (res.statusCode !== 200) { res.resume(); return fail(`Image introuvable (${res.statusCode})`); }
+    const parts = [];
+    let size = 0;
+    res.on('data', (p) => {
+      size += p.length;
+      if (size > MAX_PHOTO) { req.destroy(); fail('Photo trop grosse : 5 Mo au plus'); } else parts.push(p);
+    });
+    res.on('end', () => resolve(Buffer.concat(parts)));
+    res.on('error', () => fail('Téléchargement interrompu'));
+  });
+  req.on('error', (e) => fail(e.code === 'EPRIVATE' ? 'Adresse non publique' : 'Téléchargement impossible'));
+});
 
 // La démo : index.html, avec le dernier document enregistré dans le champ source s'il existe.
 const page = () => {
@@ -113,12 +162,18 @@ const routes = {
     send(res, 200, 'text/html; charset=utf-8', Blocks.toHtml(String(data.get('text') ?? '').replace(/\r\n/g, '\n'), { media: 'media/' }));
   },
   // Photo : JPEG, PNG, GIF ou WebP de 5 Mo au plus, gardée telle quelle, réponse JSON { id }.
+  // Envoyée (`photo`, un fichier) ou téléchargée par le serveur (`url`, l'adresse https d'une image collée).
   'POST /api/upload': async (req, res) => {
-    const MAX = 5 * 1024 * 1024;
-    const file = (await form(req, MAX + 64 * 1024)).get('photo');
-    if (!file || typeof file === 'string') return json(res, 422, { error: 'Image attendue' });
-    if (file.size > MAX) return json(res, 413, { error: 'Photo trop grosse : 5 Mo au plus' });
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const data = await form(req, MAX_PHOTO + 64 * 1024);
+    const url = data.get('url');
+    const file = data.get('photo');
+    let bytes;
+    if (typeof url === 'string' && url) bytes = await fetchImage(url);
+    else {
+      if (!file || typeof file === 'string') return json(res, 422, { error: 'Image attendue' });
+      if (file.size > MAX_PHOTO) return json(res, 413, { error: 'Photo trop grosse : 5 Mo au plus' });
+      bytes = Buffer.from(await file.arrayBuffer());
+    }
     const type = IMAGES.find(([, magic]) => magic.test(bytes.subarray(0, 12).toString('latin1')))?.[0];
     if (!type) return json(res, 422, { error: 'Image attendue : JPEG, PNG, GIF ou WebP' });
     const id = crypto.randomBytes(6).toString('hex');

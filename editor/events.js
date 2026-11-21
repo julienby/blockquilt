@@ -92,13 +92,16 @@ export function installEvents(ed) {
     const html = e.clipboardData.getData('text/html');
     const md = html ? Blocks.fromHtml(html) : '';
     const found = Blocks.parse(md).blocks.filter((b) => !Blocks.isEmpty(b));
-    if (found.length > 1 || (found.length === 1 && found[0].type !== 'text') || /^ *(?:-|\d+\.) /m.test(md)) {
+    const images = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+    const web = found.length > 1 || (found.length === 1 && found[0].type !== 'text') || /^ *(?:-|\d+\.) /m.test(md);
+    if (web || images.length) {
       e.preventDefault();
       ed.syncFromDom();
       const i = ed.blocks.findIndex((b) => b.id === ed.activeId);
-      if (i < 0) return ed.pasteBlocks(md, ed.blocks.length);
-      const empty = Blocks.isEmpty(ed.blocks[i]);
-      return ed.pasteBlocks(md, empty ? i : i + 1, empty);
+      const empty = i >= 0 && Blocks.isEmpty(ed.blocks[i]);
+      const at = i < 0 ? ed.blocks.length : empty ? i : i + 1;
+      // Une page web d'abord (ses photos seront rapatriées) ; sinon une capture d'écran, envoyée comme une photo choisie.
+      return web ? ed.pasteBlocks(md, at, { replace: empty, web: true }) : ed.addPhotos(images, { type: 'photo', at, replace: empty });
     }
     if (!field) return;
     e.preventDefault();

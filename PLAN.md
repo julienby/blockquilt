@@ -203,8 +203,8 @@ Objectif : permettre à n'importe quel serveur (Node, PHP, Python) de générer 
 ## 4h. Coller une page web (validé le 2026-11-21)
 
 - [x] **C1** `Blocks.fromHtml` (noyau, sans DOM) ; menu « Coller » lit le HTML du presse-papiers ; Ctrl+V d'une page → blocs dessous, ou à la place d'un bloc vide. Tests : `blocks_test.cjs` (20 cas), `check.mjs` (5 cas).
-- [ ] **C2** « Coller » dans le menu d'ajout (mobile, document vide).
-- [ ] **C3** Rapatrier les images : option serveur `importUrl` (http(s) seulement, pas d'IP privée, taille et type limités) ; images `data:` par `upload`.
+- [x] **C2** « Coller » dans le menu d'ajout (mobile, document vide).
+- [x] **C3** Rapatrier les images : `uploadUrl` accepte `url` (démo : garde-fous SSRF) ; capture d'écran collée → `upload`. Images `data:` du HTML : ignorées.
 - [ ] **C4** IA sur la plage collée, avec une consigne.
 - [ ] **C5** Lien « Source » quand l'adresse d'origine est connue.
 
