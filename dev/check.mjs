@@ -283,7 +283,11 @@ try {
   })()`);
   ok(two.n === 2 && !two.dup, 'deux éditeurs dans la même page : aucun identifiant en double');
   ok(two.md === '## Deux\n\nSecond éditeur\n', 'second éditeur : getMarkdown() rend son propre texte');
-  ok(await ev(`(async () => { document.querySelectorAll('[data-bq]')[1].querySelector('[data-save]').click(); await new Promise((r) => setTimeout(r, 50)); return window.saves === 1; })()`), 'second éditeur : onSave appelé');
+  ok(await ev(`(async () => {
+    const el = document.querySelectorAll('[data-bq]')[1];
+    el.querySelector('[data-rich]').dispatchEvent(new Event('input', { bubbles: true }));
+    el.querySelector('[data-save]').click(); await new Promise((r) => setTimeout(r, 50)); return window.saves === 1;
+  })()`), 'second éditeur : onSave appelé');
   ok(await ev(`(async () => {
     const el = document.querySelectorAll('[data-bq]')[1];
     window.second.destroy();
@@ -297,6 +301,25 @@ try {
     return gone && quiet;
   })()`), 'destroy() : éditeur retiré, plus aucun écouteur (un clic ne déclenche rien)');
   ok(await ev(`(() => { editor.setMarkdown('Nouveau'); return editor.getMarkdown() === 'Nouveau\\n' && document.querySelector('[data-save]').getAttribute('aria-label') === 'Enregistré'; })()`), 'setMarkdown() : remplace le document, état enregistré');
+  // B1 : rien à enregistrer → bouton inactif
+  const b1 = await ev(`(async () => {
+    const el = document.createElement('div'); document.body.append(el);
+    let saves = 0;
+    const e = Blockquilt.mount(el, { source: 'Un', onSave: () => { saves++; } });
+    const btn = el.querySelector('[data-save]'); const full = el.querySelector('[data-full-save]'); const field = el.querySelector('[data-rich]');
+    const out = { loaded: btn.disabled && full.disabled };
+    await e.save(); out.noSave = saves === 0;
+    field.textContent = 'Deux'; field.dispatchEvent(new Event('input', { bubbles: true }));
+    out.typed = !btn.disabled && !full.disabled && !btn.querySelector('[data-dot]').hidden;
+    await e.save(); out.saved = saves === 1 && btn.disabled && full.disabled;
+    field.textContent = 'Trois'; field.dispatchEvent(new Event('input', { bubbles: true }));
+    e.undo(); out.undone = e.getMarkdown() === 'Deux\\n' && btn.disabled;
+    e.redo(); out.redone = e.getMarkdown() === 'Trois\\n' && !btn.disabled;
+    e.destroy(); el.remove(); return out;
+  })()`);
+  ok(b1.loaded && b1.noSave, `bouton Enregistrer : inactif au chargement, save() sans modification n'envoie rien (${JSON.stringify(b1)})`);
+  ok(b1.typed && b1.saved, `bouton Enregistrer : actif après une frappe, inactif après l'enregistrement (${JSON.stringify(b1)})`);
+  ok(b1.undone && b1.redone, `bouton Enregistrer : annuler jusqu'au texte enregistré le rend inactif, rétablir le réactive (${JSON.stringify(b1)})`);
 
   // ---- Phase 5 : interactions ----
   const key = async (k, code, vk, modifiers = 0) => {

@@ -39,7 +39,7 @@ Pas à pas, avec un serveur PHP ou Flask : [TUTORIEL.md](TUTORIEL.md).
 </script>
 ```
 
-`mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), checkRemote(), version, destroy() }`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
+`mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), checkRemote(), version, destroy() }`. `save()` sans modification n'envoie rien et renvoie `true`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs.
 
 Trois vues dans l'en-tête : **édition** par blocs, **texte source** (le Markdown complet, contrôlé par `Blocks.lint`) et **aperçu**. Le bouton **Visuel à côté** (icône deux colonnes) affiche un visuel à droite du texte, en blocs comme en source ; il est grisé en aperçu. Par défaut, deux panneaux dès 1024 px, un en dessous ; le choix est gardé dans le navigateur. Le visuel est toujours rendu par l'éditeur (`Blocks.toHtml`), même avec `previewUrl`, et ne suit pas le défilement. En revenant aux blocs depuis la source, le texte est relu, en une étape annulable.
 

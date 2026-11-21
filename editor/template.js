@@ -24,7 +24,7 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
     <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
     <button type="button" data-visual-toggle aria-pressed="false" aria-label="Visuel à côté" title="Visuel à côté" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white disabled:opacity-40">${ic('columns')}</button>
     ${o.aiUrl ? `<button type="button" data-ai aria-label="Assistant IA" title="Assistant IA" class="bq-btn hidden text-amber-600 sm:inline-flex">${ic('wand')}</button>` : ''}
-    <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative text-stone-400">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
+    <button type="button" data-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
     <button type="button" data-width hidden aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn bq-muted max-sm:hidden">${ic('width')}</button>
     <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn bq-muted hidden sm:inline-flex">${ic('maximize')}</button>
     <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn bq-muted sm:hidden">${ic('more')}</button>

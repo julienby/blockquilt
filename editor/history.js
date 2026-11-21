@@ -37,8 +37,8 @@ export function installHistory(ed) {
   const restore = (state) => {
     ed.setDoc(Blocks.parse(state.md)); // l'affichage choisi (replié, aperçu…) suit la place et le type
     ed.activeId = ed.blocks[Math.min(state.active, ed.blocks.length - 1)].id;
-    ed.setDirty(true);
     ed.render();
+    ed.setDirty(ed.markdown() !== ed.savedText);
     ed.canvas.querySelector(`[data-id="${ed.activeId}"]`)?.scrollIntoView({ block: 'nearest' });
     updateButtons();
   };

@@ -10,11 +10,14 @@ export function installDocument(ed) {
   };
 
   // ---- État enregistré / à enregistrer ----
+  // Rien à enregistrer : les boutons Enregistrer sont inactifs. Le texte enregistré sert à Ctrl+Z (retour à l'état enregistré).
   ed.setDirty = (value) => {
     ed.dirty = value;
+    if (!value) ed.savedText = ed.markdown();
+    saveBtn.disabled = !value;
+    $('[data-full-save]').disabled = !value;
     $('[data-dot]', saveBtn).hidden = !value;
     saveBtn.classList.toggle('text-brand-700', value);
-    saveBtn.classList.toggle('text-stone-400', !value);
     saveBtn.setAttribute('aria-label', value ? 'Enregistrer' : 'Enregistré');
   };
   ed.on(window, 'beforeunload', (e) => { if (ed.dirty) { e.preventDefault(); e.returnValue = ''; } });
@@ -72,6 +75,8 @@ export function installDocument(ed) {
   let saving = null;
   ed.save = async () => {
     if (saving) return saving;
+    if (!ed.dirty) return true;
+    ed.checkpoint(); // l'état enregistré est une étape de Ctrl+Z
     const text = ed.markdown();
     saving = (async () => {
       try {
