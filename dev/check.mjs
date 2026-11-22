@@ -320,6 +320,82 @@ try {
   ok(b1.loaded && b1.noSave, `bouton Enregistrer : inactif au chargement, save() sans modification n'envoie rien (${JSON.stringify(b1)})`);
   ok(b1.typed && b1.saved, `bouton Enregistrer : actif après une frappe, inactif après l'enregistrement (${JSON.stringify(b1)})`);
   ok(b1.undone && b1.redone, `bouton Enregistrer : annuler jusqu'au texte enregistré le rend inactif, rétablir le réactive (${JSON.stringify(b1)})`);
+  // B2 : brouillon écrit dans le navigateur, sans message du navigateur
+  const b2 = await ev(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const leave = () => { const ev = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(ev); return ev.defaultPrevented; };
+    const draft = (k) => JSON.parse(localStorage.getItem('blockquilt.draft.' + k) || 'null');
+    const open = (options) => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Un', onSave: () => {}, ...options }); return { el, e, type: (t) => { const f = el.querySelector('[data-rich]'); f.textContent = t; f.dispatchEvent(new Event('input', { bubbles: true })); }, close: () => { e.destroy(); el.remove(); } }; };
+    localStorage.removeItem('blockquilt.draft.b2');
+    const out = {};
+    let a = open({ storageKey: 'b2' });
+    a.type('Deux');
+    out.notYet = draft('b2') === null;
+    await wait(1100);
+    const d = draft('b2');
+    out.written = d?.text === 'Deux\\n' && typeof d.at === 'number' && typeof d.base === 'string';
+    out.noPrompt = leave() === false;
+    a.type('Trois'); window.dispatchEvent(new Event('pagehide'));
+    out.pagehide = draft('b2')?.text === 'Trois\\n';
+    await a.e.save(); out.savedDropped = draft('b2') === null;
+    a.type('Quatre'); window.dispatchEvent(new Event('pagehide')); a.e.undo();
+    out.undoDropped = draft('b2') === null && a.e.getMarkdown() === 'Trois\\n';
+    a.type('Cinq'); a.close();
+    out.destroyWritten = draft('b2')?.text === 'Cinq\\n';
+    a = open({ storageKey: 'b2' });
+    out.keptAtMount = draft('b2')?.text === 'Cinq\\n';
+    a.close();
+    a = open({ storageKey: 'b2off', draft: false }); a.type('X');
+    out.optOut = leave() === true && draft('b2off') === null; a.close();
+    a = open({}); a.type('X');
+    out.noKey = leave() === true; a.close();
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => { throw new Error('plein'); };
+    a = open({ storageKey: 'b2full' }); a.type('X');
+    out.full = leave() === true;
+    Storage.prototype.setItem = setItem; a.close();
+    localStorage.setItem('autre', '1');
+    Blockquilt.clearDrafts();
+    out.cleared = draft('b2') === null && !Object.keys(localStorage).some((k) => k.startsWith('blockquilt.')) && localStorage.getItem('autre') === '1';
+    localStorage.removeItem('autre');
+    return out;
+  })()`);
+  ok(b2.notYet && b2.written && b2.noPrompt, `brouillon : écrit 1 s après la frappe, aucun message du navigateur au départ (${JSON.stringify(b2)})`);
+  ok(b2.pagehide && b2.destroyWritten && b2.keptAtMount, `brouillon : écrit quand la page se cache et par destroy(), gardé au montage suivant (${JSON.stringify(b2)})`);
+  ok(b2.savedDropped && b2.undoDropped, `brouillon : effacé après l'enregistrement et après un retour à l'état enregistré (${JSON.stringify(b2)})`);
+  ok(b2.optOut && b2.noKey && b2.full, `brouillon : message du navigateur avec draft: false, sans clé, ou si le stockage refuse (${JSON.stringify(b2)})`);
+  ok(b2.cleared, `brouillon : Blockquilt.clearDrafts() efface les clés blockquilt.* et rien d'autre (${JSON.stringify(b2)})`);
+  // B3 : brouillon proposé par un bandeau, au montage
+  const b3 = await ev(`(() => {
+    const put = (k, d) => localStorage.setItem('blockquilt.draft.' + k, JSON.stringify({ version: null, at: Date.now() - 300000, ...d }));
+    const has = (k) => localStorage.getItem('blockquilt.draft.' + k) !== null;
+    const leave = () => { const ev = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(ev); return ev.defaultPrevented; };
+    const open = (k) => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Un', storageKey: k, onSave: () => {} }); return { el, e, bar: el.querySelector('[data-draft-bar]'), close: () => { e.destroy(); el.remove(); } }; };
+    const out = {};
+    put('b3a', { text: 'Brouillon\\n', base: Blocks.hash('Un\\n') });
+    put('b3b', { text: 'Autre\\n', base: Blocks.hash('Un\\n') });
+    const a = open('b3a'), b = open('b3b');
+    out.shown = !a.bar.hidden && a.bar.textContent.includes('il y a 5 min') && !a.bar.textContent.includes('changé') && a.e.getMarkdown() === 'Un\\n';
+    out.noPrompt = leave() === false;
+    a.bar.querySelector('[data-draft-take]').click();
+    out.taken = a.bar.hidden && a.e.getMarkdown() === 'Brouillon\\n' && !a.el.querySelector('[data-save]').disabled;
+    a.e.undo(); out.undo = a.e.getMarkdown() === 'Un\\n';
+    out.otherStill = !b.bar.hidden && b.e.getMarkdown() === 'Un\\n';
+    b.bar.querySelector('[data-draft-drop]').click();
+    out.dropped = b.bar.hidden && b.e.getMarkdown() === 'Un\\n' && !has('b3b');
+    a.close(); b.close();
+    put('b3c', { text: 'Un\\n', base: Blocks.hash('Un\\n') });
+    const c = open('b3c'); out.same = c.bar.hidden && !has('b3c'); c.close();
+    put('b3d', { text: 'Brouillon\\n', base: Blocks.hash('Ancien\\n') });
+    const d = open('b3d'); out.changed = !d.bar.hidden && d.bar.textContent.includes('Le contenu a changé depuis ce brouillon'); d.close();
+    const n = open('b3none'); out.none = n.bar.hidden; n.close();
+    ['b3a', 'b3b', 'b3c', 'b3d'].forEach((k) => localStorage.removeItem('blockquilt.draft.' + k));
+    return out;
+  })()`);
+  ok(b3.shown && b3.noPrompt && b3.none, `brouillon proposé : bandeau au montage, le texte chargé reste en attendant, aucun message du navigateur (${JSON.stringify(b3)})`);
+  ok(b3.taken && b3.undo, `brouillon proposé : « Reprendre » met le brouillon, à enregistrer, Ctrl+Z rend le texte chargé (${JSON.stringify(b3)})`);
+  ok(b3.otherStill && b3.dropped, `brouillon proposé : deux éditeurs, deux bandeaux indépendants ; « Ignorer » efface le brouillon (${JSON.stringify(b3)})`);
+  ok(b3.same && b3.changed, `brouillon proposé : identique au texte chargé → effacé sans bandeau ; texte changé depuis → mention (${JSON.stringify(b3)})`);
 
   // ---- Phase 5 : interactions ----
   const key = async (k, code, vk, modifiers = 0) => {
@@ -1349,6 +1425,22 @@ try {
     e.destroy(); el.remove();
     return out;
   })()`), 'contentUrl sans source : texte et version lus par l’éditeur');
+  // B3 : brouillon d'une ancienne version → Reprendre puis Enregistrer → feuille de conflit, le serveur n'est pas écrasé.
+  const b3c = await ev(`(async () => {
+    localStorage.setItem('blockquilt.draft.contents/guide-1b', JSON.stringify({ text: 'Brouillon ancien\\n', version: '"00000000"', base: 'x', at: Date.now() }));
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { contentUrl: 'contents/guide-1b', pollSeconds: 0 });
+    const bar = el.querySelector('[data-draft-bar]');
+    for (let i = 0; i < 40 && bar.hidden; i++) await new Promise((r) => setTimeout(r, 50));
+    const out = { shown: !bar.hidden };
+    bar.querySelector('[data-draft-take]').click();
+    out.version = e.version;
+    out.saved = await e.save();
+    out.sheet = el.querySelector('[data-sheet="remote"]').open;
+    e.destroy(); el.remove(); localStorage.removeItem('blockquilt.draft.contents/guide-1b');
+    return out;
+  })()`);
+  ok(b3c.shown && b3c.version === '"00000000"' && b3c.sheet && !fs.readFileSync(path.join(data, 'contents', 'guide-1b.md'), 'utf8').includes('Brouillon ancien'), `brouillon d'une ancienne version : Reprendre, Enregistrer → feuille de conflit, serveur intact (${JSON.stringify(b3c)})`);
   ws.close();
 } catch (error) {
   ok(false, error.message);

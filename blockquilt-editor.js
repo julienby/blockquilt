@@ -23,6 +23,7 @@ import { installDrag } from './editor/drag.js';
 import { installEmoji, emoji } from './editor/emoji.js';
 import { installAi } from './editor/ai.js';
 import { installRemote } from './editor/remote.js';
+import { installDraft, clearDrafts } from './editor/draft.js';
 import { installBar } from './editor/bar.js';
 import { installEvents } from './editor/events.js';
 
@@ -68,22 +69,24 @@ export function mount(element, options = {}) {
   ed.newId = () => 'b' + ed.nextId++;
   ed.def = (b) => Blocks.def(b.type);
 
-  for (const install of [installViews, installDocument, installSheets, installRender, installHistory, installActions, installMedia,
+  for (const install of [installViews, installDocument, installDraft, installSheets, installRender, installHistory, installActions, installMedia,
     installSource, installFullscreen, installDrag, installEmoji, installAi, installRemote, installBar, installEvents]) install(ed);
 
   ed.load(o.source);
-  ed.setDirty(false);
+  ed.setDirty(false, { loaded: true });
   ed.checkpoint();
+  if (o.source || !o.contentUrl) ed.offerDraft(); // sinon : après la lecture du texte (remote.js)
 
   return {
     getMarkdown: ed.markdown,
-    setMarkdown: (md) => { ed.load(md); ed.setDirty(false); ed.resetHistory(); },
+    setMarkdown: (md) => { ed.load(md); ed.setDirty(false, { loaded: true }); ed.resetHistory(); },
     save: ed.save,
     undo: ed.undo,
     redo: ed.redo,
     checkRemote: () => ed.checkRemote(),
     get version() { return ed.version; },
     destroy: () => {
+      ed.writeDraft(); // retiré sans quitter la page (htmx…) : pas de pagehide
       ac.abort();
       timers.forEach(clearTimeout);
       ed.dragEnd(false);
@@ -94,5 +97,5 @@ export function mount(element, options = {}) {
 }
 
 // Objet public : window.Blockquilt.mount, .icons, .emoji (chargement de emoji.json), .clipboard, .emojiData.
-export const Blockquilt = Object.assign(shared, { mount, icons: ICONS, emoji });
+export const Blockquilt = Object.assign(shared, { mount, icons: ICONS, emoji, clearDrafts });
 window.Blockquilt = Blockquilt;

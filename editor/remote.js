@@ -2,17 +2,7 @@
 // L'éditeur lit le texte et sa version (ETag), enregistre par PUT avec If-Match, et ne remplace jamais une version écrite
 // ailleurs (par une IA, un autre onglet…) : il montre les différences et laisse choisir. Il revérifie de temps en temps
 // (`pollSeconds`, 30 par défaut, 0 = jamais) et quand la page redevient visible.
-import { esc } from './shared.js';
-
-// « il y a 3 min » : la date d'une version, pour dire quand et par qui elle a été écrite.
-const ago = (date) => {
-  const s = Math.max(0, Math.round((Date.now() - date) / 1000));
-  if (!Number.isFinite(s)) return '';
-  if (s < 45) return 'à l’instant';
-  if (s < 3600) return `il y a ${Math.round(s / 60) || 1} min`;
-  if (s < 86400) return `il y a ${Math.round(s / 3600)} h`;
-  return 'le ' + new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-};
+import { esc, ago } from './shared.js';
 
 export function installRemote(ed) {
   const { o, $ } = ed;
@@ -122,7 +112,7 @@ export function installRemote(ed) {
   // Version de départ : donnée par l'application (`version`), sinon lue ; sans `source`, le texte aussi.
   if (!ed.version) {
     get().then((r) => {
-      if (!o.source) { ed.load(r.markdown); ed.version = r.version; ed.setDirty(false); ed.resetHistory(); }
+      if (!o.source) { ed.load(r.markdown); ed.version = r.version; ed.setDirty(false, { loaded: true }); ed.resetHistory(); ed.offerDraft(); }
       else arrived(r); // même texte : sa version est adoptée ; sinon le bandeau, et pas d'enregistrement avant un choix
     }).catch((error) => { if (error.name !== 'AbortError') ed.toast(error.message); });
   }

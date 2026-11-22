@@ -11,16 +11,19 @@ export function installDocument(ed) {
 
   // ---- État enregistré / à enregistrer ----
   // Rien à enregistrer : les boutons Enregistrer sont inactifs. Le texte enregistré sert à Ctrl+Z (retour à l'état enregistré).
-  ed.setDirty = (value) => {
+  // Brouillon : écrit 1 s après une modification ; effacé quand il n'y a plus rien à enregistrer,
+  // sauf au chargement d'un texte (`loaded`) : le brouillon d'avant reste à proposer.
+  ed.setDirty = (value, { loaded = false } = {}) => {
     ed.dirty = value;
     if (!value) ed.savedText = ed.markdown();
+    if (value) ed.draftLater();
+    else if (!loaded) ed.dropDraft();
     saveBtn.disabled = !value;
     $('[data-full-save]').disabled = !value;
     $('[data-dot]', saveBtn).hidden = !value;
     saveBtn.classList.toggle('text-brand-700', value);
     saveBtn.setAttribute('aria-label', value ? 'Enregistrer' : 'Enregistré');
   };
-  ed.on(window, 'beforeunload', (e) => { if (ed.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   // ---- Titre et icône : dans le frontmatter ; les autres clés sont gardées dans leur ordre ----
   ed.showIcon = () => { iconBtn.textContent = ed.icon || '📄'; iconBtn.classList.toggle('grayscale', !ed.icon); };
