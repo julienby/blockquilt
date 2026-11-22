@@ -122,6 +122,9 @@ try {
   ok(last.body.messages[1].content.includes('Ne modifie que les blocs 1 à 2'), 'range : la consigne limite les opérations aux blocs collés');
   await post({ scope: 'document', instruction: 'résume', text: 'T', blocks: JSON.stringify(sent) });
   ok(!last.body.messages[1].content.includes('Ne modifie que'), 'sans range : tout le document');
+  const etapes = createAi({ baseUrl, apiKey: 'k', model: 'm', uses: [{ id: 'etapes', label: 'En étapes', instruction: 'En étapes.', output: 'document' }] });
+  const ranged = await etapes.complete({ scope: 'document', use: 'etapes', text: 'T', blocks: sent, range: '1-2' });
+  ok(typeof ranged.operations === 'string' && ranged.markdown === undefined && last.body.messages[1].content.includes('Ne modifie que les blocs 1 à 2'), 'range avec un usage output: document : opérations quand même, jamais le document entier (' + JSON.stringify(ranged) + ')');
   const badRange = await Promise.all(['0-1', '2-1', '1-3', 'x'].map((range) => post({ scope: 'document', instruction: 'x', text: 'T', blocks: JSON.stringify(sent), range })));
   ok(badRange.every((r) => r.status === 400 && r.error === 'range : « a-b », numéros de blocs du document envoyé'), 'range invalide : 400 (' + badRange.map((r) => r.status).join() + ')');
   const small = createAi({ baseUrl, apiKey: 'k', model: 'm', limits: { maxChars: 20 } });

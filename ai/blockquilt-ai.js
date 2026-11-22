@@ -7,7 +7,8 @@
 //   POST → champs (multipart, urlencoded ou JSON) : scope (document | block), use (facultatif), instruction,
 //          text (document complet), block (Markdown du bloc si scope=block),
 //          blocks (scope=document, facultatif : liste JSON de textes, [0] = frontmatter ou "", [n] = Markdown du bloc n),
-//          range (avec blocks, facultatif : « a-b », les seuls blocs à modifier, par exemple ceux qu'on vient de coller)
+//          range (avec blocks, facultatif : « a-b », les seuls blocs à modifier, par exemple ceux qu'on vient de coller ;
+//          réponse toujours en opérations, même pour un usage `output: 'document'`)
 //        → 200 { markdown } (bloc, document sans `blocks`, usage `output: 'document'`)
 //          · 200 { operations } (document avec `blocks` : texte « @@ remplacer | avant | après | supprimer n », « @@ rien » ou vide = rien à changer)
 //          · 400 { error } (demande invalide) · 413 { error } (texte trop long, limits.maxChars)
@@ -108,7 +109,8 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
       range = m && [Number(m[1]), Number(m[2])];
       if (!range || range[0] < 1 || range[0] > range[1] || range[1] >= blocks.length) throw fail(400, 'range : « a-b », numéros de blocs du document envoyé');
     }
-    const output = blocks && use?.output !== 'document' ? 'operations' : 'document';
+    // Avec range, toujours des opérations : un document entier modifierait aussi les blocs hors de la plage.
+    const output = blocks && (range || use?.output !== 'document') ? 'operations' : 'document';
     const ask = { scope, use, output, blocks, range, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
     const size = (output === 'operations' ? blocks.join('').length : ask.text.length) + ask.block.length + ask.instruction.length;
     if (limits.maxChars && size > limits.maxChars) throw fail(413, `Texte trop long pour l’IA : ${size} caractères envoyés, ${limits.maxChars} au plus.`);
