@@ -32,6 +32,9 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
   ${o.contentUrl ? `<div data-remote-bar hidden role="status" class="bq-remote-bar sticky z-10 mx-3 mt-2 flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 py-0.5 pl-3 pr-1 text-sm text-amber-950 sm:mx-6">
     <span data-remote-text class="min-w-0 flex-1 truncate font-semibold"></span>
     <button type="button" data-remote-show class="min-h-11 shrink-0 rounded-xl px-3 font-bold underline">Voir</button></div>` : ''}
+  <div data-save-error hidden role="alert" class="mx-3 mt-2 flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 py-0.5 pl-3 pr-1 text-sm text-amber-950 sm:mx-6">
+    <span data-save-error-text class="min-w-0 flex-1 font-semibold"></span>
+    <button type="button" data-save-error-close class="min-h-11 shrink-0 rounded-xl px-3 underline">Fermer</button></div>
   <div data-draft-bar hidden role="status" class="mx-3 mt-2 flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 py-0.5 pl-3 pr-1 text-sm text-amber-950 sm:mx-6">
     <span data-draft-text class="min-w-0 flex-1 font-semibold"></span>
     <button type="button" data-draft-take class="min-h-11 shrink-0 rounded-xl px-3 font-bold underline">Reprendre</button>

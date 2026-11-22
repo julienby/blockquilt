@@ -76,6 +76,14 @@ export function installDocument(ed) {
     return data;
   };
 
+  // Erreur d'enregistrement : un bandeau qui reste (pas une notification de 1,8 s), jusqu'au prochain succès ou « Fermer ».
+  const errorBar = $('[data-save-error]');
+  ed.saveError = (text) => {
+    $('[data-save-error-text]', errorBar).textContent = text;
+    errorBar.hidden = !text;
+  };
+  ed.on(errorBar, 'click', (e) => { if (e.target.closest('[data-save-error-close]')) ed.saveError(''); });
+
   // ---- Enregistrer : onSave(markdown) ou saveUrl ----
   let saving = null;
   ed.save = async () => {
@@ -93,10 +101,13 @@ export function installDocument(ed) {
           if (!r.ok) throw new Error(j.error || 'Enregistrement impossible');
         } else throw new Error('Enregistrement non configuré');
         if (ed.markdown() === text) ed.setDirty(false);
+        ed.saveError('');
         ed.toast('Enregistré');
         return true;
       } catch (error) {
-        if (error.name !== 'AbortError') ed.toast(error.message);
+        if (error.name === 'AbortError') return false;
+        if (error.conflict) ed.toast(error.message); // la feuille du conflit est ouverte : elle suffit
+        else ed.saveError(error.message);
         return false;
       } finally { saving = null; }
     })();

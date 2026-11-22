@@ -62,7 +62,7 @@ export function installRemote(ed) {
     // Version inconnue (texte de départ différent de celui du serveur) : rien n'est écrit avant un choix.
     if (!ed.version) {
       remote = await get();
-      if (remote.markdown !== text) { show(); throw new Error('Le texte a changé ailleurs : choisir la version à garder'); }
+      if (remote.markdown !== text) { show(); throw Object.assign(new Error('Le texte a changé ailleurs : choisir la version à garder'), { conflict: true }); }
       ed.version = remote.version;
       remote = null;
       return;
@@ -71,7 +71,7 @@ export function installRemote(ed) {
     if (r.status === 412) {
       remote = await get();
       show();
-      throw new Error('Modifié ailleurs entre-temps : choisir la version à garder');
+      throw Object.assign(new Error('Modifié ailleurs entre-temps : choisir la version à garder'), { conflict: true });
     }
     if (!r.ok) throw new Error(serverText(r, await r.text()));
     ed.version = r.headers.get('ETag');

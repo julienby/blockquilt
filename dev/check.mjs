@@ -371,11 +371,11 @@ try {
     const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const real = window.fetch;
     const out = {};
-    const open = (options) => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Un', ...options }); const f = el.querySelector('[data-rich]'); f.textContent = 'Deux'; f.dispatchEvent(new Event('input', { bubbles: true })); return { el, e, toast: () => el.querySelector('[data-toast]').textContent, close: () => { e.destroy(); el.remove(); } }; };
+    const open = (options) => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Un', ...options }); const f = el.querySelector('[data-rich]'); f.textContent = 'Deux'; f.dispatchEvent(new Event('input', { bubbles: true })); return { el, e, toast: () => el.querySelector('[data-toast]').textContent, error: () => { const b = el.querySelector('[data-save-error]'); return b.hidden ? '' : b.querySelector('[data-save-error-text]').textContent; }, close: () => { e.destroy(); el.remove(); } }; };
     window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
     try {
       let a = open({ saveUrl: 'api/save', uploadUrl: 'api/upload', aiUrl: 'api/ai' });
-      out.save = (await a.e.save()) === false && a.toast() === OFF && !a.el.querySelector('[data-save]').disabled;
+      out.save = (await a.e.save()) === false && a.error() === OFF && !a.el.querySelector('[data-save]').disabled;
       const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'p.png', { type: 'image/png' }));
       const fi = a.el.querySelector('[data-file]'); fi.files = dt.files; fi.dispatchEvent(new Event('change', { bubbles: true }));
       await wait(50); out.photo = a.toast() === OFF;
@@ -385,17 +385,30 @@ try {
       a.close();
       window.fetch = async () => new Response('<!doctype html><html><body><h1>Fatal error</h1>' + 'x'.repeat(500) + '</body></html>', { status: 500 });
       a = open({ contentUrl: 'contents/n1', version: '"v1"', pollSeconds: 0 });
-      out.html500 = (await a.e.save()) === false && a.toast() === 'Erreur du serveur (500).';
+      out.html500 = (await a.e.save()) === false && a.error() === 'Erreur du serveur (500).';
       a.close();
       window.fetch = async () => new Response('Contenu verrouillé', { status: 423 });
       a = open({ contentUrl: 'contents/n1', version: '"v1"', pollSeconds: 0 });
-      out.short = (await a.e.save()) === false && a.toast() === 'Contenu verrouillé';
+      out.short = (await a.e.save()) === false && a.error() === 'Contenu verrouillé';
+      a.close();
+      // N2 : l'erreur d'enregistrement reste affichée ; cachée par « Fermer » ou au prochain enregistrement réussi.
+      window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+      a = open({ saveUrl: 'api/save' });
+      await a.e.save(); await wait(2000);
+      out.stays = a.error() === OFF;
+      a.el.querySelector('[data-save-error-close]').click();
+      out.closed = a.error() === '';
+      await a.e.save();
+      window.fetch = async () => new Response('{}', { status: 200 });
+      await a.e.save();
+      out.cleared = a.error() === '' && a.el.querySelector('[data-save]').disabled;
       a.close();
     } finally { window.fetch = real; }
     return out;
   })()`);
   ok(n1.save && n1.photo && n1.ai, `réseau coupé : enregistrer, photo, IA → « Pas de connexion. Rien n’est perdu… » (${JSON.stringify(n1)})`);
   ok(n1.html500 && n1.short, `serveur en erreur : page HTML → « Erreur du serveur (500). », texte court gardé (${JSON.stringify(n1)})`);
+  ok(n1.stays && n1.closed && n1.cleared, `erreur d'enregistrement : reste affichée, « Fermer » la cache, un enregistrement réussi la retire (${JSON.stringify(n1)})`);
   // B3 : brouillon proposé par un bandeau, au montage
   const b3 = await ev(`(() => {
     const put = (k, d) => localStorage.setItem('blockquilt.draft.' + k, JSON.stringify({ version: null, at: Date.now() - 300000, ...d }));
@@ -1425,6 +1438,7 @@ try {
   await ev(`(() => { const b = document.querySelector('[data-bq] [data-body]'); b.textContent = 'Arrivée (éditeur)'; b.dispatchEvent(new InputEvent('input', { bubbles: true })); })()`);
   await key('s', 'KeyS', 83, CTRL);
   await waitFor(() => ev(`document.querySelector('[data-sheet="remote"]').open`), 'feuille du conflit');
+  ok(await ev(`document.querySelector('[data-save-error]').hidden`), 'app : conflit — la feuille suffit, pas de bandeau d’erreur en plus');
   const kept = fs.readFileSync(guide, 'utf8');
   ok(kept.includes('Écrit par l’IA.') && !kept.includes('Arrivée (éditeur)') && await ev(`editor.getMarkdown().includes('Arrivée (éditeur)')`), 'app : conflit (412) — le texte de l’IA n’est pas écrasé, celui de l’éditeur reste à l’écran');
   const diff = await ev(`(() => { const s = document.querySelector('[data-sheet="remote"]'); return { who: s.querySelector('[data-remote-who]').textContent, ops: [...s.querySelectorAll('[data-remote-diff] [data-op]')].map((d) => d.dataset.op + d.textContent.slice(2)) }; })()`);
