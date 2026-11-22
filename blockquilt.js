@@ -473,6 +473,7 @@ const Blocks = {
   /**
    * HTML collé (page web, traitement de texte) → Markdown blockquilt, au mieux. Sans DOM.
    * Seul le texte est gardé : titres, paragraphes, listes, citations, code, photos https, vidéos YouTube et Vimeo, lignes.
+   * Un <div> est un saut de ligne, pas un bloc. Le texte caché (aria-hidden, hidden, display: none) est retiré.
    * La mise en forme du texte passe par htmlToMd. Ce que le noyau ne relit pas à l'identique deviendra un bloc « texte source ».
    */
   fromHtml(html) {
@@ -485,7 +486,13 @@ const Blocks = {
       return m ? decode(m[1] ?? m[2] ?? m[3]).trim() : '';
     };
     const INLINE = { b: 'b', strong: 'b', i: 'i', em: 'i', u: 'u', mark: 'mark', code: 'code', a: 'a' };
-    const BLOCK = /^(p|div|section|article|main|header|footer|h[1-6]|blockquote|pre|figure|figcaption|table|tr|dl|dt|dd|address|details|summary|center)$/;
+    // Un bloc par paragraphe (PARA). Un conteneur (LINE) n'est qu'un saut de ligne : les pages mettent des <div> partout.
+    const PARA = /^(p|h[1-6]|figure|figcaption)$/;
+    const LINE = /^(div|section|article|main|header|footer|table|tr|dl|dt|dd|address|details|summary|center)$/;
+    const VOID = /^(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)$/;
+    // Ce qu'un lecteur d'écran ne lit pas : aria-hidden="true", hidden, display: none. La classe « hidden » ne compte pas.
+    const hidden = (attrs) => attrOf(attrs, 'aria-hidden') === 'true' || /\shidden(?=[\s=]|$)/i.test(attrs.replace(/"[^"]*"|'[^']*'/g, '""'))
+      || /display\s*:\s*none/i.test(attrOf(attrs, 'style'));
     const DROP = [...Blocks.DROP_TAGS, 'nav', 'aside'];
 
     const out = [];
@@ -517,9 +524,22 @@ const Blocks = {
     const re = /<!--[\s\S]*?(?:-->|$)|<![^>]*>|<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[^\s"'>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>`]+))?)*)\s*\/?>/g;
     let at = 0;
     let m;
+    const ws = []; // éléments en white-space: pre… ouverts : { tag, n } (n : balises de même nom ouvertes dedans)
     const text = (t) => {
       if (pre !== null) pre += decode(t);
-      else buf += Blocks.esc(decode(t).replace(/[ \t\n\r\f]+/g, ' '));
+      else if (!ws.length) buf += Blocks.esc(decode(t).replace(/[ \t\n\r\f]+/g, ' '));
+      // Les retours à la ligne du texte comptent ; une ligne vide ouvre un nouveau bloc.
+      else decode(t).split(/\n[ \t\r\f]*\n\s*/).forEach((part, i) => {
+        if (i) { if (lists || quotes) buf += '<br>'; else flush(); }
+        buf += Blocks.esc(part.replace(/[ \t\r\f]+/g, ' ')).replace(/\n/g, '<br>');
+      });
+    };
+    // Saute un élément caché jusqu'à sa balise de fin, en comptant les balises de même nom ouvertes dedans.
+    const skip = (tag) => {
+      let depth = 1;
+      let s;
+      while (depth && (s = re.exec(html))) if (s[2] && s[2].toLowerCase() === tag && !s[0].endsWith('/>')) depth += s[1] ? -1 : 1;
+      at = s ? re.lastIndex : (re.lastIndex = html.length);
     };
     while ((m = re.exec(html))) {
       text(html.slice(at, m.index));
@@ -543,6 +563,16 @@ const Blocks = {
           if (end.exec(html)) at = re.lastIndex = end.lastIndex;
         }
         continue;
+      }
+      if (!close && hidden(attrs)) {
+        if (!VOID.test(tag)) skip(tag);
+        continue;
+      }
+      if (pre === null && !VOID.test(tag)) {
+        const top = ws[ws.length - 1];
+        if (close) { if (top && top.tag === tag) { if (top.n) top.n--; else ws.pop(); } }
+        else if (/white-space\s*:\s*pre/i.test(attrOf(attrs, 'style'))) ws.push({ tag, n: 0 });
+        else if (top && top.tag === tag) top.n++;
       }
       if (pre !== null) {
         if (tag === 'pre' && close) code();
@@ -585,9 +615,9 @@ const Blocks = {
           push(photo(attrOf(attrs, 'alt'), src));
           lastPhoto = { i: out.length - 1, src };
         }
-      } else if (BLOCK.test(tag)) {
+      } else if (PARA.test(tag) || LINE.test(tag)) {
         if (lists) buf += ' ';
-        else if (quotes) buf += '<br>';
+        else if (quotes || LINE.test(tag)) buf += '<br>';
         else {
           flush();
           if (!close && /^h[1-6]$/.test(tag)) kind = tag;

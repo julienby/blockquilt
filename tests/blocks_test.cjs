@@ -401,7 +401,32 @@ for (const f of ['blockquilt-editor.js', ...fs.readdirSync(path.join(ROOT, 'edit
   same('<p>L&#8217;été &amp; l&rsquo;hiver&nbsp;! &#x1F600; &#99999999;</p>', 'L’été & l’hiver ! 😀 �', 'entités décodées');
   same('<hr><h2>Titre <b>gras</b></h2>', '---\n\n## Titre gras', 'ligne, titre sans mise en forme');
   same('<p><b>a</p><p>b</b> <i>c</p>', '**a**\n\nb *c*', 'balises mal fermées : aucun texte perdu');
-  same('<table><tr><th>a</th><td>b</td></tr><tr><td>c</td></tr></table>', 'a b\n\nc', 'tableau : une ligne = un paragraphe');
+  same('<table><tr><th>a</th><td>b</td></tr><tr><td>c</td></tr></table>', 'a b\nc', 'tableau : une ligne du tableau = une ligne du bloc');
+  // Un bloc par paragraphe, titre, liste, citation, code, photo. Un <div> (et les autres conteneurs) : un saut de ligne dans le bloc.
+  same('<div><div>Zach</div><div>8 k abonnés</div></div><div></div><section>20 nov.</section><p>Para</p>', 'Zach\n8 k abonnés\n20 nov.\n\nPara', 'div, section : sauts de ligne, pas de nouveau bloc');
+  // Ce qu'un lecteur d'écran ne lit pas n'est pas collé : aria-hidden="true", hidden, display: none.
+  same('<div>Vues<div aria-hidden="true"><div>1</div><div><div>2</div></div></div> fin</div>', 'Vues fin','aria-hidden : sous-arbre ignoré, div imbriqués compris');
+  same('<p>a</p><div hidden><p>x</p></div><span style="color: red; display: none">y</span><img hidden src="https://e.fr/i.png"><p class="hidden">b</p><input hidden><p>c</p>', 'a\n\nb\n\nc', 'hidden et display: none ignorés ; la classe « hidden » ou un élément vide ne cachent rien d’autre');
+  // white-space: pre / pre-wrap : les retours à la ligne du texte comptent ; une ligne vide = un nouveau bloc.
+  same('<span style="white-space: pre-wrap">Un.\n\nDeux\n#5 x\n</span><a href="https://e.fr/a">lien</a><span style="white-space: pre-wrap">\n#4 y</span>', 'Un.\n\nDeux\n#5 x\n[lien](https://e.fr/a)\n#4 y', 'pre-wrap : lignes gardées, ligne vide = nouveau bloc');
+  same('<span style="white-space: nowrap">a\nb</span><div style="white-space: pre"><span>c\n</span>d</div>e\nf', 'a b\nc\nd\ne f', 'nowrap replié ; pre limité à son élément');
+  // Page YouTube réduite (structure du presse-papiers de Chrome) : compteurs animés aria-hidden, description en pre-wrap.
+  const yt = `<div id="title-row"><div id="title"><h1><yt-formatted-string><br class="Apple-interchange-newline">My Top 5</yt-formatted-string></h1><ytd-badge-supported-renderer><div class="ytBadgeShapeText" aria-hidden="true">IA</div></ytd-badge-supported-renderer></div></div>
+<div id="top-row"><div id="owner"><a href="https://www.youtube.com/@Z"><img width="40" src="https://yt3.ggpht.com/a" alt="Zach"></a><div id="upload-info"><ytd-channel-name><div><div><yt-formatted-string style="white-space: pre;"><a href="https://www.youtube.com/@Z" style="white-space: pre;">Zach Babiarz</a></yt-formatted-string></div></div></ytd-channel-name><yt-formatted-string>8,59 k abonnés</yt-formatted-string></div></div>
+<div id="actions"><button aria-label="J'aime"><yt-animated-rolling-number aria-hidden="true"><span><animated-rolling-character><div> </div><div>1</div><div>2</div></animated-rolling-character></span></yt-animated-rolling-number></button></div></div>
+<div id="bottom-row"><div id="description"><div id="view-count" aria-label="494 vues" style="white-space: pre;"><yt-animated-rolling-number aria-hidden="true"><span><animated-rolling-character><div>4</div><div>9</div></animated-rolling-character></span></yt-animated-rolling-number><yt-formatted-string aria-hidden="true"> vues  </yt-formatted-string></div><yt-formatted-string id="info" style="white-space: pre-wrap;"><span>20 nov. 2026</span><span>  </span><a href="https://www.youtube.com/hashtag/github">#GitHub</a></yt-formatted-string>
+<div id="expanded" style="white-space: pre-wrap;"><span style="white-space: pre-wrap;"><span>5 free GitHub repos.
+
+FREE CHEAT SHEET: all 5 links
+</span><span><a href="https://www.youtube.com/redirect?q=x&amp;v=1">https://guide.zachbabiarz.com/go/repo...</a></span><span>
+
+The 5 free GitHub repos
+#5 Humanizer: makes AI writing sound like a person
+</span><span><a href="https://www.youtube.com/redirect?q=y">https://guide.zachbabiarz.com/go/huma...</a></span></span></div></div></div>`;
+  same(yt, ['# My Top 5', '[Zach Babiarz](https://www.youtube.com/@Z)\n8,59 k abonnés\n20 nov. 2026 [#GitHub](https://www.youtube.com/hashtag/github)\n5 free GitHub repos.',
+    'FREE CHEAT SHEET: all 5 links\n[https://guide.zachbabiarz.com/go/repo...](https://www.youtube.com/redirect?q=x&v=1)',
+    'The 5 free GitHub repos\n#5 Humanizer: makes AI writing sound like a person\n[https://guide.zachbabiarz.com/go/huma...](https://www.youtube.com/redirect?q=y)'].join('\n\n'), 'page YouTube : 4 blocs, sans chiffres des compteurs');
+  ok(types(Blocks.loosen(f(yt))) === 'h1,text,text,text', 'page YouTube : titre puis 3 blocs texte, aucun bloc source');
   // Google Docs : tout est enveloppé dans un <b style="font-weight:normal">, et chaque morceau dans un <span>.
   same('<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-1"><h1 dir="ltr"><span style="font-size:20pt">Titre</span></h1><p dir="ltr"><span style="font-weight:700">Gras</span><span> normal</span></p></b>', '# Titre\n\nGras normal', 'Google Docs');
   same('', '', 'rien');

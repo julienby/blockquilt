@@ -120,7 +120,9 @@ Copier une partie d'une page web (ou d'un Google Docs), puis coller. Le HTML du 
 - listes imbriquées, citations, code, lignes ;
 - photos `https` avec leur légende, vidéos YouTube et Vimeo intégrées.
 
-Retirés : scripts, styles, menus de navigation, images `data:` ou relatives, petites icônes (moins de 48 px). Le gras fait par un style CSS (Google Docs) est perdu : seul le gras balisé reste.
+Un nouveau bloc commence à chaque paragraphe, titre, liste, citation, code ou photo. Un `<div>` (ou `section`, `article`, une ligne de tableau…) n'est qu'un saut de ligne dans le bloc en cours. Dans un texte en `white-space: pre` ou `pre-wrap`, les retours à la ligne sont gardés, et une ligne vide ouvre un nouveau bloc.
+
+Retirés : scripts, styles, menus de navigation, ce qu'un lecteur d'écran ne lit pas (`aria-hidden="true"`, `hidden`, `display: none`), images `data:` ou relatives, petites icônes (moins de 48 px). Le gras fait par un style CSS (Google Docs) est perdu : seul le gras balisé reste.
 
 Où coller :
 
