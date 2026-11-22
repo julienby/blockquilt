@@ -365,6 +365,37 @@ try {
   ok(b2.savedDropped && b2.undoDropped, `brouillon : effacé après l'enregistrement et après un retour à l'état enregistré (${JSON.stringify(b2)})`);
   ok(b2.optOut && b2.noKey && b2.full, `brouillon : message du navigateur avec draft: false, sans clé, ou si le stockage refuse (${JSON.stringify(b2)})`);
   ok(b2.cleared, `brouillon : Blockquilt.clearDrafts() efface les clés blockquilt.* et rien d'autre (${JSON.stringify(b2)})`);
+  // N1 : réseau coupé ou serveur en erreur → message clair
+  const n1 = await ev(`(async () => {
+    const OFF = 'Pas de connexion. Rien n’est perdu : réessayez quand le réseau revient.';
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const real = window.fetch;
+    const out = {};
+    const open = (options) => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Un', ...options }); const f = el.querySelector('[data-rich]'); f.textContent = 'Deux'; f.dispatchEvent(new Event('input', { bubbles: true })); return { el, e, toast: () => el.querySelector('[data-toast]').textContent, close: () => { e.destroy(); el.remove(); } }; };
+    window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+    try {
+      let a = open({ saveUrl: 'api/save', uploadUrl: 'api/upload', aiUrl: 'api/ai' });
+      out.save = (await a.e.save()) === false && a.toast() === OFF && !a.el.querySelector('[data-save]').disabled;
+      const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'p.png', { type: 'image/png' }));
+      const fi = a.el.querySelector('[data-file]'); fi.files = dt.files; fi.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait(50); out.photo = a.toast() === OFF;
+      a.el.querySelector('[data-more]').click(); a.el.querySelector('[data-more-act="ai"]').click();
+      const s = a.el.querySelector('[data-sheet="ai"]'); s.querySelector('[data-ai-instruction]').value = 'Corrige'; s.querySelector('[data-ai-run]').click();
+      await wait(50); out.ai = s.querySelector('[data-ai-error]').textContent === OFF && !s.querySelector('[data-ai-error]').hidden; s.close();
+      a.close();
+      window.fetch = async () => new Response('<!doctype html><html><body><h1>Fatal error</h1>' + 'x'.repeat(500) + '</body></html>', { status: 500 });
+      a = open({ contentUrl: 'contents/n1', version: '"v1"', pollSeconds: 0 });
+      out.html500 = (await a.e.save()) === false && a.toast() === 'Erreur du serveur (500).';
+      a.close();
+      window.fetch = async () => new Response('Contenu verrouillé', { status: 423 });
+      a = open({ contentUrl: 'contents/n1', version: '"v1"', pollSeconds: 0 });
+      out.short = (await a.e.save()) === false && a.toast() === 'Contenu verrouillé';
+      a.close();
+    } finally { window.fetch = real; }
+    return out;
+  })()`);
+  ok(n1.save && n1.photo && n1.ai, `réseau coupé : enregistrer, photo, IA → « Pas de connexion. Rien n’est perdu… » (${JSON.stringify(n1)})`);
+  ok(n1.html500 && n1.short, `serveur en erreur : page HTML → « Erreur du serveur (500). », texte court gardé (${JSON.stringify(n1)})`);
   // B3 : brouillon proposé par un bandeau, au montage
   const b3 = await ev(`(() => {
     const put = (k, d) => localStorage.setItem('blockquilt.draft.' + k, JSON.stringify({ version: null, at: Date.now() - 300000, ...d }));

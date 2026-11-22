@@ -5,7 +5,7 @@
 // Réponse : { operations } (propositions une à une, ai-ops.js) ou { markdown }. Relais prêt à monter : ai/blockquilt-ai.js.
 // { markdown } passe par Blocks.lint et s'affiche à côté de l'actuel ; puis, au choix (toujours annulable) :
 // document : remplacer, ajouter au début, à la fin ; bloc : remplacer, insérer au-dessus, dessous ; ou copier sans rien changer.
-import { esc, shared } from './shared.js';
+import { esc, shared, request } from './shared.js';
 import { installAiOps } from './ai-ops.js';
 
 export function installAi(ed) {
@@ -59,7 +59,7 @@ export function installAi(ed) {
     try {
       // En vue source, le texte de la zone fait foi : pas de blocs à désigner, le document part entier.
       const numbered = !b && ed.mode !== 'source' ? { blocks: ed.aiSnapshot() } : {};
-      const r = await fetch(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
+      const r = await request(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
       const j = await r.json().catch(() => ({}));
       if (mine.signal.aborted) return;
       const ops = r.ok && typeof j.operations === 'string';

@@ -15,3 +15,16 @@ export const ago = (date) => {
   if (s < 86400) return `il y a ${Math.round(s / 3600)} h`;
   return 'le ' + new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 };
+
+// Réseau absent : un message clair au lieu de celui du navigateur (« Failed to fetch », « Load failed »…).
+export const OFFLINE = 'Pas de connexion. Rien n’est perdu : réessayez quand le réseau revient.';
+/** `fetch` dont l'échec réseau devient OFFLINE ; une annulation reste une annulation. */
+export const request = (url, options) => fetch(url, options).catch((error) => {
+  if (error.name === 'AbortError' || error.name === 'TimeoutError') throw error;
+  throw new Error(OFFLINE);
+});
+/** Texte d'erreur du serveur : court, il est gardé ; une page HTML ou un long texte → « Erreur du serveur (500). ». */
+export const serverText = (r, text) => {
+  const t = text.trim();
+  return t && t.length <= 200 && !t.startsWith('<') ? t : `Erreur du serveur (${r.status}).`;
+};

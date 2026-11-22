@@ -1,6 +1,6 @@
 // Dessin : cartes de blocs, intervalles « Insérer / Fusionner », aperçu ; la vue source est dans source.js.
 import { ic } from './icons.js';
-import { esc, attr } from './shared.js';
+import { esc, attr, request } from './shared.js';
 
 export function installRender(ed) {
   const { o, canvas } = ed;
@@ -104,7 +104,7 @@ export function installRender(ed) {
     const text = ed.markdown();
     canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
     try {
-      const html = o.previewUrl ? await (await fetch(o.previewUrl, { method: 'POST', body: ed.form({ text }), signal: ed.ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
+      const html = o.previewUrl ? await (await request(o.previewUrl, { method: 'POST', body: ed.form({ text }), signal: ed.ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
       if (ed.mode === 'preview') {
         canvas.innerHTML = `<div class="bq-column p-1 sm:p-4">${html}</div>`;
         window.BlockquiltContent?.enhance(canvas); // flèches et puces des carrousels, si blockquilt-content.js est chargé
