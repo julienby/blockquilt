@@ -236,6 +236,19 @@ Problème : sans réseau, le message est celui du navigateur (« Failed to fetch
 
 Écarté : réenregistrer seul au retour du réseau (change « j'enregistre quand je veux » ; le brouillon protège déjà le texte).
 
+## 4k. IA en plein écran sur un bloc (validé le 2026-11-22)
+
+Principe : le contexte visuel est le contexte de travail. En plein écran, l'IA ne transforme que le champ texte du bloc (sélection, contenu entier, ou insertion au curseur) ; jamais de bloc créé hors de la vue. Un bloc ne produit que son type : texte → texte. Pour découper : « Scinder » (existe). Bouton seulement si le bloc a un champ `.bq-edit[data-rich]` (texte, citation, encadrés, texte en grand) ; titres, photo, vidéo, code, carte : IA par l'éditeur seulement. Contrat `aiUrl` inchangé (`block` = contenu envoyé).
+
+Précisé le 2026-11-22 : la carte n'a pas de bouton (liste fermée : texte, citation, texte en grand, encadrés). Texte sélectionné → la sélection part, un bouton « Remplacer la sélection ». Curseur seul → le champ entier part, deux boutons « Remplacer le texte » et « Insérer au curseur ».
+
+- [x] **P0 Essais Chromium d'abord** (`dev/check.mjs`) : feuille IA au-dessus du plein écran ; bouton présent / absent ; remplacer la sélection ; insérer au curseur ; remplacer le contenu d'un encadré (titre et icône gardés) ; 2 paragraphes → 2 lignes ; réponse avec photo → boutons désactivés ; un seul Annuler.
+- [x] **P1 Bouton** `data-full-ai` (template, fullscreen `draw`, events).
+- [x] **P2 Ouverture** (`ai.js`) : plage gardée, `ai.sent` (sélection ou champ entier), libellé.
+- [x] **P3 Réponse → texte du champ** : blocs texte / citation / texte en grand → html, titre → texte brut, joints par `<br>` ; sinon boutons désactivés avec la raison.
+- [x] **P4 Boutons et application** : `here` / `all`, `ed.change` + `syncFromDom`, plage vérifiée, focus rendu au champ.
+- [x] **P5 Docs** : README (IA, plein écran), DECISIONS.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

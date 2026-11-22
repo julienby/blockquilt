@@ -1,7 +1,7 @@
 // Assistant IA : `aiUrl` désigne le service ; l'éditeur n'appelle aucun modèle lui-même et ne contient aucune clé.
 // GET aiUrl → { uses: [{ id, label, scopes }] } : les usages de l'application (modèle et consigne restent chez elle) ;
 // sans réponse, les boutons intégrés (consignes écrites). Envoi (POST) : scope (document | block), use, instruction,
-// text (document), block (Markdown du bloc), blocks (document hors vue source : blocs numérotés, voir ai-ops.js),
+// text (document), block (Markdown du bloc ; en plein écran d'un bloc, le texte sélectionné ou tout son champ), blocks (document hors vue source : blocs numérotés, voir ai-ops.js),
 // range (blocs collés : « 4-8 », numéros de `blocks` ; l'IA ne modifie qu'eux).
 // Réponse : { operations } (propositions une à une, ai-ops.js) ou { markdown }. Relais prêt à monter : ai/blockquilt-ai.js.
 // { markdown } passe par Blocks.lint et s'affiche à côté de l'actuel ; puis, au choix (toujours annulable) :
@@ -51,11 +51,33 @@ export function installAi(ed) {
   // id : un bloc ; ids : des blocs collés (tout le document part, l'IA ne modifie qu'eux) ; rien : tout le document.
   ed.openAi = (id, ids = null) => {
     ed.syncFromDom();
-    ai = { id, ids };
     const b = id && ed.blocks.find((x) => x.id === id);
-    $('[data-ai-scope]', sheet).textContent = b ? `Sur ce bloc : ${ed.def(b).label}` : ids ? `Sur les ${ids.length} blocs collés` : 'Sur tout le document';
-    const labels = b ? ['Remplacer le bloc', 'Insérer au-dessus', 'Insérer dessous'] : ['Remplacer le document', 'Ajouter au début', 'Ajouter à la fin'];
+    prepare({ id, ids }, b ? `Sur ce bloc : ${ed.def(b).label}` : ids ? `Sur les ${ids.length} blocs collés` : 'Sur tout le document');
+  };
+  // Plein écran d'un bloc : seul son champ de texte change. Texte sélectionné : il part seul, la réponse le remplace.
+  // Curseur seul : tout le champ part, la réponse s'insère au curseur ou remplace tout le texte.
+  ed.openAiField = (el) => {
+    ed.syncFromDom();
+    const sel = getSelection();
+    const range = sel.rangeCount && el.contains(sel.getRangeAt(0).commonAncestorContainer) ? sel.getRangeAt(0).cloneRange() : document.createRange();
+    if (!el.contains(range.commonAncestorContainer)) { range.selectNodeContents(el); range.collapse(false); }
+    const selected = !range.collapsed;
+    const box = document.createElement('div');
+    box.append(selected ? range.cloneContents() : el.cloneNode(true));
+    const sent = Blocks.htmlToMd(selected ? box.innerHTML : box.firstChild.innerHTML);
+    const b = ed.blocks.find((x) => x.id === el.closest('[data-id]').dataset.id);
+    prepare({ id: b.id, field: { el, range, selected, sent } }, `${selected ? 'Sur la sélection' : 'Sur ce bloc'} : ${ed.def(b).label}`);
+  };
+  const prepare = (state, label) => {
+    ai = state;
+    const { id, field } = state;
+    $('[data-ai-scope]', sheet).textContent = label;
+    const labels = id ? ['Remplacer le bloc', 'Insérer au-dessus', 'Insérer dessous'] : ['Remplacer le document', 'Ajouter au début', 'Ajouter à la fin'];
     ['replace', 'start', 'end'].forEach((k, i) => { $(`[data-ai-apply="${k}"]`, sheet).textContent = labels[i]; });
+    sheet.querySelectorAll('[data-ai-apply]').forEach((x) => { x.hidden = !!field; });
+    $('[data-ai-field="here"]', sheet).hidden = !field;
+    $('[data-ai-field="here"]', sheet).textContent = field?.selected ? 'Remplacer la sélection' : 'Insérer au curseur';
+    $('[data-ai-field="all"]', sheet).hidden = !field || field.selected;
     $('[data-ai-form]', sheet).hidden = false;
     $('[data-ai-result]', sheet).hidden = true;
     $('[data-ai-instruction]', sheet).value = '';
@@ -63,7 +85,7 @@ export function installAi(ed) {
     ed.openSheet('ai');
     loadUses().then((list) => {
       if (!list || !ai || ai.id !== id) return;
-      const scope = b ? 'block' : 'document';
+      const scope = id ? 'block' : 'document';
       $('[data-ai-uses]', sheet).innerHTML = list.filter((u) => !u.scopes || u.scopes.includes(scope))
         .map((u) => `<button type="button" data-ai-use="${esc(u.id).replace(/"/g, '&quot;')}" class="${useCls}">${esc(u.label)}</button>`).join('');
     });
@@ -85,7 +107,8 @@ export function installAi(ed) {
     try {
       // En vue source, le texte de la zone fait foi : pas de blocs à désigner, le document part entier.
       const numbered = !b && ed.mode !== 'source' ? ed.aiSnapshot(ai.ids) : {};
-      const r = await request(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
+      const sent = ai.field ? ai.field.sent : b ? Blocks.toMarkdown(b) : null;
+      const r = await request(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: sent } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
       const j = await r.json().catch(() => ({}));
       if (mine.signal.aborted) return;
       const ops = r.ok && typeof j.operations === 'string';
@@ -104,11 +127,17 @@ export function installAi(ed) {
       const lint = $('[data-ai-lint]', sheet);
       lint.hidden = !problems.length;
       lint.innerHTML = problems.map((p) => `<li>Ligne ${p.line} : ${esc(p.message)}</li>`).join('');
-      $('[data-ai-force-wrap]', sheet).hidden = !problems.length;
+      if (ai.field) {
+        const fit = asField(ai.markdown);
+        ai.html = fit.html ?? null;
+        $('[data-ai-why]', sheet).textContent = fit.why ?? '';
+      }
+      $('[data-ai-why]', sheet).hidden = ai.html !== null;
+      $('[data-ai-force-wrap]', sheet).hidden = !problems.length || ai.html === null;
       $('[data-ai-force]', sheet).checked = false;
-      sheet.querySelectorAll('[data-ai-apply]').forEach((x) => { x.disabled = problems.length > 0; });
+      enable(!problems.length);
       const show = (md) => Blocks.toHtml(md, { media: o.media, title: !b });
-      $('[data-ai-before]', sheet).innerHTML = show(b ? Blocks.toMarkdown(b) : text);
+      $('[data-ai-before]', sheet).innerHTML = show(sent ?? text);
       $('[data-ai-after]', sheet).innerHTML = show(ai.markdown);
       $('[data-ai-form]', sheet).hidden = true;
       $('[data-ai-result]', sheet).hidden = false;
@@ -120,6 +149,32 @@ export function installAi(ed) {
       button.disabled = false;
       button.querySelector('span').textContent = 'Envoyer';
     }
+  };
+  // Réponse → HTML d'un champ de texte, une ligne par bloc : texte, citation et texte en grand gardent leur mise en forme,
+  // un titre devient du texte simple. Tout autre bloc (photo, liste à part, encadré…) ne peut pas entrer dans le champ.
+  const asField = (md) => {
+    const blocks = Blocks.parse(md).blocks;
+    const other = blocks.find((x) => !['text', 'quote', 't1', 't2', 't3', 'h1', 'h2', 'h3'].includes(x.type));
+    if (other) return { why: `La réponse contient un bloc « ${ed.def(other).label} » : il ne peut pas entrer dans ce texte. Copiez la réponse, ou utilisez l’IA de l’éditeur.` };
+    if (!blocks.length) return { why: 'La réponse de l’IA est vide.' };
+    return { html: blocks.map((x) => (['h1', 'h2', 'h3'].includes(x.type) ? esc(Blocks.stripTags(x.html)) : x.html)).join('<br>') };
+  };
+  // Boutons d'application : actifs si la réponse est sans alerte (ou appliquée malgré elles) ; ceux du champ, si elle y entre.
+  const enable = (yes) => {
+    sheet.querySelectorAll('[data-ai-apply]').forEach((x) => { x.disabled = !yes; });
+    sheet.querySelectorAll('[data-ai-field]').forEach((x) => { x.disabled = !yes || ai.html === null; });
+  };
+  // how : here (sélection remplacée, ou insertion au curseur) | all (tout le texte du champ). Une seule étape d'annulation.
+  const applyField = (how) => {
+    const { el, range } = ai.field;
+    if (!el.isConnected || !el.contains(range.commonAncestorContainer)) return ed.toast('Le texte a changé : relancez l’IA');
+    ed.change(() => {
+      if (how === 'all') el.innerHTML = ai.html;
+      else { range.deleteContents(); range.insertNode(range.createContextualFragment(ai.html)); }
+      ed.syncFromDom();
+    });
+    ed.blockFull.querySelector('[data-rich]')?.focus();
+    ed.toast('Proposition appliquée');
   };
   // how : replace | start | end. Bloc : remplacer, au-dessus, dessous. Document : Blocks.combine (replace | prepend | append).
   const apply = (how) => {
@@ -151,6 +206,8 @@ export function installAi(ed) {
     }
     const how = e.target.closest('[data-ai-apply]')?.dataset.aiApply;
     if (how) { sheet.close(); apply(how); }
+    const where = e.target.closest('[data-ai-field]')?.dataset.aiField;
+    if (where) { sheet.close(); applyField(where); }
   });
-  ed.on(sheet, 'change', (e) => { if (e.target.matches('[data-ai-force]')) sheet.querySelectorAll('[data-ai-apply]').forEach((x) => { x.disabled = !e.target.checked; }); });
+  ed.on(sheet, 'change', (e) => { if (e.target.matches('[data-ai-force]')) enable(e.target.checked); });
 }

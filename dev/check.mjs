@@ -1409,6 +1409,77 @@ try {
     return none;
   })()`), 'sans aiUrl : aucun bouton IA');
 
+  // ---- 4k : IA en plein écran sur un bloc. Éditeur à part ; la réponse de l'IA est imposée (fetch remplacé dans la page). ----
+  // select : [début, fin] dans le premier nœud texte du champ (début = fin : curseur). click : here | all | rien.
+  const fullAi = (source, { select = [0, 0], answer = 'X', click = '', aiUrl = 'api/ai' } = {}) => ev(`(async () => {
+    const wait = async (f) => { for (let i = 0; i < 100 && !f(); i++) await new Promise((r) => setTimeout(r, 50)); return f(); };
+    const real = window.fetch;
+    let sent = null;
+    window.fetch = async (url, init) => {
+      if (init?.method !== 'POST') return new Response('{}', { status: 404 });
+      sent = Object.fromEntries(init.body);
+      return new Response(JSON.stringify({ markdown: ${JSON.stringify(answer)} }), { headers: { 'Content-Type': 'application/json' } });
+    };
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: ${JSON.stringify(source)}, ${aiUrl ? `aiUrl: '${aiUrl}'` : ''} });
+    const $ = (s) => el.querySelector(s), $$ = (s) => [...el.querySelectorAll(s)];
+    const visible = (x) => !!x && x.offsetParent !== null;
+    const out = {};
+    try {
+      $('[data-canvas] [data-id] [data-expand]').click();
+      const full = $('[data-block-full]');
+      out.button = visible(full.querySelector('[data-full-ai]'));
+      if (!out.button) return out;
+      const f = full.querySelector('[data-rich]');
+      f.focus();
+      const r = document.createRange(); r.setStart(f.firstChild, ${select[0]}); r.setEnd(f.firstChild, ${select[1]});
+      getSelection().removeAllRanges(); getSelection().addRange(r);
+      full.querySelector('[data-full-ai]').click();
+      const sheet = $('[data-sheet="ai"]');
+      const box = sheet.getBoundingClientRect();
+      out.onTop = sheet.open && full.open && sheet.contains(document.elementFromPoint(box.x + box.width / 2, box.y + 20));
+      out.scope = $('[data-ai-scope]').textContent;
+      $('[data-ai-instruction]').value = 'x'; $('[data-ai-run]').click();
+      await wait(() => !$('[data-ai-result]').hidden);
+      out.sentScope = sent?.scope; out.sentBlock = sent?.block;
+      out.buttons = $$('[data-ai-field]').filter(visible).map((b) => b.textContent + (b.disabled ? ' (désactivé)' : '')).join('|');
+      out.others = $$('[data-ai-apply]').some(visible);
+      out.why = visible($('[data-ai-why]')) ? $('[data-ai-why]').textContent : '';
+      if (${JSON.stringify(click)}) {
+        $('[data-ai-field="${click}"]').click();
+        await wait(() => !sheet.open);
+        out.md = e.getMarkdown();
+        out.html = full.querySelector('[data-rich]')?.innerHTML;
+        out.focus = full.open && document.activeElement === full.querySelector('[data-rich]');
+        out.count = Blocks.parse(out.md).blocks.length;
+        e.undo();
+        out.undone = e.getMarkdown();
+      } else { out.md = e.getMarkdown(); sheet.close(); }
+      return out;
+    } finally { window.fetch = real; e.destroy(); el.remove(); }
+  })()`);
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    const off = await Promise.all(['## Titre', '```\nx\n```', ':::card\n### Carte\nTexte.\n:::'].map((s) => fullAi(s)));
+    const noAi = await fullAi('Un texte.', { aiUrl: '' });
+    ok(off.every((x) => x.button === false) && noAi.button === false, `${width} px, IA plein écran : pas de bouton sur un titre, du code, une carte, ni sans aiUrl`);
+    const sel = await fullAi('Bonjour le monde.', { select: [11, 16], answer: 'MONDE', click: 'here' });
+    ok(sel.button && sel.onTop, `${width} px, IA plein écran : bouton présent, feuille IA au-dessus du plein écran`);
+    ok(sel.scope === 'Sur la sélection : Texte' && sel.sentScope === 'block' && sel.sentBlock === 'monde', `${width} px, IA plein écran : la sélection part seule (${JSON.stringify([sel.scope, sel.sentScope, sel.sentBlock])})`);
+    ok(sel.buttons === 'Remplacer la sélection' && !sel.others, `${width} px, IA plein écran : un seul bouton avec une sélection (${sel.buttons})`);
+    ok(sel.md === 'Bonjour le MONDE.\n' && sel.focus && sel.undone === 'Bonjour le monde.\n', `${width} px, IA plein écran : sélection remplacée, focus rendu au champ, un seul Annuler (${JSON.stringify([sel.md, sel.undone])})`);
+    const cur = await fullAi('Avant. Après.', { select: [7, 7], answer: 'Milieu. ', click: 'here' });
+    ok(cur.scope === 'Sur ce bloc : Texte' && cur.sentBlock === 'Avant. Après.' && cur.buttons === 'Insérer au curseur|Remplacer le texte', `${width} px, IA plein écran : curseur seul → le champ entier part, deux boutons (${cur.buttons})`);
+    ok(cur.md === 'Avant. Milieu.Après.\n' && cur.undone === 'Avant. Après.\n', `${width} px, IA plein écran : inséré au curseur, un seul Annuler (${JSON.stringify(cur.md)})`);
+    const tip = await fullAi('> [!tip] 🔑 La clé\n> Sous le pot.', { answer: 'Dans la boîte.', click: 'all' });
+    ok(tip.md === '> [!tip] 🔑 La clé\n> Dans la boîte.\n' && tip.undone === '> [!tip] 🔑 La clé\n> Sous le pot.\n', `${width} px, IA plein écran : texte de l’encadré remplacé, titre et icône gardés (${JSON.stringify(tip.md)})`);
+    const two = await fullAi('Un.', { answer: 'Premier.\n\nSecond.', click: 'all' });
+    ok(two.html === 'Premier.<br>Second.' && two.count === 1, `${width} px, IA plein écran : 2 paragraphes → 2 lignes du même bloc (${JSON.stringify(two.html)})`);
+    const photo = await fullAi('Un.', { answer: 'Texte.\n\n![](https://example.com/a.png)' });
+    ok(photo.buttons === 'Insérer au curseur (désactivé)|Remplacer le texte (désactivé)' && photo.why.includes('Photo') && photo.md === 'Un.\n', `${width} px, IA plein écran : réponse avec une photo → boutons désactivés, raison donnée (${photo.why})`);
+  }
+  await viewport(375);
+
   // ---- Phase 10 : démo complète, accessibilité, parcours au clavier ----
   fs.rmSync(doc);
   await viewport(375);

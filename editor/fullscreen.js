@@ -4,6 +4,8 @@
 import { ic } from './icons.js';
 
 const WIDTHS = [['40rem', 'étroite'], ['48rem', 'moyenne'], ['100%', 'pleine']];
+// Blocs dont le plein écran offre l'IA sur leur texte (un seul champ de texte mis en forme). Les autres : IA par l'éditeur.
+const FIELD_AI = ['text', 'quote', 't1', 't2', 't3', ...Blocks.CALLOUTS];
 
 export function installFullscreen(ed) {
   const { app, element, editorFull, blockFull, inner, sheets, $ } = ed;
@@ -69,6 +71,8 @@ export function installFullscreen(ed) {
     $('[data-block-full-body]', blockFull).innerHTML = `<div data-id="${id}" data-view="${view}" class="bq-focus">${tools}${ed.editorOf(b).edit(b, ed.ui)}</div>`;
     $('[data-full-prev]', blockFull).disabled = !neighbour(id, -1);
     $('[data-full-next]', blockFull).disabled = !neighbour(id, 1);
+    const ai = blockFull.querySelector('[data-full-ai]');
+    if (ai) ai.hidden = !FIELD_AI.includes(b.type);
     return true;
   };
   // Après un redessin de la page (ordre ou retrait d'une photo…), le dialogue montre le bloc à jour.

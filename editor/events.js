@@ -42,6 +42,7 @@ export function installEvents(ed) {
     if (hit('[data-ai]')) return ed.openAi(null);
     if (hit('[data-more]')) return ed.openSheet('more', hit('[data-more]'));
     if (hit('[data-full-save]')) return ed.save();
+    if (hit('[data-full-ai]')) return ed.openAiField(blockFull.querySelector('[data-rich]'));
     if (hit('[data-full-prev]')) return ed.stepBlockFull(-1);
     if (hit('[data-full-next]')) return ed.stepBlockFull(1);
     if (hit('[data-block-full-close]')) return blockFull.close();

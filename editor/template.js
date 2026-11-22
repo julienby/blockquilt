@@ -95,7 +95,10 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
       <p class="mt-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">Proposition de l’IA</p>
       <div data-ai-after class="bq-content mt-1 max-h-64 overflow-auto rounded-xl border border-amber-200 bg-white p-3 text-sm"></div>
       <p class="mt-3 text-[11px] font-bold uppercase tracking-wider text-stone-400">Que faire de la proposition ?</p>
+      <p data-ai-why role="alert" hidden class="mt-1 rounded-xl bg-red-50 p-3 text-sm text-red-800"></p>
       <div class="mt-1 grid grid-cols-2 gap-2">
+        <button type="button" data-ai-field="here" hidden class="col-span-2 min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white disabled:opacity-40">Insérer au curseur</button>
+        <button type="button" data-ai-field="all" hidden class="col-span-2 min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold disabled:opacity-40">Remplacer le texte</button>
         <button type="button" data-ai-apply="replace" class="col-span-2 min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white disabled:opacity-40">Remplacer le document</button>
         <button type="button" data-ai-apply="start" class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold disabled:opacity-40">Ajouter au début</button>
         <button type="button" data-ai-apply="end" class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold disabled:opacity-40">Ajouter à la fin</button>
@@ -116,6 +119,7 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
       <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-500"></span>
       <button type="button" data-full-prev aria-label="Bloc précédent" title="Bloc précédent" class="bq-btn bq-muted">${ic('chevron_up')}</button>
       <button type="button" data-full-next aria-label="Bloc suivant" title="Bloc suivant" class="bq-btn bq-muted">${ic('chevron_down')}</button>
+      ${o.aiUrl ? `<button type="button" data-full-ai hidden aria-label="Assistant IA sur ce texte" title="Assistant IA sur ce texte" class="bq-btn bq-muted">${ic('wand')}</button>` : ''}
       <button type="button" data-full-save aria-label="Enregistrer" title="Enregistrer (Ctrl+S)" class="bq-btn bq-muted">${ic('save')}</button>
       <button type="button" data-width aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn bq-muted hidden sm:inline-flex">${ic('width')}</button>
       <button type="button" data-block-full-close aria-label="Quitter le plein écran" title="Quitter le plein écran" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">
