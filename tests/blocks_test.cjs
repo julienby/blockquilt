@@ -105,6 +105,14 @@ for (const md of ['Bonjour **tout le monde**, voir *ici*.', 'Ligne un\nLigne deu
 ok(['| a | b |\n|---|---|\n| 1 | 2 |', '#### Titre quatre', 'a\n---', ':::columns\nx\n:::'].every((md) => kind(md) === 'raw' && Blocks.toMarkdown(Blocks.fromMarkdown(md)) === md), 'ce que l’éditeur ne sait pas refaire reste intact (tableau, titre ####, « --- » collé, colonnes)');
 ok(Blocks.toMarkdown(Blocks.fromMarkdown('- pain \n- lait')) === '- pain\n- lait', 'espaces en fin de ligne : ignorés');
 
+// Texte venu d'ailleurs (collage, réponse IA) : un bloc non reconnu sans signe de structure en tête devient un texte.
+ok(kind('\\#5 **Humanizer** : x') === 'raw', 'loosen : un fichier reste strict (\\#5 → bloc source)');
+ok(Blocks.loosen('\\#5 **Humanizer** : x\n\n\\#4 y') === '#5 **Humanizer** : x\n\n#4 y\n', 'loosen : « \\# » inutile → texte, réécrit sans le « \\ »');
+ok(['__gras__ et ~~barré~~', 'a \\# b', 'Prix \\$5'].every((md) => kind(md) === 'raw' && types(Blocks.loosen(md)) === 'text'), 'loosen : écritures non canoniques → texte');
+ok(['| a | b |\n|---|---|\n| 1 | 2 |', '<div>x</div>', ':::autre\nx\n:::', '#### Titre quatre', 'a\n---'].every((md) => Blocks.loosen(md) === md + '\n'), 'loosen : structure non reconnue (tableau, HTML, :::, ####, ---) → gardée telle quelle');
+ok(Blocks.loosen('---\ntitle: T\n---\n\n\\#5 x') === '---\ntitle: T\n---\n\n#5 x\n', 'loosen : frontmatter gardé');
+ok(Blocks.loosen('## Titre\n\nUn **texte**.') === '## Titre\n\nUn **texte**.\n', 'loosen : texte déjà reconnu → identique');
+
 // ---- Ce que produit le navigateur en modifiant ----
 const md = (html, type = 'text') => Blocks.toMarkdown({ type, html });
 ok(md('un <b>gras </b>mot') === 'un **gras** mot', 'gras : les espaces sortent des **');

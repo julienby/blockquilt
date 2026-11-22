@@ -160,7 +160,7 @@ export function installActions(ed) {
   // Markdown collé → blocs à la place `at`. `replace` : le bloc à cette place (vide) est remplacé. Un seul « Annuler ».
   // `web` : collage d'une page web, ses photos sont ensuite rapatriées (ed.importPhotos).
   ed.pasteBlocks = (md, at, { replace = false, web = false } = {}) => {
-    const fresh = Blocks.parse(md).blocks.filter((b) => !Blocks.isEmpty(b)).map((b) => ({ id: ed.newId(), ...b }));
+    const fresh = Blocks.parse(Blocks.loosen(md)).blocks.filter((b) => !Blocks.isEmpty(b)).map((b) => ({ id: ed.newId(), ...b }));
     if (!fresh.length) return ed.toast('Presse-papiers vide');
     ed.change(() => ed.blocks.splice(at, replace ? 1 : 0, ...fresh));
     ed.focusCard(fresh[fresh.length - 1].id);

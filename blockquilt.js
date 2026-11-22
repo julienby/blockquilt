@@ -105,6 +105,23 @@ const Blocks = {
     return { meta: fm.meta, blocks: chunks.map((c) => Blocks.fromMarkdown(c.text)) };
   },
 
+  /**
+   * Texte venu d'ailleurs (collage, réponse IA) → texte où un bloc non reconnu sans signe de structure en tête
+   * (pas `#… `, `>`, `|`, `:::`, ``` ``` ```, `---`, `<`) devient un bloc texte. Ce qui ne s'affichait pas reste visible tel quel.
+   * Un fichier ouvert reste strict (parse) : son écriture d'origine est gardée.
+   */
+  loosen(markdown) {
+    const { meta, blocks } = Blocks.parse(markdown);
+    const loose = blocks.map((b) => {
+      const t = b.type === 'raw' ? Blocks.tidy(b.md) : '';
+      const m = t && !t.startsWith('<') ? Blocks.types.text.match(t) : null;
+      if (!m) return b;
+      const { md, ...rest } = b;
+      return { ...rest, type: 'text', ...m };
+    });
+    return Blocks.serialize(meta, loose);
+  },
+
   /** { meta, blocks } → texte complet. Les blocs vides disparaissent. */
   serialize(meta, blocks) {
     const keys = Object.keys(meta || {});

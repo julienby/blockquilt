@@ -99,7 +99,7 @@ export function installAi(ed) {
         $('[data-ai-result]', sheet).hidden = false;
         return;
       }
-      ai.markdown = j.markdown.replace(/\r\n/g, '\n');
+      ai.markdown = Blocks.loosen(j.markdown.replace(/\r\n/g, '\n'));
       const problems = Blocks.lint(ai.markdown);
       const lint = $('[data-ai-lint]', sheet);
       lint.hidden = !problems.length;

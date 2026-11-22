@@ -82,6 +82,7 @@ export function installAiOps(ed, sheet) {
     items = [];
     let unchanged = 0;
     for (const op of parsed.ops || []) {
+      if (op.mode !== 'remove') op.markdown = Blocks.fragment(Blocks.loosen(op.markdown));
       // Un modèle recopie parfois un bloc sans rien changer : ce n'est pas une proposition.
       if (op.mode === 'replace' && op.markdown === Blocks.fragment(before(op))) unchanged++;
       else items.push({ op, alerts: alertsOf(op) });
