@@ -39,6 +39,10 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
     <span data-draft-text class="min-w-0 flex-1 font-semibold"></span>
     <button type="button" data-draft-take class="min-h-11 shrink-0 rounded-xl px-3 font-bold underline">Reprendre</button>
     <button type="button" data-draft-drop class="min-h-11 shrink-0 rounded-xl px-3 underline">Ignorer</button></div>
+  ${o.aiUrl ? `<div data-pasted hidden role="status" class="mx-3 mt-2 flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 py-0.5 pl-3 pr-1 text-sm text-amber-950 sm:mx-6">
+    <span data-pasted-text class="min-w-0 flex-1 font-semibold"></span>
+    <button type="button" data-pasted-ai class="min-h-11 shrink-0 rounded-xl px-3 font-bold underline">IA sur ces blocs</button>
+    <button type="button" data-pasted-close class="min-h-11 shrink-0 rounded-xl px-3 underline">Fermer</button></div>` : ''}
   <div data-canvas class="flex-1 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
   <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 text-white shadow-2xl">
     <div data-bar-clip hidden role="group" aria-label="Presse-papiers" class="flex basis-full justify-center gap-1 border-b border-white/15 py-1">

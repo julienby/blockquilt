@@ -6,7 +6,8 @@
 //   GET  → { uses: [{ id, label, scopes }] }   les usages proposés (boutons de la feuille IA)
 //   POST → champs (multipart, urlencoded ou JSON) : scope (document | block), use (facultatif), instruction,
 //          text (document complet), block (Markdown du bloc si scope=block),
-//          blocks (scope=document, facultatif : liste JSON de textes, [0] = frontmatter ou "", [n] = Markdown du bloc n)
+//          blocks (scope=document, facultatif : liste JSON de textes, [0] = frontmatter ou "", [n] = Markdown du bloc n),
+//          range (avec blocks, facultatif : « a-b », les seuls blocs à modifier, par exemple ceux qu'on vient de coller)
 //        → 200 { markdown } (bloc, document sans `blocks`, usage `output: 'document'`)
 //          · 200 { operations } (document avec `blocks` : texte « @@ remplacer | avant | après | supprimer n », « @@ rien » ou vide = rien à changer)
 //          · 400 { error } (demande invalide) · 413 { error } (texte trop long, limits.maxChars)
@@ -52,7 +53,7 @@ Règles :
  *   OpenRouter `{ reasoning: { effort: 'low' } }` : un modèle qui « réfléchit » peut épuiser max_tokens avant de répondre ;
  * maxTokens : longueur maximale de la réponse (un document entier : 16 000 par défaut) ;
  * timeout : attente maximale du modèle en ms (120 000 par défaut ; au-delà, 504) ; maxBytes : taille maximale de la demande reçue (2 Mo ; au-delà, 413) ;
- * fallback({ scope, instruction, text, block, blocks, use, output }) : réponse sans clé (démo, essais), Markdown ou opérations ;
+ * fallback({ scope, instruction, text, block, blocks, range, use, output }) : réponse sans clé (démo, essais), Markdown ou opérations ;
  * limits : { maxChars, perUserDay, globalDay } (absent ou 0 = pas de limite). maxChars : texte (ou blocs) + bloc + consigne envoyés.
  *   perUserDay, globalDay : jetons du jour (usage.total_tokens du modèle), par personne et pour tout le site ;
  *   compteurs en mémoire, remis à zéro à minuit (heure du serveur) et au redémarrage ;
@@ -68,7 +69,7 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     if (spent.day !== day) Object.assign(spent, { day, global: 0, users: new Map() });
   };
 
-  const prompt = ({ scope, instruction, text, block, blocks, use, output }) => {
+  const prompt = ({ scope, instruction, text, block, blocks, range, use, output }) => {
     const ops = output === 'operations';
     const doc = ops ? 'Document :\n\n' + blocks.map((b, n) => `[${n}]\n${b || (n ? '' : '(pas de frontmatter)')}`).join('\n\n') + '\n\n'
       : scope === 'block' ? `Document complet, pour le contexte :\n\n${text}\n\n---\n\nBloc à modifier :\n\n${block}\n\n`
@@ -77,7 +78,9 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
       system: 'Tu modifies un contenu au format blockquilt. '
         + (ops ? OPERATIONS : 'Réponds uniquement avec le Markdown demandé, sans explication ni bloc de code autour.')
         + (use?.instruction ? `\n\nTâche : ${use.instruction}` : '') + '\n\n' + FORMAT,
-      user: doc + (instruction ? `Consigne : ${instruction}\n\n` : '')
+      user: doc
+        + (ops && range ? `Ne modifie que les blocs ${range[0]} à ${range[1]} (les blocs collés) : « remplacer », « supprimer », « avant » et « après » seulement sur ces numéros. Les autres blocs servent de contexte.\n\n` : '')
+        + (instruction ? `Consigne : ${instruction}\n\n` : '')
         + (ops ? 'Réponds par des opérations, ou par « @@ rien ».' : scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
     };
   };
@@ -99,8 +102,14 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
       try { blocks = typeof req.blocks === 'string' ? JSON.parse(req.blocks) : req.blocks; } catch { blocks = null; }
       if (!Array.isArray(blocks) || !blocks.length || !blocks.every((b) => typeof b === 'string')) throw fail(400, 'blocks : liste JSON de textes attendue');
     }
+    let range = null;
+    if (blocks && req.range !== undefined && req.range !== '') {
+      const m = /^(\d+)-(\d+)$/.exec(String(req.range));
+      range = m && [Number(m[1]), Number(m[2])];
+      if (!range || range[0] < 1 || range[0] > range[1] || range[1] >= blocks.length) throw fail(400, 'range : « a-b », numéros de blocs du document envoyé');
+    }
     const output = blocks && use?.output !== 'document' ? 'operations' : 'document';
-    const ask = { scope, use, output, blocks, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
+    const ask = { scope, use, output, blocks, range, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
     const size = (output === 'operations' ? blocks.join('').length : ask.text.length) + ask.block.length + ask.instruction.length;
     if (limits.maxChars && size > limits.maxChars) throw fail(413, `Texte trop long pour l’IA : ${size} caractères envoyés, ${limits.maxChars} au plus.`);
     const answer = (out) => ({ [output === 'operations' ? 'operations' : 'markdown']: out });

@@ -116,6 +116,14 @@ try {
   ok((await post({ scope: 'document', instruction: 'x', text: 'T' })).markdown === 'Réécrit.\n', 'sans blocks : document entier, comme avant');
   ok((await post({ scope: 'block', instruction: 'x', text: 'T', block: 'B', blocks: JSON.stringify(sent) })).markdown === 'Réécrit.\n', 'sur un bloc : rien ne change');
   ok((await post({ scope: 'document', instruction: 'x', text: 'T', blocks: '{"a":1}' })).error === 'blocks : liste JSON de textes attendue', 'blocks mal formé : 400');
+  // C4 : `range` (blocs collés) → l'IA ne modifie que ces blocs ; numéros hors du document envoyé → 400.
+  answer = { status: 200, body: { choices: [{ message: { content: '@@ rien' } }] } };
+  await post({ scope: 'document', instruction: 'résume', text: 'T', blocks: JSON.stringify(sent), range: '1-2' });
+  ok(last.body.messages[1].content.includes('Ne modifie que les blocs 1 à 2'), 'range : la consigne limite les opérations aux blocs collés');
+  await post({ scope: 'document', instruction: 'résume', text: 'T', blocks: JSON.stringify(sent) });
+  ok(!last.body.messages[1].content.includes('Ne modifie que'), 'sans range : tout le document');
+  const badRange = await Promise.all(['0-1', '2-1', '1-3', 'x'].map((range) => post({ scope: 'document', instruction: 'x', text: 'T', blocks: JSON.stringify(sent), range })));
+  ok(badRange.every((r) => r.status === 400 && r.error === 'range : « a-b », numéros de blocs du document envoyé'), 'range invalide : 400 (' + badRange.map((r) => r.status).join() + ')');
   const small = createAi({ baseUrl, apiKey: 'k', model: 'm', limits: { maxChars: 20 } });
   ok(await small.complete({ scope: 'document', instruction: 'x', text: 'T', blocks: ['', 'a'.repeat(30)] }).then(() => false, (e) => e.status === 413), 'opérations : maxChars compte les blocs envoyés');
   let seenAsk = null;

@@ -205,7 +205,7 @@ Objectif : permettre à n'importe quel serveur (Node, PHP, Python) de générer 
 - [x] **C1** `Blocks.fromHtml` (noyau, sans DOM) ; menu « Coller » lit le HTML du presse-papiers ; Ctrl+V d'une page → blocs dessous, ou à la place d'un bloc vide. Tests : `blocks_test.cjs` (20 cas), `check.mjs` (5 cas).
 - [x] **C2** « Coller » dans le menu d'ajout (mobile, document vide).
 - [x] **C3** Rapatrier les images : `uploadUrl` accepte `url` (démo : garde-fous SSRF) ; capture d'écran collée → `upload`. Images `data:` du HTML : ignorées.
-- [ ] **C4** IA sur la plage collée, avec une consigne. Choix validés le 2026-11-22 ; détail à valider (contrat `aiUrl`) :
+- [x] **C4** IA sur la plage collée, avec une consigne (validé le 2026-11-22) :
   - **Bandeau juste après le collage** (Ctrl+V d'une page, menu « Coller », s'il crée au moins 2 blocs) : « 5 blocs collés · IA sur ces blocs · Fermer ». Il garde les ids des blocs insérés. Il part à la modification suivante (frappe, action, Annuler) : les ids sont alors encore justes, pas besoin de les garder dans l'historique.
   - **IA sur ces blocs** : la feuille IA s'ouvre avec « Sur les 5 blocs collés ». Envoi `scope=document` avec les blocs numérotés (§4c), plus un nouveau champ **`range`** = `"4-8"` (numéros du document envoyé). Le relais ajoute à la consigne : ne modifier que les blocs 4 à 8 ; insérer seulement entre eux ou juste après. Les usages proposés sont ceux du document.
   - **Côté éditeur** : une opération hors de la plage est montrée, décochée, désactivée, avec « hors des blocs collés » (comme une opération périmée). Le reste ne change pas : « Appliquer » = une étape annulable.

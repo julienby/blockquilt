@@ -165,6 +165,7 @@ export function installActions(ed) {
     ed.change(() => ed.blocks.splice(at, replace ? 1 : 0, ...fresh));
     ed.focusCard(fresh[fresh.length - 1].id);
     ed.toast(fresh.length > 1 ? `${fresh.length} blocs collés` : 'Bloc collé');
+    if (fresh.length > 1) ed.offerPasted(fresh.map((b) => b.id));
     if (web) ed.importPhotos(fresh);
   };
   const paste = async (at) => { const c = await readClipboard(); ed.pasteBlocks(c.md, at, { web: c.web }); };

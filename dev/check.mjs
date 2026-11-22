@@ -1304,6 +1304,44 @@ try {
     const f = await opsRun('@@ après 3\n:::html\n<p>sans fin</p>', '');
     ok(f.checked.join() === 'false' && f.button === 'Aucune proposition choisie', 'IA document : proposition en alerte lint → décochée');
   }
+  // C4 : IA sur les blocs collés — bandeau juste après le collage, `range` envoyé, opération hors plage désactivée
+  const c4 = await ev(`(async () => {
+    const wait = async (f) => { for (let i = 0; i < 100 && !f(); i++) await new Promise((r) => setTimeout(r, 50)); return f(); };
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Avant.\\n\\nAprès.\\n', aiUrl: 'api/ai' });
+    const $ = (s) => el.querySelector(s), $$ = (s) => [...el.querySelectorAll(s)];
+    const paste = (html) => { const f = $$('[data-id] .bq-edit')[0]; f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd();
+      const dt = new DataTransfer(); dt.setData('text/html', html); f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); };
+    const bar = () => !$('[data-pasted]').hidden;
+    const page = '<h3>Collé</h3><p>Un.</p><p>Deux.</p>';
+    const real = window.fetch; let sent = null;
+    window.fetch = (url, options) => { if (options?.body instanceof FormData && options.body.has('instruction')) sent = Object.fromEntries(options.body); return real(url, options); };
+    const s = {};
+    try {
+      paste('<h3>Seul</h3>'); s.one = !bar(); e.undo();
+      paste(page); s.text = $('[data-pasted-text]').textContent; s.shown = bar();
+      e.undo(); s.undoHides = !bar();
+      paste(page); $('[data-pasted-close]').click(); s.closeHides = !bar(); e.undo();
+      paste(page); $('[data-source-mode]').click(); s.sourceHides = !bar(); $('[data-source-mode]').click(); e.undo();
+      paste(page);
+      const f = $$('[data-id] .bq-edit')[2]; f.textContent = 'Un modifié.'; f.dispatchEvent(new Event('input', { bubbles: true }));
+      s.typeKeeps = bar();
+      $('[data-pasted-ai]').click();
+      s.scope = $('[data-ai-scope]').textContent;
+      $('[data-ai-instruction]').value = '@@ remplacer 1\\nHors.\\n@@ remplacer 3\\nUn corrigé.\\n@@ après 4\\nAjout.'; $('[data-ai-run]').click();
+      await wait(() => !$('[data-ai-ops]').hidden);
+      s.range = sent?.range; s.scopeSent = sent?.scope;
+      s.titles = $$('[data-ai-ops-list] label span').map((x) => x.textContent);
+      s.checked = $$('[data-ai-op]').map((c) => c.checked).join(); s.disabled = $$('[data-ai-op]').map((c) => c.disabled).join();
+      $('[data-ai-ops-apply]').click(); s.after = e.getMarkdown(); s.applyHides = !bar();
+    } finally { window.fetch = real; e.destroy(); el.remove(); }
+    return s;
+  })()`);
+  ok(c4.one && c4.shown && c4.text === '3 blocs collés', `blocs collés : bandeau après un collage de 2 blocs ou plus, pas pour 1 (${JSON.stringify(c4)})`);
+  ok(c4.undoHides && c4.closeHides && c4.sourceHides && c4.typeKeeps && c4.applyHides, `blocs collés : le bandeau part à Annuler, Fermer, vue source, bloc collé remplacé ; la frappe le garde (${JSON.stringify(c4)})`);
+  ok(c4.scope === 'Sur les 3 blocs collés' && c4.scopeSent === 'document' && c4.range === '2-4', `blocs collés : la feuille IA envoie le document et range=2-4 (${JSON.stringify(c4)})`);
+  ok(c4.titles?.[0] === 'Remplacer le bloc 1 — hors des blocs collés' && c4.checked === 'false,true,true' && c4.disabled === 'true,false,false'
+    && c4.after === 'Avant.\n\n### Collé\n\nUn corrigé.\n\nDeux.\n\nAjout.\n\nAprès.\n', `blocs collés : opération hors plage décochée et désactivée ; les autres appliquées (${JSON.stringify(c4)})`);
   // I4 : ce qu'on fait de la proposition — au début, à la fin, au-dessus, dessous, ou copier sans rien changer
   const aiRun = async (blockIndex, instruction = 'Tout en majuscules') => {
     if (blockIndex === undefined) { await ev(`document.querySelector('[data-more]').click()`); await ev(`document.querySelector('[data-more-act="ai"]').click()`); }

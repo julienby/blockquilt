@@ -153,6 +153,7 @@ export function installRender(ed) {
     ed.refreshVisual();
   };
   ed.render = () => {
+    ed.refreshPasted();
     // Texte de départ illisible (`contentUrl`) : un message à la place d'un document vide, quelle que soit la vue.
     if (ed.unread) {
       canvas.innerHTML = `<div role="alert" class="bq-column rounded-xl bg-red-100 p-3 text-red-800"><p>Le texte n’a pas pu être lu. ${esc(ed.unread)}</p>

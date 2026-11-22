@@ -10,7 +10,7 @@ const BOX = 'mt-1 whitespace-pre-wrap break-words rounded-lg p-2 text-sm';
 
 export function installAiOps(ed, sheet) {
   const { o, $ } = ed;
-  let sent = null; // le document tel qu'envoyé : { head, blocks: [{ id, md }] }
+  let sent = null; // le document tel qu'envoyé : { head, blocks: [{ id, md }], range: [premier, dernier] ou null }
   let items = []; // propositions affichées : [{ op, alerts }]
 
   const head = () => Blocks.serialize(ed.docMeta(), []).trim();
@@ -18,13 +18,15 @@ export function installAiOps(ed, sheet) {
   // Remplacement sans ligne de largeur : le bloc garde la sienne (Blocks.keepWidth) ; on compare donc sans elle.
   const before = (op) => (op.n > 0 && !Blocks.WIDTH.test(op.markdown.split('\n')[0]) ? target(op.n).replace(/^<!-- [^\n]* -->\n/, '') : target(op.n));
 
-  /** Le champ `blocks` à envoyer ; garde de quoi retrouver chaque bloc à l'application. */
-  ed.aiSnapshot = () => {
+  /** Les champs `blocks` et, pour des blocs désignés (`ids`, les blocs collés), `range` (« 4-8 ») ; garde de quoi retrouver chaque bloc. */
+  ed.aiSnapshot = (ids = null) => {
     ed.syncFromDom();
     const blocks = ed.blocks.map((b) => ({ id: b.id, md: Blocks.toMarkdown(b) })).filter((b) => b.md.trim() !== '');
-    sent = { head: head(), blocks };
-    return JSON.stringify([sent.head, ...blocks.map((b) => b.md)]);
+    const nums = ids ? blocks.flatMap((b, i) => (ids.includes(b.id) ? [i + 1] : [])) : [];
+    sent = { head: head(), blocks, range: nums.length ? [nums[0], nums.at(-1)] : null };
+    return { blocks: JSON.stringify([sent.head, ...blocks.map((b) => b.md)]), ...(sent.range ? { range: sent.range.join('-') } : {}) };
   };
+  const outside = ({ op }) => !!sent.range && (op.n < sent.range[0] || op.n > sent.range[1]);
 
   const stale = ({ op }) => {
     if (op.n === 0) return op.mode === 'replace' && head() !== sent.head;
@@ -88,11 +90,12 @@ export function installAiOps(ed, sheet) {
     else summary.textContent = (items.length ? plural(items.length, 'proposition', 'propositions') : 'Aucune modification proposée')
       + (unchanged ? ` · ${plural(unchanged, 'bloc inchangé ignoré', 'blocs inchangés ignorés')}` : '') + '.';
     $('[data-ai-ops-list]', sheet).innerHTML = items.map((it, i) => {
-      const old = stale(it);
-      const on = !old && !it.alerts.length;
+      const out = outside(it);
+      const old = !out && stale(it);
+      const on = !out && !old && !it.alerts.length;
       return `<li class="rounded-xl border border-stone-200 p-2">
-        <label class="flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" data-ai-op="${i}" class="size-5 shrink-0"${on ? ' checked' : ''}${old ? ' disabled' : ''}>
-          <span>${esc(title(it.op))}${old ? ' — périmée : le bloc a changé depuis l’envoi' : ''}</span></label>
+        <label class="flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" data-ai-op="${i}" class="size-5 shrink-0"${on ? ' checked' : ''}${out || old ? ' disabled' : ''}>
+          <span>${esc(title(it.op))}${out ? ' — hors des blocs collés' : old ? ' — périmée : le bloc a changé depuis l’envoi' : ''}</span></label>
         ${body(it.op)}
         ${it.alerts.length ? `<ul role="alert" class="mt-1 space-y-1 text-xs text-red-800">${it.alerts.map((a) => `<li>Ligne ${a.line} : ${esc(a.message)}</li>`).join('')}</ul>` : ''}</li>`;
     }).join('');

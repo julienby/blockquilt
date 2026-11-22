@@ -1,7 +1,8 @@
 // Assistant IA : `aiUrl` désigne le service ; l'éditeur n'appelle aucun modèle lui-même et ne contient aucune clé.
 // GET aiUrl → { uses: [{ id, label, scopes }] } : les usages de l'application (modèle et consigne restent chez elle) ;
 // sans réponse, les boutons intégrés (consignes écrites). Envoi (POST) : scope (document | block), use, instruction,
-// text (document), block (Markdown du bloc), blocks (document hors vue source : blocs numérotés, voir ai-ops.js).
+// text (document), block (Markdown du bloc), blocks (document hors vue source : blocs numérotés, voir ai-ops.js),
+// range (blocs collés : « 4-8 », numéros de `blocks` ; l'IA ne modifie qu'eux).
 // Réponse : { operations } (propositions une à une, ai-ops.js) ou { markdown }. Relais prêt à monter : ai/blockquilt-ai.js.
 // { markdown } passe par Blocks.lint et s'affiche à côté de l'actuel ; puis, au choix (toujours annulable) :
 // document : remplacer, ajouter au début, à la fin ; bloc : remplacer, insérer au-dessus, dessous ; ou copier sans rien changer.
@@ -12,6 +13,8 @@ export function installAi(ed) {
   const { o, $ } = ed;
   const sheet = ed.sheets.ai;
   ed.openAi = () => {};
+  ed.offerPasted = () => {};
+  ed.refreshPasted = () => {};
   if (!sheet) return; // sans aiUrl, aucun bouton IA
   installAiOps(ed, sheet);
   let ai = null; // { id, markdown }
@@ -23,11 +26,34 @@ export function installAi(ed) {
   const loadUses = () => (uses ??= fetch(o.aiUrl, { headers: { Accept: 'application/json' }, signal: ed.ac.signal })
     .then((r) => (r.ok ? r.json() : null)).then((j) => (Array.isArray(j?.uses) && j.uses.length ? j.uses : null)).catch(() => null));
 
-  ed.openAi = (id) => {
+  // Blocs collés : offerts juste après le collage (bandeau). Le bandeau part dès qu'ils ne se suivent plus tels quels
+  // (Annuler redonne des identifiants, bloc remplacé ou déplacé) ou hors de la vue blocs. La frappe le garde.
+  const pastedBar = $('[data-pasted]');
+  let pasted = null; // identifiants des blocs collés, dans l'ordre
+  const together = () => {
+    const i = ed.blocks.findIndex((b) => b.id === pasted[0]);
+    return i >= 0 && pasted.every((id, k) => ed.blocks[i + k]?.id === id);
+  };
+  ed.refreshPasted = () => {
+    if (pasted && (ed.mode !== 'edit' || !together())) pasted = null;
+    pastedBar.hidden = !pasted;
+  };
+  ed.offerPasted = (ids) => {
+    pasted = ids;
+    $('[data-pasted-text]', pastedBar).textContent = `${ids.length} blocs collés`;
+    pastedBar.hidden = false;
+  };
+  ed.on(pastedBar, 'click', (e) => {
+    if (e.target.closest('[data-pasted-ai]') && pasted) ed.openAi(null, pasted);
+    else if (e.target.closest('[data-pasted-close]')) { pasted = null; pastedBar.hidden = true; }
+  });
+
+  // id : un bloc ; ids : des blocs collés (tout le document part, l'IA ne modifie qu'eux) ; rien : tout le document.
+  ed.openAi = (id, ids = null) => {
     ed.syncFromDom();
-    ai = { id };
+    ai = { id, ids };
     const b = id && ed.blocks.find((x) => x.id === id);
-    $('[data-ai-scope]', sheet).textContent = b ? `Sur ce bloc : ${ed.def(b).label}` : 'Sur tout le document';
+    $('[data-ai-scope]', sheet).textContent = b ? `Sur ce bloc : ${ed.def(b).label}` : ids ? `Sur les ${ids.length} blocs collés` : 'Sur tout le document';
     const labels = b ? ['Remplacer le bloc', 'Insérer au-dessus', 'Insérer dessous'] : ['Remplacer le document', 'Ajouter au début', 'Ajouter à la fin'];
     ['replace', 'start', 'end'].forEach((k, i) => { $(`[data-ai-apply="${k}"]`, sheet).textContent = labels[i]; });
     $('[data-ai-form]', sheet).hidden = false;
@@ -58,7 +84,7 @@ export function installAi(ed) {
     pending = mine;
     try {
       // En vue source, le texte de la zone fait foi : pas de blocs à désigner, le document part entier.
-      const numbered = !b && ed.mode !== 'source' ? { blocks: ed.aiSnapshot() } : {};
+      const numbered = !b && ed.mode !== 'source' ? ed.aiSnapshot(ai.ids) : {};
       const r = await request(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: Blocks.toMarkdown(b) } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
       const j = await r.json().catch(() => ({}));
       if (mine.signal.aborted) return;
