@@ -132,6 +132,7 @@ export function installRender(ed) {
     ed.render();
   };
   ed.refreshVisual = () => {
+    if (ed.blockFull.open) ed.refreshBlockRender();
     const visual = canvas.querySelector('[data-visual]');
     if (!visual) return;
     visual.innerHTML = Blocks.toHtml(ed.markdown(), { media: o.media });

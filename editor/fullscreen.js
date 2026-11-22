@@ -58,7 +58,13 @@ export function installFullscreen(ed) {
     const next = neighbour(blockFull.querySelector('[data-id]').dataset.id, step);
     if (next) ed.openBlockFull(next.id);
   };
+  // Rendu du bloc seul, comme dans l'aperçu et le visuel de l'éditeur.
+  const blockRender = (b) => Blocks.toHtml(Blocks.toMarkdown(b), { media: ed.o.media });
+  const fullId = () => blockFull.querySelector('[data-block-full-body] [data-id]')?.dataset.id;
+  let preview = false; // aperçu du bloc seul : gardé d'un bloc à l'autre, remis à zéro à la fermeture
   // Dessine le bloc dans le dialogue ; sa carte dans la page perd data-id. Renvoie false si le bloc n'existe plus.
+  // Aperçu : le rendu à la place du champ (la carte reste, cachée : la lecture des blocs ne change pas).
+  // Visuel à côté (même réglage que l'en-tête) : le rendu à côté du champ.
   const draw = (id) => {
     const b = ed.blocks.find((x) => x.id === id);
     const cardEl = ed.canvas.querySelector(`[data-id="${id}"], [data-away="${id}"]`);
@@ -68,7 +74,16 @@ export function installFullscreen(ed) {
     const view = ed.viewOf(b) === 'collapsed' ? 'edit' : ed.viewOf(b); // le plein écran montre toujours le bloc en entier
     const tools = ed.tools(b, view) ? `<div class="-mt-2 mb-2 flex">${ed.tools(b, view)}</div>` : '';
     $('[data-block-full-label]', blockFull).textContent = ed.def(b).label;
-    $('[data-block-full-body]', blockFull).innerHTML = `<div data-id="${id}" data-view="${view}" class="bq-focus">${tools}${ed.editorOf(b).edit(b, ed.ui)}</div>`;
+    const card = `<div data-id="${id}" data-view="${view}" class="bq-focus"${preview ? ' hidden' : ''}>${tools}${ed.editorOf(b).edit(b, ed.ui)}</div>`;
+    const render = `<div data-full-render aria-label="Visuel" class="min-w-0 overflow-auto${preview ? '' : ' rounded-xl border p-3 sm:p-4'}">${blockRender(b)}</div>`;
+    const side = ed.sideBySide && !preview;
+    const body = $('[data-block-full-body]', blockFull);
+    body.classList.toggle('bq-column', !side); // côte à côte : la largeur de deux colonnes (bq-panes)
+    body.innerHTML = side ? `<div class="bq-panes mx-auto grid gap-3"><div class="min-w-0">${card}</div>${render}</div>` : preview ? card + render : card;
+    window.BlockquiltContent?.enhance(body);
+    $('[data-full-preview]', blockFull).setAttribute('aria-pressed', String(preview));
+    $('[data-full-visual]', blockFull).setAttribute('aria-pressed', String(ed.sideBySide));
+    $('[data-full-visual]', blockFull).disabled = preview;
     $('[data-full-prev]', blockFull).disabled = !neighbour(id, -1);
     $('[data-full-next]', blockFull).disabled = !neighbour(id, 1);
     const ai = blockFull.querySelector('[data-full-ai]');
@@ -77,8 +92,22 @@ export function installFullscreen(ed) {
   };
   // Après un redessin de la page (ordre ou retrait d'une photo…), le dialogue montre le bloc à jour.
   ed.redrawBlockFull = () => {
-    const id = blockFull.querySelector('[data-block-full-body] [data-id]')?.dataset.id;
+    const id = fullId();
     if (id && !draw(id)) blockFull.close();
+  };
+  ed.toggleBlockPreview = () => {
+    ed.syncFromDom();
+    preview = !preview;
+    ed.redrawBlockFull();
+    if (!preview) blockFull.querySelector('[data-block-full-body] [contenteditable], [data-block-full-body] textarea, [data-block-full-body] input')?.focus();
+  };
+  // Le rendu suit la frappe (appelé avec le visuel de l'éditeur, 300 ms après la dernière touche).
+  ed.refreshBlockRender = () => {
+    const box = blockFull.querySelector('[data-full-render]');
+    const b = ed.blocks.find((x) => x.id === fullId());
+    if (!box || !b) return;
+    box.innerHTML = blockRender(b);
+    window.BlockquiltContent?.enhance(box);
   };
   ed.openBlockFull = (id) => {
     if (blockFull.open) ed.checkpoint(); // lit le bloc quitté dans le dialogue
@@ -94,6 +123,7 @@ export function installFullscreen(ed) {
     ed.hideBar();
     ed.checkpoint(); // lit le bloc dans le dialogue
     $('[data-block-full-body]', blockFull).replaceChildren();
+    preview = false;
     leave();
     ed.render();
   });

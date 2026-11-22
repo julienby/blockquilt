@@ -1498,6 +1498,62 @@ try {
   ok(fullPaste.page.open && fullPaste.page.text === 'Un texte. Titre Para un a' && fullPaste.page.md === 'Un texte. Titre Para un a\n\nAutre.\n', `plein écran d’un bloc : une page web collée reste dans le champ, en texte (${JSON.stringify(fullPaste.page)})`);
   ok(fullPaste.shot.md === fullPaste.page.md && fullPaste.shot.toast === 'Une photo ne peut pas entrer dans ce texte', `plein écran d’un bloc : une capture collée ne crée pas de bloc (${JSON.stringify(fullPaste.shot)})`);
 
+  // ---- 4l : plein écran d'un bloc, Enregistrer, aperçu et visuel à côté comme l'en-tête ----
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    const fl = await ev(`(async () => {
+      const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
+      let split = null;
+      try { split = localStorage.getItem('blockquilt.split'); localStorage.setItem('blockquilt.split', 'false'); } catch {}
+      const el = document.createElement('div'); document.body.append(el);
+      const e = Blockquilt.mount(el, { source: 'Un texte.\\n\\nDeux.', onSave: async () => {} });
+      const $ = (s) => el.querySelector(s);
+      const state = (b) => ({ disabled: b.disabled, label: b.getAttribute('aria-label'), dot: !!b.querySelector('[data-dot]') && !b.querySelector('[data-dot]').hidden, accent: b.classList.contains('text-brand-700') });
+      const out = {};
+      try {
+        $('[data-canvas] [data-id] [data-expand]').click();
+        const full = $('[data-block-full]');
+        const save = full.querySelector('[data-full-save]');
+        const type = (t) => { const f = full.querySelector('[data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, t); };
+        out.s0 = state(save);
+        type(' plus');
+        out.s1 = state(save); out.h1 = state($('[data-save]'));
+        save.click(); await tick(100);
+        out.s2 = state(save);
+        const shown = (x) => !!x && x.offsetParent !== null;
+        const render = () => full.querySelector('[data-full-render]');
+        full.querySelector('[data-full-preview]').click();
+        out.p = { pressed: full.querySelector('[data-full-preview]').getAttribute('aria-pressed'), text: render()?.textContent.trim(), field: shown(full.querySelector('[data-rich]')), visual: full.querySelector('[data-full-visual]').disabled };
+        full.querySelector('[data-full-next]').click();
+        out.pNext = { pressed: full.querySelector('[data-full-preview]').getAttribute('aria-pressed'), text: render()?.textContent.trim() };
+        full.querySelector('[data-full-prev]').click();
+        full.querySelector('[data-full-preview]').click();
+        out.back = { pressed: full.querySelector('[data-full-preview]').getAttribute('aria-pressed'), field: shown(full.querySelector('[data-rich]')), render: shown(render()) };
+        full.querySelector('[data-full-visual]').click();
+        out.v = { pressed: full.querySelector('[data-full-visual]').getAttribute('aria-pressed'), header: $('[data-visual-toggle]').getAttribute('aria-pressed'), field: shown(full.querySelector('[data-rich]')), text: render()?.textContent.trim() };
+        type(' encore'); await tick(500);
+        const inner = full.querySelector('[data-full-inner]');
+        out.v2 = { text: render()?.textContent.trim(), fits: inner.scrollWidth <= inner.clientWidth };
+        full.querySelector('[data-full-visual]').click();
+        out.off = { render: shown(render()), header: $('[data-visual-toggle]').getAttribute('aria-pressed') };
+        full.querySelector('[data-full-preview]').click();
+        full.close(); await tick();
+        $('[data-canvas] [data-id] [data-expand]').click();
+        out.reopen = full.querySelector('[data-full-preview]').getAttribute('aria-pressed');
+        full.close(); await tick();
+        return out;
+      } finally { e.destroy(); el.remove(); try { if (split === null) localStorage.removeItem('blockquilt.split'); else localStorage.setItem('blockquilt.split', split); } catch {} }
+    })()`);
+    const j = JSON.stringify;
+    ok(j(fl.s0) === j({ disabled: true, label: 'Enregistré', dot: false, accent: false }) && j(fl.s1) === j({ disabled: false, label: 'Enregistrer', dot: true, accent: true }) && j(fl.s1) === j(fl.h1) && j(fl.s2) === j(fl.s0), `${width} px, plein écran d’un bloc : Enregistrer comme dans l’en-tête (${j([fl.s0, fl.s1, fl.h1, fl.s2])})`);
+    ok(fl.p.pressed === 'true' && fl.p.text === 'Un texte. plus' && !fl.p.field && fl.p.visual, `${width} px, plein écran d’un bloc : aperçu, le bloc rendu à la place du champ, visuel inactif (${j(fl.p)})`);
+    ok(fl.pNext.pressed === 'true' && fl.pNext.text === 'Deux.' && fl.back.pressed === 'false' && fl.back.field && !fl.back.render, `${width} px, plein écran d’un bloc : l’aperçu suit le bloc voisin, re-clic → le champ (${j([fl.pNext, fl.back])})`);
+    ok(fl.v.pressed === 'true' && fl.v.header === 'true' && fl.v.field && fl.v.text === 'Un texte. plus', `${width} px, plein écran d’un bloc : visuel à côté du champ, même réglage que l’en-tête (${j(fl.v)})`);
+    ok(fl.v2.text === 'Un texte. plus encore' && fl.v2.fits && !fl.off.render && fl.off.header === 'false', `${width} px, plein écran d’un bloc : le visuel suit la frappe, tient dans la largeur, se retire (${j([fl.v2, fl.off])})`);
+    ok(fl.reopen === 'false', `${width} px, plein écran d’un bloc : l’aperçu est remis à zéro à la fermeture`);
+  }
+  await viewport(375);
+
   // ---- Phase 10 : démo complète, accessibilité, parcours au clavier ----
   fs.rmSync(doc);
   await viewport(375);

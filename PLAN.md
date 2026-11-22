@@ -249,6 +249,13 @@ Précisé le 2026-11-22 : la carte n'a pas de bouton (liste fermée : texte, cit
 - [x] **P4 Boutons et application** : `here` / `all`, `ed.change` + `syncFromDom`, plage vérifiée, focus rendu au champ.
 - [x] **P5 Docs** : README (IA, plein écran), DECISIONS.
 
+## 4l. Plein écran d'un bloc : Enregistrer et rendu comme l'en-tête (validé le 2026-11-22)
+
+- [x] **F1 Enregistrer** : le bouton du plein écran a le comportement du bouton de l'en-tête (inactif, « Enregistré » ; modifié → couleur de l'accent, pastille, « Enregistrer » ; attente `aria-busy`). Un seul code pour les deux boutons (`setDirty`, `save`).
+- [x] **F2 Aperçu** (œil, `aria-pressed`) : le bloc rendu à la place du champ (le champ reste dans la page, caché : la lecture des blocs ne change pas). « Visuel à côté » inactif pendant l'aperçu, comme dans l'en-tête. Gardé en passant au bloc voisin ; remis à zéro à la fermeture.
+- [x] **F3 Visuel à côté** (deux colonnes) : même réglage que l'en-tête (`ed.sideBySide`, `blockquilt.split`) ; le bloc seul rendu à côté (dessous sous 1024 px), suit la frappe comme le visuel de l'éditeur.
+- [x] **F4** Essais Chromium 375 et 1280 px d'abord ; README (« Il n'a pas de visuel à côté » retiré), DECISIONS.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

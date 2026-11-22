@@ -15,16 +15,19 @@ export function installDocument(ed) {
   // Rien à enregistrer : les boutons Enregistrer sont inactifs. Le texte enregistré sert à Ctrl+Z (retour à l'état enregistré).
   // Brouillon : écrit 1 s après une modification ; effacé quand il n'y a plus rien à enregistrer,
   // sauf au chargement d'un texte (`loaded`) : le brouillon d'avant reste à proposer.
+  // Deux boutons Enregistrer, un seul comportement : l'en-tête et le plein écran d'un bloc.
+  const saveButtons = () => [saveBtn, $('[data-full-save]')];
   ed.setDirty = (value, { loaded = false } = {}) => {
     ed.dirty = value;
     if (!value) ed.savedText = ed.markdown();
     if (value) ed.draftLater();
     else if (!loaded) ed.dropDraft();
-    saveBtn.disabled = !value;
-    $('[data-full-save]').disabled = !value;
-    $('[data-dot]', saveBtn).hidden = !value;
-    saveBtn.classList.toggle('text-brand-700', value);
-    saveBtn.setAttribute('aria-label', value ? 'Enregistrer' : 'Enregistré');
+    for (const b of saveButtons()) {
+      b.disabled = !value;
+      $('[data-dot]', b).hidden = !value;
+      b.classList.toggle('text-brand-700', value);
+      b.setAttribute('aria-label', value ? 'Enregistrer' : 'Enregistré');
+    }
   };
 
   // ---- Titre et icône : dans le frontmatter ; les autres clés sont gardées dans leur ordre ----
@@ -93,7 +96,7 @@ export function installDocument(ed) {
     ed.checkpoint(); // l'état enregistré est une étape de Ctrl+Z
     const text = ed.markdown();
     saving = (async () => {
-      saveBtn.setAttribute('aria-busy', 'true'); // l'attente se voit (jusqu'à 30 s sur un réseau muet)
+      saveButtons().forEach((b) => b.setAttribute('aria-busy', 'true')); // l'attente se voit (jusqu'à 30 s sur un réseau muet)
       try {
         if (o.onSave) await o.onSave(text);
         else if (o.contentUrl) await ed.putContent(text);
@@ -111,7 +114,7 @@ export function installDocument(ed) {
         if (error.conflict) ed.toast(error.message); // la feuille du conflit est ouverte : elle suffit
         else ed.saveError(error.message);
         return false;
-      } finally { saving = null; saveBtn.removeAttribute('aria-busy'); }
+      } finally { saving = null; saveButtons().forEach((b) => b.removeAttribute('aria-busy')); }
     })();
     return saving;
   };
