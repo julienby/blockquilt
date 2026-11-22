@@ -90,9 +90,17 @@ export function installEvents(ed) {
   ed.on(titleEl, 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
   // Coller une page web (plusieurs blocs, ou un titre, une photo, une liste…) : des blocs sous le bloc en cours ; un bloc vide est remplacé.
   // Sinon, dans un champ : texte simple seulement (pas de styles venus d'ailleurs). Les autres champs (titre, légende, code) collent seuls.
+  // En plein écran d'un bloc, tout reste dans le champ en texte simple : jamais de bloc créé hors de la vue.
   ed.on(app, 'paste', (e) => {
     const field = e.target.closest?.('.bq-edit');
     if (inSheet(e.target) || (!field && e.target.matches?.('input, textarea, [contenteditable]'))) return;
+    if (field && blockFull.contains(field)) {
+      e.preventDefault();
+      const text = e.clipboardData.getData('text/plain');
+      if (text) document.execCommand('insertText', false, text);
+      else if (e.clipboardData.files.length) ed.toast('Une photo ne peut pas entrer dans ce texte');
+      return;
+    }
     const html = e.clipboardData.getData('text/html');
     const md = html ? Blocks.fromHtml(html) : '';
     const found = Blocks.parse(md).blocks.filter((b) => !Blocks.isEmpty(b));

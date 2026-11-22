@@ -1479,6 +1479,24 @@ try {
     ok(photo.buttons === 'Insérer au curseur (désactivé)|Remplacer le texte (désactivé)' && photo.why.includes('Photo') && photo.md === 'Un.\n', `${width} px, IA plein écran : réponse avec une photo → boutons désactivés, raison donnée (${photo.why})`);
   }
   await viewport(375);
+  // Coller en plein écran d'un bloc : tout reste dans son champ, jamais de bloc créé hors de la vue.
+  const fullPaste = await ev(`(async () => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Un texte.\\n\\nAutre.', uploadUrl: 'api/upload' });
+    el.querySelector('[data-canvas] [data-id] [data-expand]').click();
+    const full = el.querySelector('[data-block-full]');
+    const paste = (fill) => { const f = full.querySelector('[data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd();
+      const dt = new DataTransfer(); fill(dt); f.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); };
+    paste((dt) => { dt.setData('text/html', '<h2>Titre</h2><p>Para <b>un</b></p><ul><li>a</li></ul><img src="https://example.com/a.png">'); dt.setData('text/plain', ' Titre Para un a'); });
+    const page = { open: full.open, text: full.querySelector('[data-rich]').textContent, md: e.getMarkdown() };
+    paste((dt) => dt.items.add(new File([new Uint8Array([137, 80, 78, 71])], 'a.png', { type: 'image/png' })));
+    await new Promise((r) => setTimeout(r, 100));
+    const shot = { md: e.getMarkdown(), toast: el.querySelector('[data-toast]').textContent };
+    e.destroy(); el.remove();
+    return { page, shot };
+  })()`);
+  ok(fullPaste.page.open && fullPaste.page.text === 'Un texte. Titre Para un a' && fullPaste.page.md === 'Un texte. Titre Para un a\n\nAutre.\n', `plein écran d’un bloc : une page web collée reste dans le champ, en texte (${JSON.stringify(fullPaste.page)})`);
+  ok(fullPaste.shot.md === fullPaste.page.md && fullPaste.shot.toast === 'Une photo ne peut pas entrer dans ce texte', `plein écran d’un bloc : une capture collée ne crée pas de bloc (${JSON.stringify(fullPaste.shot)})`);
 
   // ---- Phase 10 : démo complète, accessibilité, parcours au clavier ----
   fs.rmSync(doc);

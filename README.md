@@ -130,6 +130,7 @@ Où coller :
 - Ctrl+V dans un bloc plein : les blocs vont dessous. Dans un bloc vide : ils le remplacent ;
 - menu d'ajout « Ajouter un bloc » : bouton « Coller » en tête. C'est la seule façon de coller dans un document vide sur mobile ;
 - Ctrl+V d'une simple phrase : texte simple, au curseur. Ctrl+V ne marche que si le focus est dans l'éditeur.
+- bloc en plein écran : tout reste dans son texte, en texte simple, au curseur. Aucun bloc n'est créé ; une capture d'écran n'est pas collée (message).
 
 Capture d'écran : Ctrl+V d'une image du presse-papiers ajoute un bloc photo, envoyé comme une photo choisie. Il va sous le bloc en cours, ou remplace un bloc vide.
 
