@@ -2,7 +2,7 @@
 // L'éditeur lit le texte et sa version (ETag), enregistre par PUT avec If-Match, et ne remplace jamais une version écrite
 // ailleurs (par une IA, un autre onglet…) : il montre les différences et laisse choisir. Il revérifie de temps en temps
 // (`pollSeconds`, 30 par défaut, 0 = jamais) et quand la page redevient visible.
-import { esc, ago, request, serverText } from './shared.js';
+import { esc, ago, request, serverText, within } from './shared.js';
 
 export function installRemote(ed) {
   const { o, $ } = ed;
@@ -14,13 +14,13 @@ export function installRemote(ed) {
   let remote = null; // { markdown, version, by, at } : la version d'ailleurs, en attente d'un choix
 
   const get = async (headers = {}) => {
-    const r = await request(o.contentUrl, { headers: { Accept: 'text/markdown', ...headers }, signal: ed.ac.signal, cache: 'no-store' });
+    const r = await request(o.contentUrl, { headers: { Accept: 'text/markdown', ...headers }, signal: within(ed.ac.signal), cache: 'no-store' });
     if (r.status === 304) return null;
     if (!r.ok) throw new Error(serverText(r, await r.text()));
     const by = r.headers.get('X-Updated-By');
     return { markdown: (await r.text()).replace(/\r\n/g, '\n'), version: r.headers.get('ETag'), by: by ? decodeURIComponent(by) : '', at: Date.parse(r.headers.get('Last-Modified')) };
   };
-  const put = (text, version) => request(o.contentUrl, { method: 'PUT', headers: { 'Content-Type': 'text/markdown; charset=utf-8', 'If-Match': version || '*' }, body: text, signal: ed.ac.signal });
+  const put = (text, version) => request(o.contentUrl, { method: 'PUT', headers: { 'Content-Type': 'text/markdown; charset=utf-8', 'If-Match': version || '*' }, body: text, signal: within(ed.ac.signal) });
 
   const who = (r) => `Modifié ${r.by ? `par ${r.by} ` : ''}${ago(r.at)}`.trim();
   // Feuille : qui, quand, les lignes qui changent (votre texte → l'autre version), puis le choix.

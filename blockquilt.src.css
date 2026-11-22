@@ -15,6 +15,7 @@
 @layer components {
   .bq-rail { @apply inline-flex h-8 w-11 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-20; color: color-mix(in srgb, currentColor 65%, transparent); }
   .bq-btn { @apply inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-30; }
+  .bq-btn[aria-busy="true"] { @apply cursor-progress opacity-50; }
 }
 /* Intégration neutre : l'éditeur reprend la police et la couleur du texte de la page. Tout se règle par variables CSS,
    posées sur l'élément de l'éditeur ou n'importe quel parent :

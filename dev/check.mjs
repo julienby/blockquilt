@@ -408,7 +408,35 @@ try {
   })()`);
   ok(n1.save && n1.photo && n1.ai, `réseau coupé : enregistrer, photo, IA → « Pas de connexion. Rien n’est perdu… » (${JSON.stringify(n1)})`);
   ok(n1.html500 && n1.short, `serveur en erreur : page HTML → « Erreur du serveur (500). », texte court gardé (${JSON.stringify(n1)})`);
-  ok(n1.stays && n1.closed && n1.cleared, `erreur d'enregistrement : reste affichée, « Fermer » la cache, un enregistrement réussi la retire (${JSON.stringify(n1)})`);
+  // N3 : serveur qui ne répond pas → délai maximal de 30 s (raccourci ici à 50 ms), bouton « en cours » pendant l'attente
+  const n3 = await ev(`(async () => {
+    const SLOW = 'Le serveur ne répond pas. Réessayez.';
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const real = window.fetch, timeout = AbortSignal.timeout;
+    const asked = [];
+    AbortSignal.timeout = (ms) => { asked.push(ms); const c = new AbortController(); setTimeout(() => c.abort(new DOMException('délai', 'TimeoutError')), 50); return c.signal; };
+    window.fetch = (url, { signal } = {}) => new Promise((_, reject) => { signal?.addEventListener('abort', () => reject(signal.reason)); });
+    const out = {};
+    try {
+      const open = (options) => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: 'Un', ...options }); const f = el.querySelector('[data-rich]'); f.textContent = 'Deux'; f.dispatchEvent(new Event('input', { bubbles: true })); return { el, e, error: () => el.querySelector('[data-save-error]').hidden ? '' : el.querySelector('[data-save-error-text]').textContent, close: () => { e.destroy(); el.remove(); } }; };
+      let a = open({ saveUrl: 'api/save', uploadUrl: 'api/upload' });
+      const saving = a.e.save();
+      await wait(10);
+      out.busy = a.el.querySelector('[data-save]').getAttribute('aria-busy') === 'true';
+      out.save = (await saving) === false && a.error() === SLOW && a.el.querySelector('[data-save]').getAttribute('aria-busy') !== 'true';
+      const dt = new DataTransfer(); dt.items.add(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'p.png', { type: 'image/png' }));
+      const fi = a.el.querySelector('[data-file]'); fi.files = dt.files; fi.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait(150); out.photo = a.el.querySelector('[data-toast]').textContent === SLOW;
+      a.close();
+      a = open({ contentUrl: 'contents/n3', version: '"v1"', pollSeconds: 0 });
+      out.put = (await a.e.save()) === false && a.error() === SLOW;
+      a.close();
+      out.ms = asked.length >= 3 && asked.every((ms) => ms === 30000);
+    } finally { window.fetch = real; AbortSignal.timeout = timeout; }
+    return out;
+  })()`);
+  ok(n3.busy && n3.save && n3.photo && n3.put && n3.ms, `serveur muet : enregistrer, photo, contentUrl → « Le serveur ne répond pas » après 30 s ; bouton « en cours » pendant l'attente (${JSON.stringify(n3)})`);
+  ok(n1.stays && n1.closed && n1.cleared,`erreur d'enregistrement : reste affichée, « Fermer » la cache, un enregistrement réussi la retire (${JSON.stringify(n1)})`);
   // B3 : brouillon proposé par un bandeau, au montage
   const b3 = await ev(`(() => {
     const put = (k, d) => localStorage.setItem('blockquilt.draft.' + k, JSON.stringify({ version: null, at: Date.now() - 300000, ...d }));

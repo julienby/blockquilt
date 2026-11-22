@@ -1,5 +1,5 @@
 // Photos : envoi (plusieurs fichiers à la fois) et actions du carrousel (ordre, retrait, ajout).
-import { request } from './shared.js';
+import { request, within } from './shared.js';
 
 export function installMedia(ed) {
   const { o, fileInput, canvas } = ed;
@@ -7,7 +7,7 @@ export function installMedia(ed) {
   // Envoi à uploadUrl : un fichier (`photo`) ou l'adresse d'une image que le serveur télécharge (`url`). Renvoie le src à écrire.
   const send = async (fields) => {
     if (!o.uploadUrl) throw new Error('Envoi de photos non configuré');
-    const r = await request(o.uploadUrl, { method: 'POST', body: ed.form(fields), headers: { Accept: 'application/json' }, signal: ed.ac.signal });
+    const r = await request(o.uploadUrl, { method: 'POST', body: ed.form(fields), headers: { Accept: 'application/json' }, signal: within(ed.ac.signal) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !(j.id || j.src)) throw new Error(j.error || 'Envoi impossible');
     return j.src || 'media/' + j.id;
