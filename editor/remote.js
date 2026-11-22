@@ -26,6 +26,7 @@ export function installRemote(ed) {
   // Feuille : qui, quand, les lignes qui changent (votre texte → l'autre version), puis le choix.
   const show = () => {
     bar.hidden = true;
+    $('[data-remote-error]', sheet).hidden = true;
     $('[data-remote-who]', sheet).textContent = who(remote) + '.';
     const lines = Blocks.diffLines(ed.markdown(), remote.markdown);
     const near = lines.map((l, i) => lines.slice(Math.max(0, i - 2), i + 3).some((x) => x.op !== ' '));
@@ -94,12 +95,20 @@ export function installRemote(ed) {
       // Garder la mienne : elle remplace l'autre, en connaissance de cause (If-Match = la version qu'on vient de voir).
       const r = remote;
       const text = ed.markdown();
-      const w = await put(text, r.version);
-      if (w.status === 412) { remote = await get(); return show(); }
-      if (!w.ok) return ed.toast(serverText(w, await w.text()));
+      const error = $('[data-remote-error]', sheet);
+      try {
+        const w = await put(text, r.version);
+        if (w.status === 412) { remote = await get(); return show(); }
+        if (!w.ok) throw new Error(serverText(w, await w.text()));
+        ed.version = w.headers.get('ETag');
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+        error.textContent = e.message; // la feuille reste ouverte : le choix est à refaire
+        error.hidden = false;
+        return;
+      }
       remote = null;
       sheet.close();
-      ed.version = w.headers.get('ETag');
       if (ed.markdown() === text) ed.setDirty(false);
       ed.toast('Votre version est enregistrée');
     } else if (e.target.closest('[data-remote-later]')) {
@@ -110,12 +119,22 @@ export function installRemote(ed) {
   ed.on(bar, 'click', (e) => { if (e.target.closest('[data-remote-show]') && remote) show(); });
 
   // Version de départ : donnée par l'application (`version`), sinon lue ; sans `source`, le texte aussi.
-  if (!ed.version) {
-    get().then((r) => {
-      if (!o.source) { ed.load(r.markdown); ed.version = r.version; ed.setDirty(false, { loaded: true }); ed.resetHistory(); ed.offerDraft(); }
-      else arrived(r); // même texte : sa version est adoptée ; sinon le bandeau, et pas d'enregistrement avant un choix
-    }).catch((error) => { if (error.name !== 'AbortError') ed.toast(error.message); });
-  }
+  // Texte non lu (réseau, serveur) : `ed.unread` porte la raison ; l'éditeur l'affiche et n'enregistre rien (render.js, document.js).
+  ed.unread = '';
+  const start = () => get().then((r) => {
+    if (!o.source) {
+      ed.unread = '';
+      if (ed.mode === 'source') ed.setMode('edit');
+      ed.load(r.markdown); ed.version = r.version; ed.setDirty(false, { loaded: true }); ed.resetHistory(); ed.offerDraft();
+    } else arrived(r); // même texte : sa version est adoptée ; sinon le bandeau, et pas d'enregistrement avant un choix
+  }).catch((error) => {
+    if (error.name === 'AbortError') return;
+    if (o.source) return ed.toast(error.message);
+    ed.unread = error.message;
+    ed.render();
+  });
+  if (!ed.version) start();
+  ed.on(ed.canvas, 'click', (e) => { if (e.target.closest('[data-reread]')) start(); });
   const every = o.pollSeconds ?? 30;
   if (every > 0) {
     const tick = () => ed.later(() => { if (document.visibilityState === 'visible') ed.checkRemote(); tick(); }, every * 1000);

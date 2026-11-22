@@ -104,7 +104,12 @@ export function installRender(ed) {
     const text = ed.markdown();
     canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
     try {
-      const html = o.previewUrl ? await (await request(o.previewUrl, { method: 'POST', body: ed.form({ text }), signal: ed.ac.signal })).text() : Blocks.toHtml(text, { media: o.media });
+      let html = Blocks.toHtml(text, { media: o.media });
+      if (o.previewUrl) {
+        const r = await request(o.previewUrl, { method: 'POST', body: ed.form({ text }), signal: ed.ac.signal });
+        if (!r.ok) throw new Error('Aperçu indisponible'); // la page d'erreur du serveur n'est pas un aperçu
+        html = await r.text();
+      }
       if (ed.mode === 'preview') {
         canvas.innerHTML = `<div class="bq-column p-1 sm:p-4">${html}</div>`;
         window.BlockquiltContent?.enhance(canvas); // flèches et puces des carrousels, si blockquilt-content.js est chargé
@@ -148,6 +153,12 @@ export function installRender(ed) {
     ed.refreshVisual();
   };
   ed.render = () => {
+    // Texte de départ illisible (`contentUrl`) : un message à la place d'un document vide, quelle que soit la vue.
+    if (ed.unread) {
+      canvas.innerHTML = `<div role="alert" class="bq-column rounded-xl bg-red-100 p-3 text-red-800"><p>Le texte n’a pas pu être lu. ${esc(ed.unread)}</p>
+        <button type="button" data-reread class="mt-2 min-h-11 rounded-xl bg-white px-3 text-sm font-semibold">Réessayer</button></div>`;
+      return;
+    }
     ed.persistViews();
     if (ed.mode === 'preview') return renderPreview();
     if (ed.mode === 'source') ed.renderSource(); else renderEdit();

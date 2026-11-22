@@ -12,7 +12,7 @@ export function installDraft(ed) {
 
   ed.writeDraft = () => {
     clearTimeout(ed.writeDraft.timer);
-    if (!key || !ed.dirty) return;
+    if (!key || !ed.dirty || ed.unread) return; // texte non lu : le brouillon d'avant reste
     const draft = { text: ed.markdown(), version: ed.version ?? null, base: Blocks.hash(ed.savedText), at: Date.now() };
     try { localStorage.setItem(key, JSON.stringify(draft)); } catch { stored = false; }
   };

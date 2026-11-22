@@ -436,6 +436,52 @@ try {
     return out;
   })()`);
   ok(n3.busy && n3.save && n3.photo && n3.put && n3.ms, `serveur muet : enregistrer, photo, contentUrl → « Le serveur ne répond pas » après 30 s ; bouton « en cours » pendant l'attente (${JSON.stringify(n3)})`);
+  // N4 : « Garder la mienne » sans réseau, aperçu en erreur, texte de départ illisible
+  const n4 = await ev(`(async () => {
+    const OFF = 'Pas de connexion. Rien n’est perdu : réessayez quand le réseau revient.';
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const real = window.fetch;
+    const offline = () => Promise.reject(new TypeError('Failed to fetch'));
+    const out = {};
+    const mount = (options) => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { pollSeconds: 0, ...options }); return { el, e, close: () => { e.destroy(); el.remove(); } }; };
+    try {
+      window.fetch = async (url, { method } = {}) => method === 'PUT' ? new Response('', { status: 412 }) : new Response('Autre', { headers: { ETag: '"v2"' } });
+      let a = mount({ source: 'Un', contentUrl: 'contents/n4', version: '"v1"' });
+      const f = a.el.querySelector('[data-rich]'); f.textContent = 'Deux'; f.dispatchEvent(new Event('input', { bubbles: true }));
+      await a.e.save();
+      const s = a.el.querySelector('[data-sheet="remote"]');
+      window.fetch = offline;
+      s.querySelector('[data-remote-keep]').click();
+      await wait(50);
+      const err = s.querySelector('[data-remote-error]');
+      out.keep = s.open && !err.hidden && err.textContent === OFF;
+      a.close();
+      window.fetch = async () => new Response('<!doctype html><h1>Fatal error</h1>', { status: 500 });
+      a = mount({ source: 'Un', previewUrl: 'api/preview' });
+      a.el.querySelector('[data-preview]').click();
+      await wait(50);
+      const canvas = a.el.querySelector('[data-canvas]');
+      out.preview = canvas.textContent.includes('Aperçu indisponible') && !canvas.textContent.includes('Fatal');
+      a.close();
+      window.fetch = offline;
+      a = mount({ contentUrl: 'contents/n4' });
+      await wait(50);
+      const c = () => a.el.querySelector('[data-canvas]');
+      out.unread = c().textContent.includes('Le texte n’a pas pu être lu.') && c().textContent.includes(OFF) && !c().querySelector('[data-rich]');
+      out.noSave = (await a.e.save()) === false && !a.el.querySelector('[data-save-error]').hidden;
+      a.el.querySelector('[data-source-mode]').click();
+      out.stays = c().textContent.includes('Le texte n’a pas pu être lu.');
+      window.fetch = async () => new Response('Texte lu', { headers: { ETag: '"v1"' } });
+      c().querySelector('[data-reread]').click();
+      await wait(50);
+      out.reread = a.e.getMarkdown().trim() === 'Texte lu' && !c().textContent.includes('pas pu être lu') && a.el.querySelector('[data-save]').disabled;
+      a.close();
+    } finally { window.fetch = real; }
+    return out;
+  })()`);
+  ok(n4.keep, `« Garder la mienne » sans réseau → message dans la feuille (${JSON.stringify(n4)})`);
+  ok(n4.preview, `aperçu : réponse en erreur → « Aperçu indisponible », pas la page d'erreur (${JSON.stringify(n4)})`);
+  ok(n4.unread && n4.noSave && n4.stays && n4.reread, `texte de départ illisible : message dans l'éditeur, enregistrement impossible, « Réessayer » le lit (${JSON.stringify(n4)})`);
   ok(n1.stays && n1.closed && n1.cleared,`erreur d'enregistrement : reste affichée, « Fermer » la cache, un enregistrement réussi la retire (${JSON.stringify(n1)})`);
   // B3 : brouillon proposé par un bandeau, au montage
   const b3 = await ev(`(() => {

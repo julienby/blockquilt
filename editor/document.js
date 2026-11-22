@@ -88,6 +88,7 @@ export function installDocument(ed) {
   let saving = null;
   ed.save = async () => {
     if (saving) return saving;
+    if (ed.unread) { ed.saveError('Le texte n’a pas pu être lu : rien n’est enregistré.'); return false; } // sinon il remplacerait celui du serveur
     if (!ed.dirty) return true;
     ed.checkpoint(); // l'état enregistré est une étape de Ctrl+Z
     const text = ed.markdown();

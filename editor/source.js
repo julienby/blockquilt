@@ -46,6 +46,6 @@ export function installSource(ed) {
     $('[data-visual-toggle]').disabled = ed.mode === 'preview';
     titleEl.contentEditable = String(ed.editing());
     ed.render();
-    if (ed.mode === 'source') ed.sourceArea().focus({ preventScroll: true });
+    if (ed.mode === 'source') ed.sourceArea()?.focus({ preventScroll: true });
   };
 }

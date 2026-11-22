@@ -63,6 +63,7 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
   ${o.contentUrl ? sheet('remote', 'Modifié ailleurs', `<p data-remote-who class="text-sm"></p>
       <p class="mt-3 text-[11px] font-bold uppercase tracking-wider text-stone-400">Votre texte → l’autre version</p>
       <div data-remote-diff class="mt-1 max-h-72 overflow-auto rounded-xl border border-stone-200 py-2 font-mono text-xs leading-relaxed"></div>
+      <p data-remote-error role="alert" hidden class="mt-3 rounded-xl bg-red-100 p-3 text-sm text-red-800"></p>
       <div class="mt-3 grid grid-cols-2 gap-2">
         <button type="button" data-remote-take class="col-span-2 min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Prendre l’autre version</button>
         <button type="button" data-remote-keep class="min-h-11 rounded-xl border border-stone-300 px-3 text-sm font-semibold">Garder la mienne</button>
