@@ -1,0 +1,5 @@
+{
+  "markdown": "---\ntitle: Bienvenue sur le mini blog\nicon: 👋\n---\n\nCe blog est un **exemple d'intégration** de blockquilt : une liste d'articles, une page publique rendue par le serveur, et l'éditeur pour écrire.\n\n> [!tip] 💡 Essayez\n> Cliquez sur « Modifier », changez ce texte, enregistrez, puis relisez l'article.\n",
+  "id": "bienvenue",
+  "updatedAt": "2026-11-21T09:00:00.000Z"
+}

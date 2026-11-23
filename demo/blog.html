@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Mini blog</title>
+  <link rel="stylesheet" href="../blockquilt.css">
+  <link rel="stylesheet" href="../blockquilt-content.css">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <!-- Exemple 1 : un mini blog. Liste des articles, page publique rendue par le serveur (/demo/blog/{id}), éditeur pour écrire.
+       Intégration la plus simple : saveUrl (le serveur reçoit le Markdown), title: true (titre et icône dans le frontmatter). -->
+  <main class="page">
+    <section data-list>
+      <div class="top"><h1>Mini blog</h1><button type="button" class="btn primary" data-new>Nouvel article</button></div>
+      <ul class="list" data-articles></ul>
+    </section>
+    <section data-edit hidden>
+      <div class="top"><button type="button" class="btn" data-back>← Articles</button><a data-read href="#">Lire l’article</a></div>
+      <div data-editor></div>
+    </section>
+  </main>
+  <script src="../blockquilt.js"></script>
+  <script src="../blockquilt-content.js"></script>
+  <script type="module" src="blog.js"></script>
+</body>
+</html>

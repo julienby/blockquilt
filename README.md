@@ -18,6 +18,12 @@ docker compose run --rm check-php     # tests de conformité du moteur PHP + int
 
 La démo enregistre pour de vrai : le document va dans `dev/data/document.md`, les photos dans `dev/data/media/`. Pour repartir du document de démo, supprimer `dev/data/`. Sans Docker : `node dev/server.js` (Node 22), puis `node tests/blocks_test.cjs`.
 
+**Exemples d'intégration**, pour essayer l'éditeur dans une vraie application (fiches en JSON dans `dev/data/demos/`, code dans `demo/`, route dans `dev/demos.js`) :
+
+- `/demo/blog` : mini blog. Liste, édition (`saveUrl`, `title: true`), page publique rendue par le serveur (`/demo/blog/{id}`, `Blocks.toHtml`).
+- `/demo/notes` : second cerveau. Deux éditeurs dans la page (la note et le journal du jour) ; changer de note sans recharger (`destroy`, puis `mount`, brouillon par note) ; recherche dans le texte ; `onDirty` met la liste à jour après un enregistrement.
+- `/demo/admin` : admin d'un SaaS. Une fiche produit : nom, statut et catégorie (listes), prix, et deux éditeurs avec `save: false` ; un seul « Enregistrer » (et Ctrl+S) pour toute la fiche.
+
 `/app` est une **application de démo** : deux utilisateurs, chacun ses contenus (user1 : guides 1A et 1B ; user2 : guide 2A), édités par l'éditeur et exposés par le contrat ci-dessous (« Contenus d'une application »).
 
 ## Intégrer
@@ -39,7 +45,7 @@ Pas à pas, avec un serveur PHP ou Flask : [TUTORIEL.md](TUTORIEL.md).
 </script>
 ```
 
-`mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), undo(), redo(), checkRemote(), version, destroy() }`. `save()` sans modification n'envoie rien et renvoie `true`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs (il écrit d'abord le brouillon s'il reste des modifications). `Blockquilt.clearDrafts()` efface tout ce que blockquilt garde dans le navigateur (clés `blockquilt.*` : brouillons, affichage des blocs) : à appeler à la déconnexion.
+`mount` est aussi accessible par `window.Blockquilt.mount` une fois le module chargé. Il renvoie `{ getMarkdown(), setMarkdown(md), save(), dirty, markSaved(), undo(), redo(), checkRemote(), version, destroy() }`. `dirty` : des modifications ne sont pas enregistrées ; `markSaved()` : l'application a enregistré `getMarkdown()` elle-même (option `save: false`). `save()` sans modification n'envoie rien et renvoie `true`. Plusieurs éditeurs peuvent cohabiter dans une page ; `destroy()` retire l'éditeur et tous ses écouteurs (il écrit d'abord le brouillon s'il reste des modifications). `Blockquilt.clearDrafts()` efface tout ce que blockquilt garde dans le navigateur (clés `blockquilt.*` : brouillons, affichage des blocs) : à appeler à la déconnexion.
 
 Trois vues dans l'en-tête : **édition** par blocs, **texte source** (le Markdown complet, contrôlé par `Blocks.lint`) et **aperçu**. Le bouton **Visuel à côté** (icône deux colonnes) affiche un visuel à droite du texte, en blocs comme en source ; il est grisé en aperçu. Par défaut, deux panneaux dès 1024 px, un en dessous ; le choix est gardé dans le navigateur. Le visuel est toujours rendu par l'éditeur (`Blocks.toHtml`), même avec `previewUrl`, et ne suit pas le défilement. En revenant aux blocs depuis la source, le texte est relu, en une étape annulable.
 
@@ -49,6 +55,8 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 |---|---|
 | `source` | Texte du document au format blockquilt. |
 | `onSave(markdown)` ou `saveUrl` | Enregistrer : fonction (peut renvoyer une promesse, une erreur levée est affichée) ou adresse. |
+| `save` | `false` : l'éditeur n'a pas de bouton Enregistrer (en-tête, plein écran) et laisse Ctrl+S à l'application. Pour un éditeur dans un formulaire : l'application enregistre tout d'un seul bouton, lit `getMarkdown()` et `dirty`, puis appelle `markSaved()`. Exemple : `/demo/admin`. |
+| `onDirty(dirty)` | Appelée quand l'état change : `true` dès une modification, `false` une fois enregistré. Sert à activer le bouton Enregistrer de l'application. |
 | `contentUrl`, `version` | À la place de `saveUrl` : l'adresse du contenu dans le contrat de l'application (« Contenus d'une application ») et sa version (`ETag`). L'éditeur enregistre par `PUT` + `If-Match` ; si le contenu a changé ailleurs (une IA, un autre onglet), rien n'est écrasé : une feuille montre qui, quand et les lignes qui changent, puis « Prendre l'autre version » (annulable), « Garder la mienne » ou « Plus tard ». Sans `version`, il la lit ; sans `source`, il lit aussi le texte. |
 | `storageKey` | Nom du contenu pour garder, dans le navigateur (`localStorage`), l'affichage choisi par bloc (texte ou carrousel replié, aperçu du HTML). Par défaut `contentUrl`. Sans l'un ni l'autre, l'affichage est gardé le temps de la session seulement. Jamais écrit dans le Markdown. L'état suit la place et le type du bloc : il est réécrit à chaque dessin. Nomme aussi le brouillon (`draft`). Application à plusieurs utilisateurs sur un même appareil : mettre l'identifiant de l'utilisateur dans `storageKey`. |
 | `draft` | Brouillon local, actif par défaut avec `storageKey` ou `contentUrl`. Le texte non enregistré est gardé dans le navigateur 1 s après une modification et quand la page se cache ; il n'y a plus de message du navigateur au départ. Au chargement suivant, un bandeau dans l'éditeur propose « Reprendre » (annulable) ou « Ignorer » ; il signale si le contenu a changé depuis. Avec `contentUrl`, un brouillon d'une ancienne version mène à la feuille de conflit à l'enregistrement. `false` : pas de brouillon, message du navigateur (appareil partagé). Si le navigateur refuse l'écriture (stockage plein ou bloqué), le message du navigateur revient. Limites : le brouillon reste sur cet appareil et ce navigateur ; deux onglets sur le même contenu : le dernier brouillon écrit gagne. |

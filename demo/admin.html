@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Admin produits</title>
+  <link rel="stylesheet" href="../blockquilt.css">
+  <link rel="stylesheet" href="../blockquilt-content.css">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <!-- Exemple 3 : l'administration d'un SaaS. Une fiche produit = des champs de l'application + deux éditeurs.
+       Les éditeurs n'ont pas de bouton Enregistrer (save: false) : la fiche entière s'enregistre d'un seul bouton. -->
+  <main class="page">
+    <div class="top"><h1>Produits</h1><button type="button" class="btn" data-new>Nouveau produit</button></div>
+    <div class="split">
+      <nav class="side" aria-label="Produits"><ul class="list" data-products></ul></nav>
+      <form class="main card" data-form>
+        <div class="top"><h2 data-heading>Fiche produit</h2><span class="status" data-state role="status"></span>
+          <button type="submit" class="btn primary" data-save-form disabled>Enregistrer</button></div>
+        <div class="fields">
+          <label>Nom <input name="name" required autocomplete="off"></label>
+          <label>Statut <select name="status"><option value="draft">Brouillon</option><option value="published">Publié</option><option value="archived">Archivé</option></select></label>
+          <label>Catégorie <select name="category"><option value="abonnement">Abonnement</option><option value="option">Option</option><option value="service">Service</option></select></label>
+          <label>Prix (€ / mois) <input name="price" class="price" inputmode="decimal" autocomplete="off"></label>
+        </div>
+        <p class="editor-label" id="summary-label">Description courte</p>
+        <div data-summary aria-labelledby="summary-label"></div>
+        <p class="editor-label" id="page-label">Page produit</p>
+        <div data-page aria-labelledby="page-label"></div>
+      </form>
+    </div>
+  </main>
+  <script src="../blockquilt.js"></script>
+  <script src="../blockquilt-content.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

@@ -1624,6 +1624,29 @@ try {
   }
   await viewport(375);
 
+  // ---- 4n D1 : option save: false, l'application enregistre elle-même (dirty, markSaved, onDirty) ----
+  const ns = await ev(`(async () => {
+    const el = document.createElement('div'); document.body.append(el);
+    const calls = [];
+    const e = Blockquilt.mount(el, { source: 'Un.\\n\\nDeux.', save: false, onDirty: (d) => calls.push(d) });
+    const $ = (s) => el.querySelector(s);
+    const out = { head: $('[data-save]').offsetParent === null, start: e.dirty };
+    const f = $('[data-canvas] [data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, ' A'); document.execCommand('insertText', false, 'B');
+    out.typed = e.dirty;
+    const k = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });
+    f.dispatchEvent(k);
+    out.ctrlS = k.defaultPrevented;
+    $('[data-canvas] [data-id] [data-expand]').click();
+    out.full = $('[data-block-full] [data-full-save]').offsetParent === null;
+    $('[data-block-full]').close(); await new Promise((r) => setTimeout(r, 50));
+    e.markSaved();
+    out.saved = e.dirty; out.calls = calls.join(); out.md = e.getMarkdown();
+    e.destroy(); el.remove();
+    return out;
+  })()`);
+  ok(ns.head && ns.full && ns.start === false && ns.typed === true && ns.ctrlS === false, `save: false : pas de bouton Enregistrer (en-tête, plein écran), Ctrl+S laissé à l’application, dirty lisible (${JSON.stringify(ns)})`);
+  ok(ns.saved === false && ns.calls === 'true,false' && ns.md === 'Un. AB\n\nDeux.\n', `save: false : markSaved() ; onDirty appelé à chaque changement d’état seulement (${ns.calls})`);
+
   // ---- Phase 10 : démo complète, accessibilité, parcours au clavier ----
   fs.rmSync(doc);
   await viewport(375);
@@ -1813,6 +1836,63 @@ try {
     return out;
   })()`);
   ok(b3c.shown && b3c.version === '"00000000"' && b3c.sheet && !fs.readFileSync(path.join(data, 'contents', 'guide-1b.md'), 'utf8').includes('Brouillon ancien'), `brouillon d'une ancienne version : Reprendre, Enregistrer → feuille de conflit, serveur intact (${JSON.stringify(b3c)})`);
+  // ---- 4n : exemples d'intégration (/demo/blog, /demo/notes, /demo/admin), dans de vraies pages ----
+  const record = (name, id) => { try { return JSON.parse(fs.readFileSync(path.join(data, 'demos', name, id + '.json'), 'utf8')); } catch { return {}; } };
+  const go = async (url, test, label) => { await send('Page.navigate', { url }); await sleep(200); await waitFor(() => ev(test), label); };
+  const typeIn = (selector, text) => ev(`(() => { const f = document.querySelector(${JSON.stringify(selector)}); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, ${JSON.stringify(text)}); })()`);
+  const fitsPage = () => ev(`document.documentElement.scrollWidth <= innerWidth`);
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    // Mini blog : liste, édition (saveUrl, title: true), page publique rendue par le serveur.
+    await go(BASE + '/demo/blog', `document.querySelectorAll('[data-articles] li').length >= 2`, 'liste du blog');
+    ok(await fitsPage() && await ev(`document.querySelector('[data-articles]').textContent.includes('Bienvenue sur le mini blog')`), `${width} px, /demo/blog : la liste des articles, sans défilement horizontal`);
+    await ev(`document.querySelector('a[href="#edit=bienvenue"]').click()`);
+    await waitFor(() => ev(`!!document.querySelector('[data-editor] [data-id]') && document.querySelector('[data-editor] [data-title]').textContent === 'Bienvenue sur le mini blog'`), 'éditeur du blog');
+    await typeIn('[data-editor] [data-rich]', ` Modifié ${width}.`);
+    await ev(`document.querySelector('[data-editor] [data-save]').click()`);
+    await waitFor(async () => (record('blog', 'bienvenue').markdown || '').includes(`Modifié ${width}.`), 'article enregistré');
+    ok(await fitsPage(), `${width} px, /demo/blog : édition et enregistrement d’un article (saveUrl)`);
+    await go(BASE + '/demo/blog/bienvenue', `!!document.querySelector('article h1')`, 'article publié');
+    ok(await ev(`document.querySelector('article h1').textContent.includes('Bienvenue') && document.querySelector('article').textContent.includes('Modifié ${width}.') && !document.querySelector('[data-bq]')`), `${width} px, /demo/blog/bienvenue : l’article rendu par le serveur, sans éditeur`);
+
+    // Second cerveau : deux éditeurs dans la page, changer de note sans recharger, recherche.
+    await go(BASE + '/demo/notes', `document.querySelectorAll('[data-bq]').length === 2 && !!document.querySelector('[data-note] [data-id]') && !!document.querySelector('[data-journal] [data-id]')`, 'deux éditeurs');
+    const noteId = await ev(`document.querySelector('[data-notes] [aria-current="true"]').dataset.open`);
+    await typeIn('[data-journal] .bq-edit', `Journal ${width}.`);
+    await typeIn('[data-note] .bq-edit', ` Note ${width}.`);
+    await ev(`document.querySelector('[data-note] [data-save]').click()`);
+    await waitFor(async () => (record('notes', noteId).markdown || '').includes(`Note ${width}.`), 'note enregistrée');
+    ok(await fitsPage() && await ev(`!document.querySelector('[data-journal] [data-save]').disabled && document.querySelector('[data-note] [data-save]').disabled`) && !(record('notes', `journal-${new Date().toISOString().slice(0, 10)}`).markdown || '').includes(`Journal ${width}.`),
+      `${width} px, /demo/notes : deux éditeurs indépendants (la note enregistrée, le journal encore à enregistrer)`);
+    await ev(`document.querySelector('[data-open="recette-pain"]').click()`);
+    await waitFor(() => ev(`document.querySelector('[data-note]').textContent.includes('farine')`), 'autre note');
+    ok(await ev(`document.querySelectorAll('[data-bq]').length === 2 && document.querySelector('[data-journal]').textContent.includes('Journal ${width}.')`), `${width} px, /demo/notes : changer de note sans recharger, le journal garde sa frappe`);
+    await ev(`(() => { const s = document.querySelector('[data-search]'); s.value = 'farine'; s.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await waitFor(() => ev(`document.querySelectorAll('[data-notes] [data-open]').length === 1`), 'recherche');
+    ok(await ev(`document.querySelector('[data-notes] [data-open]').textContent.trim() === 'Recette du pain'`), `${width} px, /demo/notes : la recherche cherche dans le texte`);
+    await ev(`document.querySelector('[data-journal] [data-save]').click()`);
+    await waitFor(async () => (record('notes', `journal-${new Date().toISOString().slice(0, 10)}`).markdown || '').includes(`Journal ${width}.`), 'journal enregistré');
+
+    // Admin SaaS : champs + deux éditeurs (save: false), un seul Enregistrer pour la fiche.
+    const status = width < 640 ? 'archived' : 'published';
+    await go(BASE + '/demo/admin', `!!document.querySelector('[data-summary] [data-id]') && !!document.querySelector('[data-page] [data-id]') && document.querySelector('[name=name]').value !== ''`, 'fiche produit');
+    const productId = await ev(`document.querySelector('[data-products] [aria-current="true"]').dataset.open`);
+    ok(await fitsPage() && await ev(`[...document.querySelectorAll('[data-save], [data-full-save]')].every((b) => b.offsetParent === null) && document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : pas de bouton Enregistrer dans les éditeurs, celui de la fiche est inactif`);
+    await ev(`(() => { const s = document.querySelector('[name=status]'); s.value = '${status}'; s.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await typeIn('[data-page] .bq-edit', ` Admin ${width}.`);
+    ok(await ev(`!document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : un champ ou un éditeur modifié → Enregistrer actif`);
+    await ev(`document.querySelector('[data-save-form]').click()`);
+    await waitFor(async () => record('admin', productId).status === status && (record('admin', productId).page || '').includes(`Admin ${width}.`), 'fiche enregistrée');
+    ok(await ev(`document.querySelector('[data-save-form]').disabled && document.querySelector('[data-state]').textContent === 'Enregistré'`), `${width} px, /demo/admin : la fiche entière enregistrée (champs + 2 textes), bouton inactif`);
+    await typeIn('[data-summary] .bq-edit', ` Résumé ${width}.`);
+    const onlyEditor = await ev(`!document.querySelector('[data-save-form]').disabled`);
+    await ev(`document.querySelector('[data-summary] .bq-edit').dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))`);
+    await waitFor(async () => (record('admin', productId).summary || '').includes(`Résumé ${width}.`), 'Ctrl+S de la fiche');
+    ok(onlyEditor && await ev(`document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : un éditeur seul modifié (onDirty) → Enregistrer actif ; Ctrl+S enregistre la fiche`);
+    await go(BASE + '/demo/admin', `!!document.querySelector('[data-page] [data-id]') && document.querySelector('[name=name]').value !== ''`, 'fiche relue');
+    ok(await ev(`document.querySelector('[name=status]').value === '${status}' && document.querySelector('[data-page]').textContent.includes('Admin ${width}.')`), `${width} px, /demo/admin : après rechargement, la fiche est relue`);
+  }
+
   ws.close();
 } catch (error) {
   ok(false, error.message);

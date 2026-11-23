@@ -143,6 +143,9 @@ const ai = createAi({
   },
 });
 
+// Exemples d'intégration (/demo/blog, /demo/notes, /demo/admin) : leurs pages et leurs fiches JSON.
+const demos = require('./demos.js')(DATA, { send, json, read, form });
+
 const routes = {
   // IA : GET → usages proposés ; POST → { markdown } ou { operations } (contrat dans ai/blockquilt-ai.js).
   'GET /api/ai': (req, res) => ai.handler(req, res),
@@ -188,6 +191,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const route = routes[`${req.method} ${url.pathname}`];
     if (route) return await route(req, res);
+    if (await demos(req, res, url.pathname)) return;
     if (await reference.contents(req, res, url.pathname)) return;
     if (url.pathname === '/mcp') return await mcp(req, res);
     if (req.method === 'GET' && url.pathname === '/app') return reference.app(req, res, url, fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'));

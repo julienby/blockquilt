@@ -142,7 +142,7 @@ export function installEvents(ed) {
     if (e.key === 'Escape' && ed.dragging()) { e.preventDefault(); ed.dragEnd(false); return; }
     if (!(e.ctrlKey || e.metaKey) || e.altKey || !owns()) return;
     const k = e.key.toLowerCase();
-    if (k === 's') { e.preventDefault(); ed.save(); return; }
+    if (k === 's') { if (o.save !== false) { e.preventDefault(); ed.save(); } return; } // save: false : Ctrl+S est à l'application
     if (k !== 'z' && k !== 'y') return;
     if (ed.mode === 'source') return; // vue source : la zone de texte garde son propre annuler / rétablir
     if (ed.typing && inField()) return; // frappe en cours dans un champ : le navigateur annule sa propre frappe

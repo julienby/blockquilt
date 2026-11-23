@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Second cerveau</title>
+  <link rel="stylesheet" href="../blockquilt.css">
+  <link rel="stylesheet" href="../blockquilt-content.css">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <!-- Exemple 2 : un second cerveau. Deux éditeurs dans la même page : la note choisie et le journal du jour.
+       Changer de note ne recharge pas la page : l'éditeur est retiré (destroy) puis remonté (mount) sur l'autre note. -->
+  <main class="page">
+    <div class="top"><h1>Second cerveau</h1><button type="button" class="btn primary" data-new>Nouvelle note</button></div>
+    <div class="split">
+      <nav class="side" aria-label="Notes">
+        <input type="search" data-search placeholder="Chercher dans les notes" aria-label="Chercher dans les notes" class="btn">
+        <ul class="list" data-notes></ul>
+      </nav>
+      <div class="main">
+        <section class="card" aria-labelledby="note-label"><h2 id="note-label">Note</h2><div data-note></div></section>
+        <section class="card" aria-labelledby="journal-label"><h2 id="journal-label" data-journal-label>Journal du jour</h2><div data-journal></div></section>
+      </div>
+    </div>
+  </main>
+  <script src="../blockquilt.js"></script>
+  <script src="../blockquilt-content.js"></script>
+  <script type="module" src="notes.js"></script>
+</body>
+</html>

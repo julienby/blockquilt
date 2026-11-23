@@ -1,0 +1,10 @@
+{
+  "name": "Plan Solo",
+  "status": "draft",
+  "category": "abonnement",
+  "price": "9",
+  "summary": "Pour **une personne**.\n",
+  "page": "## Simple et complet\n\nUn espace, sans limite de pages.\n",
+  "id": "plan-solo",
+  "updatedAt": "2026-11-20T09:00:00.000Z"
+}

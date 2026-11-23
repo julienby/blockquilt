@@ -18,6 +18,7 @@ export function installDocument(ed) {
   // Deux boutons Enregistrer, un seul comportement : l'en-tête et le plein écran d'un bloc.
   const saveButtons = () => [saveBtn, $('[data-full-save]')];
   ed.setDirty = (value, { loaded = false } = {}) => {
+    const changed = value !== ed.dirty;
     ed.dirty = value;
     if (!value) ed.savedText = ed.markdown();
     if (value) ed.draftLater();
@@ -28,6 +29,7 @@ export function installDocument(ed) {
       b.classList.toggle('text-brand-700', value);
       b.setAttribute('aria-label', value ? 'Enregistrer' : 'Enregistré');
     }
+    if (changed) ed.o.onDirty?.(value); // l'application suit l'état (save: false : son propre bouton Enregistrer)
   };
 
   // ---- Titre et icône : dans le frontmatter ; les autres clés sont gardées dans leur ordre ----

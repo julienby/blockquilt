@@ -267,12 +267,12 @@ Précisé le 2026-11-22 : la carte n'a pas de bouton (liste fermée : texte, cit
 
 But : intégrer l'éditeur pour de vrai dans une application, pour comprendre et valider. Sans dépendance ni build : une page HTML + un script par exemple, dans `demo/`.
 
-- [ ] **D0 Stockage** : route générique dans `dev/server.js`, `/demo/api/{exemple}` (liste) et `/demo/api/{exemple}/{id}` (GET, PUT, DELETE), un fichier JSON par fiche (champs + Markdown) dans `DATA/demos/`. Pages servies sous `/demo/{exemple}` ; adresses relatives (démo publique sous `/blockquilt/`).
-- [ ] **D1 Option `save: false`** (contrat de l'éditeur) : pas de bouton Enregistrer propre (en-tête, plein écran, Ctrl+S) ; l'hôte lit `getMarkdown()`, `dirty`, et appelle `markSaved()` après son enregistrement. Brouillon et message de départ inchangés. DECISIONS.
-- [ ] **D2 `/demo/blog`** : liste des articles, lecture (rendu serveur `Blocks.toHtml` + `blockquilt-content.css`), édition (`saveUrl`, `title: true`, frontmatter).
-- [ ] **D3 `/demo/notes`** (second cerveau) : liste des notes, recherche, nouvelle note ; changer de note sans recharger (`destroy` / `mount`, brouillon par note) ; « Journal du jour » à côté : **2 éditeurs dans la page**.
-- [ ] **D4 `/demo/admin`** (admin SaaS) : fiche produit, nom (champ simple), statut et catégorie (listes), prix, 2 éditeurs (« Description courte », « Page produit ») avec `save: false` ; un seul « Enregistrer » pour la fiche.
-- [ ] **D5** Un essai Chromium par exemple (375 et 1280 px) : chargement, modification, enregistrement, relecture après rechargement, éditeurs indépendants. README « Exemples d'intégration ». Un commit par exemple.
+- [x] **D0 Stockage** : route générique dans `dev/server.js`, `/demo/api/{exemple}` (liste) et `/demo/api/{exemple}/{id}` (GET, PUT JSON, POST `text` pour saveUrl ; pas de DELETE), un fichier JSON par fiche (champs + Markdown) dans `DATA/demos/`. Pages servies sous `/demo/{exemple}` ; adresses relatives (démo publique sous `/blockquilt/`).
+- [x] **D1 Option `save: false`** (contrat de l'éditeur) : pas de bouton Enregistrer propre (en-tête, plein écran, Ctrl+S) ; l'hôte lit `getMarkdown()`, `dirty`, et appelle `markSaved()` après son enregistrement. Brouillon et message de départ inchangés. DECISIONS.
+- [x] **D2 `/demo/blog`** : liste des articles, lecture (rendu serveur `Blocks.toHtml` + `blockquilt-content.css`), édition (`saveUrl`, `title: true`, frontmatter).
+- [x] **D3 `/demo/notes`** (second cerveau) : liste des notes, recherche, nouvelle note ; changer de note sans recharger (`destroy` / `mount`, brouillon par note) ; « Journal du jour » à côté : **2 éditeurs dans la page**.
+- [x] **D4 `/demo/admin`** (admin SaaS) : fiche produit, nom (champ simple), statut et catégorie (listes), prix, 2 éditeurs (« Description courte », « Page produit ») avec `save: false` ; un seul « Enregistrer » pour la fiche.
+- [x] **D5** Un essai Chromium par exemple (375 et 1280 px) : chargement, modification, enregistrement, relecture après rechargement, éditeurs indépendants. README « Exemples d'intégration ». Un commit par exemple.
 
 ## 5. IA — fait (I1 à I6)
 
