@@ -6,6 +6,8 @@
 //   GET  → { uses: [{ id, label, scopes }] }   les usages proposés (boutons de la feuille IA)
 //   POST → champs (multipart, urlencoded ou JSON) : scope (document | block), use (facultatif), instruction,
 //          text (document complet), block (Markdown du bloc si scope=block),
+//          part (scope=block, facultatif : selection | text — plein écran d'un bloc : un passage sélectionné ou tout le texte du bloc ;
+//          la réponse doit être du texte seulement, jamais des blocs),
 //          blocks (scope=document, facultatif : liste JSON de textes, [0] = frontmatter ou "", [n] = Markdown du bloc n),
 //          range (avec blocks, facultatif : « a-b », les seuls blocs à modifier, par exemple ceux qu'on vient de coller ;
 //          réponse toujours en opérations, même pour un usage `output: 'document'`)
@@ -70,7 +72,12 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     if (spent.day !== day) Object.assign(spent, { day, global: 0, users: new Map() });
   };
 
-  const prompt = ({ scope, instruction, text, block, blocks, range, use, output }) => {
+  // Plein écran d'un bloc : la réponse va dans le champ de texte du bloc ; un autre bloc n'y entre pas.
+  const PART = {
+    selection: 'Passage sélectionné dans le texte d’un bloc : réponds seulement par le texte qui remplace ce passage, sans titre, citation, encadré, photo ni autre bloc, sans guillemets autour. Garde la mise en forme simple (gras, italique, liens).',
+    text: 'Texte d’un bloc : réponds seulement par le texte qui le remplace, sans titre, citation, encadré, photo ni autre bloc. Une ligne par paragraphe ; garde la mise en forme simple (gras, italique, liens, listes).',
+  };
+  const prompt = ({ scope, instruction, text, block, blocks, range, use, output, part }) => {
     const ops = output === 'operations';
     const doc = ops ? 'Document :\n\n' + blocks.map((b, n) => `[${n}]\n${b || (n ? '' : '(pas de frontmatter)')}`).join('\n\n') + '\n\n'
       : scope === 'block' ? `Document complet, pour le contexte :\n\n${text}\n\n---\n\nBloc à modifier :\n\n${block}\n\n`
@@ -82,7 +89,7 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
       user: doc
         + (ops && range ? `Ne modifie que les blocs ${range[0]} à ${range[1]} (les blocs collés) : « remplacer », « supprimer », « avant » et « après » seulement sur ces numéros. Les autres blocs servent de contexte.\n\n` : '')
         + (instruction ? `Consigne : ${instruction}\n\n` : '')
-        + (ops ? 'Réponds par des opérations, ou par « @@ rien ».' : scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
+        + (ops ? 'Réponds par des opérations, ou par « @@ rien ».' : part ? PART[part] : scope === 'block' ? 'Réponds avec le ou les blocs qui remplacent ce bloc.' : 'Réponds avec le document complet, frontmatter compris.'),
     };
   };
 
@@ -111,7 +118,8 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     }
     // Avec range, toujours des opérations : un document entier modifierait aussi les blocs hors de la plage.
     const output = blocks && (range || use?.output !== 'document') ? 'operations' : 'document';
-    const ask = { scope, use, output, blocks, range, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
+    const part = scope === 'block' && Object.hasOwn(PART, String(req.part)) ? req.part : null;
+    const ask = { scope, use, output, blocks, range, part, instruction: String(req.instruction || '').trim(), text: String(req.text || ''), block: String(req.block || '') };
     const size = (output === 'operations' ? blocks.join('').length : ask.text.length) + ask.block.length + ask.instruction.length;
     if (limits.maxChars && size > limits.maxChars) throw fail(413, `Texte trop long pour l’IA : ${size} caractères envoyés, ${limits.maxChars} au plus.`);
     const answer = (out) => ({ [output === 'operations' ? 'operations' : 'markdown']: out });

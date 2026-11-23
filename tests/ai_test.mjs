@@ -42,6 +42,13 @@ try {
   ok(last.body.max_tokens === 16000 && last.body.reasoning.effort === 'low' && last.body.temperature === 0.2, 'paramètres en plus (réflexion…) et longueur maximale de 16 000');
   const user = last.body.messages[1].content;
   ok(user.includes('Bloc à modifier :\n\nTexte.') && user.includes('Consigne : plus court') && user.includes('# Doc\n\nTexte.') && user.endsWith('remplacent ce bloc.'), 'message : document pour le contexte, bloc, consigne précisée ; \\r\\n remis en \\n');
+  // Plein écran d'un bloc (part) : la réponse ne doit être que du texte pour ce champ, jamais des blocs.
+  await post({ scope: 'block', instruction: 'x', text: 'Un passage ici.', block: 'passage', part: 'selection' });
+  const sel = last.body.messages[1].content;
+  ok(sel.includes('Passage sélectionné') && sel.includes('sans titre') && !sel.includes('le ou les blocs'), 'part=selection : réponds seulement par le texte qui remplace le passage');
+  await post({ scope: 'block', instruction: 'x', text: 'Un texte.', block: 'Un texte.', part: 'text' });
+  const field = last.body.messages[1].content;
+  ok(field.includes('Texte d’un bloc') && field.includes('sans titre') && !field.includes('le ou les blocs'), 'part=text : réponds seulement par du texte pour ce bloc');
   await post({ scope: 'document', use: 'resumer', text: 'Texte.' });
   ok(last.body.model === 'petit/modele' && last.body.messages[1].content.endsWith('frontmatter compris.') && !last.body.messages[1].content.includes('Consigne'), 'usage avec son propre modèle, sur le document');
   ok(last.body.reasoning.effort === 'high' && last.body.temperature === 0.2, 'paramètres d’un usage : devant ceux de tous les usages');

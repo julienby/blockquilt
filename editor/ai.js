@@ -56,17 +56,28 @@ export function installAi(ed) {
   };
   // Plein écran d'un bloc : seul son champ de texte change. Texte sélectionné : il part seul, la réponse le remplace.
   // Curseur seul : tout le champ part, la réponse s'insère au curseur ou remplace tout le texte.
+  // Toucher un bouton (téléphone) fait perdre le focus, puis la sélection, avant le clic : on garde donc la dernière
+  // sélection faite dans le champ tant qu'il avait le focus. À défaut, la sélection du moment, si elle est dans le champ.
+  let kept = null;
+  ed.on(document, 'selectionchange', () => {
+    const f = document.activeElement;
+    const sel = getSelection();
+    if (f?.matches?.('[data-rich]') && ed.blockFull.contains(f) && sel.rangeCount && f.contains(sel.getRangeAt(0).commonAncestorContainer)) kept = sel.getRangeAt(0).cloneRange();
+  });
   ed.openAiField = (el) => {
     ed.syncFromDom();
     const sel = getSelection();
-    const range = sel.rangeCount && el.contains(sel.getRangeAt(0).commonAncestorContainer) ? sel.getRangeAt(0).cloneRange() : document.createRange();
-    if (!el.contains(range.commonAncestorContainer)) { range.selectNodeContents(el); range.collapse(false); }
+    const now = sel.rangeCount && el.contains(sel.getRangeAt(0).commonAncestorContainer) ? sel.getRangeAt(0).cloneRange() : null;
+    const known = (kept && el.contains(kept.commonAncestorContainer) ? kept : null) ?? now;
+    // Aucune place connue dans le champ : la réponse s'ajoute à la fin, et le bouton le dit.
+    const range = known ?? document.createRange();
+    if (!known) { range.selectNodeContents(el); range.collapse(false); }
     const selected = !range.collapsed;
     const box = document.createElement('div');
     box.append(selected ? range.cloneContents() : el.cloneNode(true));
     const sent = Blocks.htmlToMd(selected ? box.innerHTML : box.firstChild.innerHTML);
     const b = ed.blocks.find((x) => x.id === el.closest('[data-id]').dataset.id);
-    prepare({ id: b.id, field: { el, range, selected, sent } }, `${selected ? 'Sur la sélection' : 'Sur ce bloc'} : ${ed.def(b).label}`);
+    prepare({ id: b.id, field: { el, range, selected, sent, atEnd: !known } }, `${selected ? 'Sur la sélection' : 'Sur ce bloc'} : ${ed.def(b).label}`);
   };
   const prepare = (state, label) => {
     ai = state;
@@ -76,7 +87,7 @@ export function installAi(ed) {
     ['replace', 'start', 'end'].forEach((k, i) => { $(`[data-ai-apply="${k}"]`, sheet).textContent = labels[i]; });
     sheet.querySelectorAll('[data-ai-apply]').forEach((x) => { x.hidden = !!field; });
     $('[data-ai-field="here"]', sheet).hidden = !field;
-    $('[data-ai-field="here"]', sheet).textContent = field?.selected ? 'Remplacer la sélection' : 'Insérer au curseur';
+    $('[data-ai-field="here"]', sheet).textContent = field?.selected ? 'Remplacer la sélection' : field?.atEnd ? 'Ajouter à la fin' : 'Insérer au curseur';
     $('[data-ai-field="all"]', sheet).hidden = !field || field.selected;
     $('[data-ai-form]', sheet).hidden = false;
     $('[data-ai-result]', sheet).hidden = true;
@@ -108,7 +119,7 @@ export function installAi(ed) {
       // En vue source, le texte de la zone fait foi : pas de blocs à désigner, le document part entier.
       const numbered = !b && ed.mode !== 'source' ? ed.aiSnapshot(ai.ids) : {};
       const sent = ai.field ? ai.field.sent : b ? Blocks.toMarkdown(b) : null;
-      const r = await request(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: sent } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
+      const r = await request(o.aiUrl, { method: 'POST', body: ed.form({ scope: b ? 'block' : 'document', ...(use ? { use } : {}), instruction, text, ...(b ? { block: sent } : {}), ...(ai.field ? { part: ai.field.selected ? 'selection' : 'text' } : {}), ...numbered }), headers: { Accept: 'application/json' }, signal: AbortSignal.any([ed.ac.signal, mine.signal]) });
       const j = await r.json().catch(() => ({}));
       if (mine.signal.aborted) return;
       const ops = r.ok && typeof j.operations === 'string';

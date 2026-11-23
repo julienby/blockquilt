@@ -1411,7 +1411,7 @@ try {
 
   // ---- 4k : IA en plein écran sur un bloc. Éditeur à part ; la réponse de l'IA est imposée (fetch remplacé dans la page). ----
   // select : [début, fin] dans le premier nœud texte du champ (début = fin : curseur). click : here | all | rien.
-  const fullAi = (source, { select = [0, 0], answer = 'X', click = '', aiUrl = 'api/ai' } = {}) => ev(`(async () => {
+  const fullAi = (source, { select = [0, 0], answer = 'X', click = '', aiUrl = 'api/ai', tap = false } = {}) => ev(`(async () => {
     const wait = async (f) => { for (let i = 0; i < 100 && !f(); i++) await new Promise((r) => setTimeout(r, 50)); return f(); };
     const real = window.fetch;
     let sent = null;
@@ -1436,6 +1436,8 @@ try {
       f.focus();
       const r = document.createRange(); r.setStart(f.firstChild, ${select[0]}); r.setEnd(f.firstChild, ${select[1]});
       getSelection().removeAllRanges(); getSelection().addRange(r);
+      // tap : comme un toucher sur téléphone, le champ perd le focus et la sélection avant que le bouton réagisse.
+      if (${tap}) { await new Promise((r) => setTimeout(r, 50)); f.blur(); getSelection().removeAllRanges(); await new Promise((r) => setTimeout(r, 50)); }
       if (innerWidth >= 640) direct.click(); else { full.querySelector('[data-full-more]').click(); viaMenu.click(); }
       const sheet = $('[data-sheet="ai"]');
       const box = sheet.getBoundingClientRect();
@@ -1443,7 +1445,7 @@ try {
       out.scope = $('[data-ai-scope]').textContent;
       $('[data-ai-instruction]').value = 'x'; $('[data-ai-run]').click();
       await wait(() => !$('[data-ai-result]').hidden);
-      out.sentScope = sent?.scope; out.sentBlock = sent?.block;
+      out.sentScope = sent?.scope; out.sentBlock = sent?.block; out.sentPart = sent?.part;
       out.buttons = $$('[data-ai-field]').filter(visible).map((b) => b.textContent + (b.disabled ? ' (désactivé)' : '')).join('|');
       out.others = $$('[data-ai-apply]').some(visible);
       out.why = visible($('[data-ai-why]')) ? $('[data-ai-why]').textContent : '';
@@ -1468,10 +1470,14 @@ try {
     const sel = await fullAi('Bonjour le monde.', { select: [11, 16], answer: 'MONDE', click: 'here' });
     ok(sel.button && sel.onTop, `${width} px, IA plein écran : bouton présent, feuille IA au-dessus du plein écran`);
     ok(sel.scope === 'Sur la sélection : Texte' && sel.sentScope === 'block' && sel.sentBlock === 'monde', `${width} px, IA plein écran : la sélection part seule (${JSON.stringify([sel.scope, sel.sentScope, sel.sentBlock])})`);
+    const tap = await fullAi('Bonjour le monde.', { select: [11, 16], answer: 'MONDE', click: 'here', tap: true });
+    ok(tap.scope === 'Sur la sélection : Texte' && tap.sentBlock === 'monde' && tap.buttons === 'Remplacer la sélection' && tap.md === 'Bonjour le MONDE.\n', `${width} px, IA plein écran : la sélection est gardée même si le toucher du bouton la fait perdre (${JSON.stringify([tap.scope, tap.sentBlock, tap.md])})`);
+    ok(sel.sentPart === 'selection', `${width} px, IA plein écran : la sélection part avec part=selection (${sel.sentPart})`);
     ok(sel.buttons === 'Remplacer la sélection' && !sel.others, `${width} px, IA plein écran : un seul bouton avec une sélection (${sel.buttons})`);
     ok(sel.md === 'Bonjour le MONDE.\n' && sel.focus && sel.undone === 'Bonjour le monde.\n', `${width} px, IA plein écran : sélection remplacée, focus rendu au champ, un seul Annuler (${JSON.stringify([sel.md, sel.undone])})`);
     const cur = await fullAi('Avant. Après.', { select: [7, 7], answer: 'Milieu. ', click: 'here' });
     ok(cur.scope === 'Sur ce bloc : Texte' && cur.sentBlock === 'Avant. Après.' && cur.buttons === 'Insérer au curseur|Remplacer le texte', `${width} px, IA plein écran : curseur seul → le champ entier part, deux boutons (${cur.buttons})`);
+    ok(cur.sentPart === 'text', `${width} px, IA plein écran : tout le texte part avec part=text (${cur.sentPart})`);
     ok(cur.md === 'Avant. Milieu.Après.\n' && cur.undone === 'Avant. Après.\n', `${width} px, IA plein écran : inséré au curseur, un seul Annuler (${JSON.stringify(cur.md)})`);
     const tip = await fullAi('> [!tip] 🔑 La clé\n> Sous le pot.', { answer: 'Dans la boîte.', click: 'all' });
     ok(tip.md === '> [!tip] 🔑 La clé\n> Dans la boîte.\n' && tip.undone === '> [!tip] 🔑 La clé\n> Sous le pot.\n', `${width} px, IA plein écran : texte de l’encadré remplacé, titre et icône gardés (${JSON.stringify(tip.md)})`);
