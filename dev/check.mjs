@@ -1428,13 +1428,15 @@ try {
     try {
       $('[data-canvas] [data-id] [data-expand]').click();
       const full = $('[data-block-full]');
-      out.button = visible(full.querySelector('[data-full-ai]'));
+      // Grand écran : bouton de l'en-tête ; téléphone : ligne du menu « ⋯ ».
+      const direct = full.querySelector('[data-full-ai]'), viaMenu = $('[data-sheet="fullmore"] [data-full-act="ai"]');
+      out.button = innerWidth >= 640 ? visible(direct) : !!viaMenu && !viaMenu.hidden;
       if (!out.button) return out;
       const f = full.querySelector('[data-rich]');
       f.focus();
       const r = document.createRange(); r.setStart(f.firstChild, ${select[0]}); r.setEnd(f.firstChild, ${select[1]});
       getSelection().removeAllRanges(); getSelection().addRange(r);
-      full.querySelector('[data-full-ai]').click();
+      if (innerWidth >= 640) direct.click(); else { full.querySelector('[data-full-more]').click(); viaMenu.click(); }
       const sheet = $('[data-sheet="ai"]');
       const box = sheet.getBoundingClientRect();
       out.onTop = sheet.open && full.open && sheet.contains(document.elementFromPoint(box.x + box.width / 2, box.y + 20));
@@ -1551,6 +1553,74 @@ try {
     ok(fl.v.pressed === 'true' && fl.v.header === 'true' && fl.v.field && fl.v.text === 'Un texte. plus', `${width} px, plein écran d’un bloc : visuel à côté du champ, même réglage que l’en-tête (${j(fl.v)})`);
     ok(fl.v2.text === 'Un texte. plus encore' && fl.v2.fits && !fl.off.render && fl.off.header === 'false', `${width} px, plein écran d’un bloc : le visuel suit la frappe, tient dans la largeur, se retire (${j([fl.v2, fl.off])})`);
     ok(fl.reopen === 'false', `${width} px, plein écran d’un bloc : l’aperçu est remis à zéro à la fermeture`);
+  }
+  await viewport(375);
+
+  // ---- 4m : source d'un bloc en plein écran ; menu « ⋯ » sous 640 px ----
+  for (const width of [375, 1280]) {
+    await viewport(width);
+    const fs4 = await ev(`(async () => {
+      const tick = (ms = 50) => new Promise((r) => setTimeout(r, ms));
+      let split = null;
+      try { split = localStorage.getItem('blockquilt.split'); localStorage.setItem('blockquilt.split', 'false'); } catch {}
+      const el = document.createElement('div'); document.body.append(el);
+      const e = Blockquilt.mount(el, { source: 'Un **texte**.\\n\\nDeux.', onSave: async () => {}, aiUrl: 'api/ai' });
+      const $ = (s) => el.querySelector(s);
+      const shown = (x) => !!x && x.offsetParent !== null;
+      const out = {};
+      try {
+        $('[data-canvas] [data-id] [data-expand]').click();
+        const full = $('[data-block-full]');
+        const head = full.querySelector('.bq-head');
+        out.head = { fits: head.scrollWidth <= head.clientWidth, label: full.querySelector('[data-block-full-label]').getBoundingClientRect().width,
+          direct: ['source', 'preview', 'visual', 'ai'].filter((k) => shown(full.querySelector('[data-full-' + k + ']'))).join(), more: shown(full.querySelector('[data-full-more]')) };
+        // Une action : bouton de l'en-tête (grand écran) ou ligne du menu « ⋯ » (téléphone).
+        const act = async (k) => {
+          if (innerWidth >= 640) return full.querySelector('[data-full-' + k + ']').click();
+          full.querySelector('[data-full-more]').click();
+          const menu = $('[data-sheet="fullmore"]');
+          out.menu ??= [...menu.querySelectorAll('[data-full-act]')].filter(shown).map((x) => x.textContent.trim()).join('|');
+          menu.querySelector('[data-full-act="' + k + '"]').click();
+          await tick();
+        };
+        const area = () => full.querySelector('[data-full-source-text]');
+        const type = (v) => { area().value = v; area().dispatchEvent(new InputEvent('input', { bubbles: true })); };
+        await act('source');
+        out.enter = { value: area()?.value, pressed: full.querySelector('[data-full-source]').getAttribute('aria-pressed'), lint: full.querySelector('[data-full-source-lint]')?.textContent.trim() };
+        type('> [!tip] Astuce\\n> Nouveau');
+        out.live = { md: e.getMarkdown(), label: full.querySelector('[data-block-full-label]').textContent };
+        type('A\\n\\nB');
+        out.many = { md: e.getMarkdown(), lint: full.querySelector('[data-full-source-lint]').textContent };
+        await act('source');
+        full.querySelector('[data-block-full-close]').click(); await tick();
+        out.refused = { open: full.open, area: !!area(), toast: $('[data-toast]').textContent };
+        type('Simple.');
+        await act('source');
+        out.left = { area: !!area(), field: full.querySelector('[data-rich]')?.textContent, md: e.getMarkdown(), pressed: full.querySelector('[data-full-source]').getAttribute('aria-pressed') };
+        e.undo(); await tick();
+        out.undone = e.getMarkdown();
+        $('[data-canvas] [data-id] [data-expand]').click();
+        await act('source');
+        full.querySelector('[data-full-next]').click();
+        out.next = area()?.value;
+        await act('preview');
+        out.preview = { area: !!area(), source: full.querySelector('[data-full-source]').getAttribute('aria-pressed'), preview: full.querySelector('[data-full-preview]').getAttribute('aria-pressed') };
+        await act('preview');
+        await act('source');
+        type('X\\n\\nY');
+        full.close(); await tick();
+        out.forced = e.getMarkdown();
+        return out;
+      } finally { e.destroy(); el.remove(); try { if (split === null) localStorage.removeItem('blockquilt.split'); else localStorage.setItem('blockquilt.split', split); } catch {} }
+    })()`);
+    const j = JSON.stringify;
+    ok(fs4.head.fits && fs4.head.label >= 40 && (width < 640 ? fs4.head.direct === '' && fs4.head.more && fs4.menu === 'Texte source|Aperçu|Visuel à côté|Assistant IA' : fs4.head.direct === 'source,preview,visual,ai' && !fs4.head.more), `${width} px, plein écran d’un bloc : en-tête qui tient, ${width < 640 ? 'menu « ⋯ »' : 'boutons visibles'} (${j([fs4.head, fs4.menu])})`);
+    ok(fs4.enter.value === 'Un **texte**.' && fs4.enter.pressed === 'true' && fs4.enter.lint.startsWith('Aucune alerte'), `${width} px, source d’un bloc : le Markdown du bloc seul (${j(fs4.enter)})`);
+    ok(fs4.live.md === '> [!tip] Astuce\n> Nouveau\n\nDeux.\n' && fs4.live.label === 'Astuce', `${width} px, source d’un bloc : la frappe change le bloc, le type peut changer (${j(fs4.live)})`);
+    ok(fs4.many.md === fs4.live.md && fs4.many.lint.includes('Ce texte fait 2 blocs') && fs4.refused.open && fs4.refused.area && fs4.refused.toast.includes('Ce texte fait 2 blocs'), `${width} px, source d’un bloc : 2 blocs → on reste dans la source, fermeture refusée (${j([fs4.many, fs4.refused])})`);
+    ok(!fs4.left.area && fs4.left.field === 'Simple.' && fs4.left.md === 'Simple.\n\nDeux.\n' && fs4.left.pressed === 'false' && fs4.undone === 'Un **texte**.\n\nDeux.\n', `${width} px, source d’un bloc : sortie → le champ ; un seul Annuler (${j([fs4.left, fs4.undone])})`);
+    ok(fs4.next === 'Deux.' && !fs4.preview.area && fs4.preview.source === 'false' && fs4.preview.preview === 'true', `${width} px, source d’un bloc : gardée au bloc voisin ; l’aperçu la quitte (${j([fs4.next, fs4.preview])})`);
+    ok(fs4.forced === 'Un **texte**.\n\nX\n\nY\n', `${width} px, source d’un bloc : fermeture forcée avec 2 blocs → rien n’est perdu (${j(fs4.forced)})`);
   }
   await viewport(375);
 

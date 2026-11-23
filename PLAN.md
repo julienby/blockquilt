@@ -256,6 +256,24 @@ Précisé le 2026-11-22 : la carte n'a pas de bouton (liste fermée : texte, cit
 - [x] **F3 Visuel à côté** (deux colonnes) : même réglage que l'en-tête (`ed.sideBySide`, `blockquilt.split`) ; le bloc seul rendu à côté (dessous sous 1024 px), suit la frappe comme le visuel de l'éditeur.
 - [x] **F4** Essais Chromium 375 et 1280 px d'abord ; README (« Il n'a pas de visuel à côté » retiré), DECISIONS.
 
+## 4m. Source d'un bloc en plein écran (validé le 2026-11-23)
+
+- [x] **S1 Bouton `</>`** dans l'en-tête du plein écran (`aria-pressed`) : le Markdown du bloc seul dans une zone de texte (hauteur pleine), alertes `Blocks.lint` à la frappe. Source et aperçu s'excluent ; le visuel à côté marche aussi en source.
+- [x] **S2 Sortie de la source** (re-clic, bloc voisin, fermeture) : texte relu. 1 bloc → il remplace le bloc, même si le type change. 0 bloc → bloc vide du même type. Plusieurs blocs → on reste dans la source, message « Ce texte fait N blocs : un seul ici (Scinder pour découper) » ; la fermeture est refusée tant que c'est le cas. Une seule étape d'annulation.
+- [x] **S3 Téléphone (< 640 px)** : Source, Aperçu, Visuel et IA passent dans un menu « ⋯ » de l'en-tête du plein écran ; le nom du bloc reste visible.
+- [x] **S4** Essais Chromium 375 et 1280 px d'abord ; README, DECISIONS.
+
+## 4n. Exemples d'intégration sous /demo (validé le 2026-11-23)
+
+But : intégrer l'éditeur pour de vrai dans une application, pour comprendre et valider. Sans dépendance ni build : une page HTML + un script par exemple, dans `demo/`.
+
+- [ ] **D0 Stockage** : route générique dans `dev/server.js`, `/demo/api/{exemple}` (liste) et `/demo/api/{exemple}/{id}` (GET, PUT, DELETE), un fichier JSON par fiche (champs + Markdown) dans `DATA/demos/`. Pages servies sous `/demo/{exemple}` ; adresses relatives (démo publique sous `/blockquilt/`).
+- [ ] **D1 Option `save: false`** (contrat de l'éditeur) : pas de bouton Enregistrer propre (en-tête, plein écran, Ctrl+S) ; l'hôte lit `getMarkdown()`, `dirty`, et appelle `markSaved()` après son enregistrement. Brouillon et message de départ inchangés. DECISIONS.
+- [ ] **D2 `/demo/blog`** : liste des articles, lecture (rendu serveur `Blocks.toHtml` + `blockquilt-content.css`), édition (`saveUrl`, `title: true`, frontmatter).
+- [ ] **D3 `/demo/notes`** (second cerveau) : liste des notes, recherche, nouvelle note ; changer de note sans recharger (`destroy` / `mount`, brouillon par note) ; « Journal du jour » à côté : **2 éditeurs dans la page**.
+- [ ] **D4 `/demo/admin`** (admin SaaS) : fiche produit, nom (champ simple), statut et catégorie (listes), prix, 2 éditeurs (« Description courte », « Page produit ») avec `save: false` ; un seul « Enregistrer » pour la fiche.
+- [ ] **D5** Un essai Chromium par exemple (375 et 1280 px) : chargement, modification, enregistrement, relecture après rechargement, éditeurs indépendants. README « Exemples d'intégration ». Un commit par exemple.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

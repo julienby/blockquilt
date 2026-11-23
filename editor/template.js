@@ -12,6 +12,7 @@ const sheet = (name, label, inner) => `<dialog data-sheet="${name}" aria-label="
       <button type="button" data-close aria-label="Fermer" class="bq-btn bq-muted">${ic('x')}</button></div>${inner}</dialog>`;
 export const item = (data, icon, label, cls = '') => `<button type="button" ${data} class="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium hover:bg-stone-100 active:bg-stone-200 ${cls}">${ic(icon)}<span class="min-w-0 flex-1 truncate">${label}</span></button>`;
 
+const pressedCls = 'aria-pressed:bg-brand-50 aria-pressed:text-brand-800';
 export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-full flex-col"${o.width ? ` style="--bq-width: ${attr(o.width)}"` : ''}>
   <header data-head class="bq-head sticky z-20 flex min-h-14 items-center gap-0.5 border-b px-1.5 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-3">
     ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn bq-muted">${ic('chevron_left')}</a>` : ''}
@@ -114,14 +115,17 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
     <div data-emoji-grid class="mt-1 grid h-[min(19rem,42dvh)] grid-cols-7 content-start overflow-y-auto sm:grid-cols-9"></div>
     <div class="mt-3 flex gap-2"><input data-icon-input aria-label="Votre emoji" placeholder="Ou collez un emoji" class="h-11 min-w-0 flex-1 rounded-xl border border-stone-300 px-3 text-xl"><button type="button" data-icon-use class="min-h-11 rounded-xl bg-brand-600 px-4 font-semibold text-white">Utiliser</button></div>
     <button type="button" data-icon-pick="" data-emoji-none class="mt-2 min-h-11 rounded-xl px-3 font-medium text-brand-700 hover:bg-brand-50">Aucune icône</button>`)}
+  ${menu('fullmore', 'Actions du bloc en plein écran', `<div class="grid gap-0.5">${item('data-full-act="source" aria-pressed="false"', 'code', 'Texte source', pressedCls)}${item('data-full-act="preview" aria-pressed="false"', 'eye', 'Aperçu', pressedCls)}${item('data-full-act="visual" aria-pressed="false"', 'columns', 'Visuel à côté', pressedCls)}${o.aiUrl ? item('data-full-act="ai"', 'wand', 'Assistant IA') : ''}</div>`)}
   <dialog data-block-full aria-label="Bloc en plein écran" class="bq-full"><div data-full-inner class="bq-full-inner">
     <div class="bq-head sticky z-10 flex min-h-14 items-center gap-1 border-b px-2 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <span data-block-full-label class="min-w-0 flex-1 truncate px-2 text-sm font-bold text-stone-500"></span>
       <button type="button" data-full-prev aria-label="Bloc précédent" title="Bloc précédent" class="bq-btn bq-muted">${ic('chevron_up')}</button>
       <button type="button" data-full-next aria-label="Bloc suivant" title="Bloc suivant" class="bq-btn bq-muted">${ic('chevron_down')}</button>
-      <button type="button" data-full-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
-      <button type="button" data-full-visual aria-pressed="false" aria-label="Visuel à côté" title="Visuel à côté" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white disabled:opacity-40">${ic('columns')}</button>
-      ${o.aiUrl ? `<button type="button" data-full-ai hidden aria-label="Assistant IA sur ce texte" title="Assistant IA sur ce texte" class="bq-btn bq-muted">${ic('wand')}</button>` : ''}
+      <button type="button" data-full-source aria-pressed="false" aria-label="Texte source (Markdown)" title="Texte source (Markdown)" class="bq-btn bq-muted max-sm:hidden aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('code')}</button>
+      <button type="button" data-full-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn bq-muted max-sm:hidden aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
+      <button type="button" data-full-visual aria-pressed="false" aria-label="Visuel à côté" title="Visuel à côté" class="bq-btn bq-muted max-sm:hidden aria-pressed:bg-brand-600 aria-pressed:text-white disabled:opacity-40">${ic('columns')}</button>
+      ${o.aiUrl ? `<button type="button" data-full-ai hidden aria-label="Assistant IA sur ce texte" title="Assistant IA sur ce texte" class="bq-btn bq-muted max-sm:hidden">${ic('wand')}</button>` : ''}
+      <button type="button" data-full-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn bq-muted sm:hidden">${ic('more')}</button>
       <button type="button" data-full-save aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
       <button type="button" data-width aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn bq-muted hidden sm:inline-flex">${ic('width')}</button>
       <button type="button" data-block-full-close aria-label="Quitter le plein écran" title="Quitter le plein écran" class="group inline-flex size-11 shrink-0 items-center justify-center rounded-full">

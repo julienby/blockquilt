@@ -42,12 +42,14 @@ export function installEvents(ed) {
     if (hit('[data-ai]')) return ed.openAi(null);
     if (hit('[data-more]')) return ed.openSheet('more', hit('[data-more]'));
     if (hit('[data-full-save]')) return ed.save();
+    if (hit('[data-full-source]')) return ed.toggleBlockSource();
     if (hit('[data-full-preview]')) return ed.toggleBlockPreview();
+    if (hit('[data-full-more]')) return ed.openSheet('fullmore', hit('[data-full-more]'));
     if (hit('[data-full-visual]')) return ed.toggleSplit();
     if (hit('[data-full-ai]')) return ed.openAiField(blockFull.querySelector('[data-rich]'));
     if (hit('[data-full-prev]')) return ed.stepBlockFull(-1);
     if (hit('[data-full-next]')) return ed.stepBlockFull(1);
-    if (hit('[data-block-full-close]')) return blockFull.close();
+    if (hit('[data-block-full-close]')) return ed.closeBlockFull();
     if (hit('[data-preview]')) return ed.setMode('preview');
     if (hit('[data-source-mode]')) return ed.setMode('source');
     if (hit('[data-visual-toggle]')) return ed.toggleSplit();
