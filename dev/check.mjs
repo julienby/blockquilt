@@ -824,8 +824,22 @@ try {
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await ev(`(() => { const f = [...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'tip'); f.querySelector('[data-rich]').focus(); f.querySelector('[data-callout-icon]').click(); })()`);
   ok(await ev(`matchMedia('(pointer: coarse)').matches && document.querySelector('[data-sheet="icon"]').open && !document.activeElement.matches('input, textarea, [contenteditable="true"]')`), 'sélecteur d’emoji (tactile) : aucun champ n’a le focus, le clavier se ferme');
-  await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await ev(`document.querySelector('[data-sheet="icon"]').close()`);
+  // Plein écran d'un bloc au toucher : aucun champ ne prend le focus (le clavier ne s'ouvre pas) ; on touche le texte à l'endroit voulu.
+  const noField = `!document.activeElement.matches('input, textarea, [contenteditable="true"]')`;
+  await ev(`(() => { document.activeElement?.blur(); const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === 'text'); c.querySelector('[data-expand]').click(); })()`);
+  const tOpen = await ev(`document.querySelector('[data-block-full]').open && ${noField}`);
+  await ev(`document.querySelector('[data-block-full] [data-full-next]').click()`);
+  const tNext = await ev(noField);
+  await ev(`document.querySelector('[data-block-full] [data-full-more]').click()`);
+  await ev(`document.querySelector('[data-full-act="source"]').click()`);
+  const tSource = await ev(`!!document.querySelector('[data-full-source-text]') && ${noField}`);
+  await ev(`document.querySelector('[data-block-full] [data-full-more]').click()`);
+  await ev(`document.querySelector('[data-full-act="source"]').click()`);
+  ok(tOpen && tNext && tSource, `bloc en plein écran (tactile) : le clavier ne s’ouvre pas à l’ouverture, au bloc suivant ni en source (${[tOpen, tNext, tSource]})`);
+  await ev(`document.querySelector('[data-block-full] [data-block-full-close]').click()`);
+  await sleep(100);
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await viewport(1280);
   await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'tip').querySelector('[data-callout-icon]').click()`);
   ok(await ev(`!matchMedia('(pointer: coarse)').matches && document.activeElement.matches('[data-emoji-search]')`), 'sélecteur d’emoji (souris) : la recherche a le focus');

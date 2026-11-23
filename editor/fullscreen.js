@@ -23,6 +23,9 @@ export function installFullscreen(ed) {
   };
   ed.on(window.visualViewport, 'resize', fit);
   ed.on(window.visualViewport, 'scroll', fit);
+  // Écran tactile : aucun champ ne prend le focus de lui-même, sinon le clavier s'ouvre et cache la moitié du texte.
+  // On lit d'abord, puis on touche le texte à l'endroit voulu. À la souris, le curseur est mis dans le champ.
+  const focusField = (el) => { if (!matchMedia('(pointer: coarse)').matches) el?.focus(); };
   const enter = (d) => {
     d.showModal();
     fit();
@@ -148,7 +151,7 @@ export function installFullscreen(ed) {
   ed.on(blockFull, 'input', (e) => { if (e.target.matches('[data-full-source-text]')) readSource(); });
   // Quitter la source : refusé tant que le texte fait plusieurs blocs. Le bloc est déjà à jour : une étape d'annulation.
   const leaveSource = () => {
-    if (many) { ed.toast(manyText()); area().focus(); return false; }
+    if (many) { ed.toast(manyText()); focusField(area()); return false; }
     ed.checkpoint();
     return true;
   };
@@ -158,7 +161,7 @@ export function installFullscreen(ed) {
     ed.syncFromDom();
     mode = next;
     ed.redrawBlockFull();
-    if (mode !== 'preview') body.querySelector('[contenteditable], textarea, input')?.focus();
+    if (mode !== 'preview') focusField(body.querySelector('[contenteditable], textarea, input'));
   };
   ed.toggleBlockPreview = () => setMode('preview');
   ed.toggleBlockSource = () => setMode('source');
@@ -186,7 +189,7 @@ export function installFullscreen(ed) {
     blockFull.style.setProperty('--bq-width', app.style.getPropertyValue('--bq-width') || '');
     inner(blockFull).append(ed.bar, ed.toastEl.parentElement); // la barre et les messages doivent être dans la couche du dialogue
     if (!blockFull.open) enter(blockFull);
-    blockFull.querySelector('[contenteditable], textarea, input')?.focus();
+    focusField(blockFull.querySelector('[contenteditable], textarea, input'));
   };
   ed.on(blockFull, 'close', () => {
     app.append(ed.bar, ed.toastEl.parentElement);
