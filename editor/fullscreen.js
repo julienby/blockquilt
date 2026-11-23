@@ -11,11 +11,25 @@ const FIELD_AI = ['text', 'quote', 't1', 't2', 't3', ...Blocks.CALLOUTS];
 export function installFullscreen(ed) {
   const { app, element, editorFull, blockFull, inner, sheets, $ } = ed;
 
+  // Clavier du téléphone : le navigateur rétrécit l'écran visible et le décale, sans réduire la page.
+  // Le dialogue suit l'écran visible : son en-tête et ses premières lignes restent visibles. Pas au zoom (pincer).
+  const fit = () => {
+    const vv = window.visualViewport;
+    for (const d of [blockFull, editorFull]) {
+      const keyboard = d.open && vv && Math.abs(vv.scale - 1) < 0.01;
+      d.style.top = keyboard ? vv.offsetTop + 'px' : '';
+      d.style.height = keyboard ? vv.height + 'px' : '';
+    }
+  };
+  ed.on(window.visualViewport, 'resize', fit);
+  ed.on(window.visualViewport, 'scroll', fit);
   const enter = (d) => {
     d.showModal();
+    fit();
     app.querySelectorAll('[data-width]').forEach((w) => { w.hidden = false; });
   };
   const leave = () => {
+    fit();
     app.querySelectorAll('[data-head] [data-width]').forEach((w) => { w.hidden = !editorFull.open; });
   };
   ed.cycleWidth = () => {

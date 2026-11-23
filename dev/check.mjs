@@ -720,6 +720,23 @@ try {
     await ev(`(() => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].find((x) => x.querySelector('[data-convert]')?.value === 'text'); c.querySelector('[data-expand]').click(); })()`);
     const bf = await ev(`(() => { const d = document.querySelector('[data-block-full]'); const r = d.getBoundingClientRect(); const f = d.querySelector('[data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, ' Plein${width}'); return { open: d.open, w: r.width, h: r.height, W: innerWidth, H: innerHeight }; })()`);
     ok(bf.open && bf.w === bf.W && bf.h === bf.H, `${width} px : bloc en plein écran, exactement ${bf.W} × ${bf.H} (${bf.w} × ${bf.h})`);
+    if (width === 375) {
+      // Clavier du téléphone (simulé) : l'écran visible rétrécit et le navigateur le décale vers le bas pour montrer le curseur.
+      const kb = await ev(`(async () => {
+        const vv = visualViewport; const d = document.querySelector('[data-block-full]');
+        Object.defineProperty(vv, 'height', { get: () => 400, configurable: true });
+        Object.defineProperty(vv, 'offsetTop', { get: () => 300, configurable: true });
+        vv.dispatchEvent(new Event('resize'));
+        await new Promise((r) => requestAnimationFrame(r));
+        const head = d.querySelector('.bq-head').getBoundingClientRect(); const r = d.getBoundingClientRect();
+        const inner = d.querySelector('[data-full-inner]'); inner.scrollTop = 0;
+        const field = d.querySelector('[data-rich]').getBoundingClientRect();
+        delete vv.height; delete vv.offsetTop; vv.dispatchEvent(new Event('resize'));
+        await new Promise((r) => requestAnimationFrame(r));
+        return { top: r.top, h: r.height, head: Math.round(head.top), field: Math.round(field.top), after: d.getBoundingClientRect().height };
+      })()`);
+      ok(kb.top === 300 && kb.h === 400 && kb.head >= 300 && kb.field >= 300 && kb.after === bf.H, `375 px, clavier ouvert : le bloc en plein écran suit l’écran visible, en-tête et premières lignes visibles, puis reprend la hauteur pleine (${JSON.stringify(kb)})`);
+    }
     await key('Escape', 'Escape', 27);
     ok(await ev(`!document.querySelector('[data-block-full]').open && editor.getMarkdown().includes(' Plein${width}')`), `${width} px : Échap ferme, le texte tapé est dans le document`);
   }
