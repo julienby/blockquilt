@@ -332,6 +332,7 @@ Moteurs : tout changement du format se fait en JS, PHP et Python.
 - Deux tests instables vus une fois chacun : `/demo/notes : deux éditeurs indépendants` et `/demo/admin : … Ctrl+S enregistre la fiche` (l'état du bouton est lu juste après la frappe).
 
 **Étape 3 — Cycle de vie**
+0. D'abord, rendre stables les deux tests instables de `dev/check.mjs` : `/demo/notes : deux éditeurs indépendants` et `/demo/admin : … Ctrl+S enregistre la fiche` (attendre l'état au lieu de le lire juste après la frappe). Pas de version avec un test instable.
 1. `CHANGELOG.md`.
 2. `bin/blockquilt-install <version> <dossier de l'application>` : copie les fichiers d'un tag dans `assets/blockquilt/<version>/` et `lib/blockquilt/<version>/`, écrit `VERSION`. Rien d'autre.
 3. `bin/blockquilt-verify <dossier de .md>` : relecture identique de chaque contenu, et HTML comparé entre deux versions.
