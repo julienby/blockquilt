@@ -312,9 +312,13 @@ const Blocks = {
   /** Une ligne de Markdown → texte sans mise en forme. */
   plain(md) { return Blocks.unesc(Blocks.inlineHtml(md).replace(/<[^>]+>/g, '')); },
 
-  /** Une ligne de Markdown → HTML : code, gras, italique, souligné, surligné, liens. Tout le reste reste du texte. */
-  inlineHtml(md) {
-    const re = /\\([\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\])[^)\s]*)\)/g;
+  /**
+   * Une ligne de Markdown → HTML : code, gras, italique, souligné, surligné, liens, adresses nues. Tout le reste reste du texte.
+   * urls : « link » (HTML publié), « mark » (champ de l'éditeur : l'adresse nue porte data-bq-url, réécrite nue par htmlToMd),
+   * « text » (dans le texte d'un lien : pas de lien dans un lien).
+   */
+  inlineHtml(md, urls = 'link') {
+    const re = /\\([\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\])[^)\s]*)\)|(?<!\w)(https?:\/\/[^\s<>]+)/g;
     let out = '';
     let at = 0;
     let m;
@@ -323,11 +327,17 @@ const Blocks = {
       at = re.lastIndex;
       if (m[1] !== undefined) out += Blocks.esc(m[1]);
       else if (m[2] !== undefined) out += '<code>' + Blocks.esc(m[2]) + '</code>';
-      else if (m[3] !== undefined) out += '<strong>' + Blocks.inlineHtml(m[3]) + '</strong>';
-      else if (m[4] !== undefined) out += '<em>' + Blocks.inlineHtml(m[4]) + '</em>';
-      else if (m[5] !== undefined) out += '<u>' + Blocks.inlineHtml(m[5]) + '</u>';
-      else if (m[6] !== undefined) out += '<mark>' + Blocks.inlineHtml(m[6]) + '</mark>';
-      else out += '<a href="' + Blocks.attr(m[8]) + '">' + Blocks.inlineHtml(m[7]) + '</a>';
+      else if (m[3] !== undefined) out += '<strong>' + Blocks.inlineHtml(m[3], urls) + '</strong>';
+      else if (m[4] !== undefined) out += '<em>' + Blocks.inlineHtml(m[4], urls) + '</em>';
+      else if (m[5] !== undefined) out += '<u>' + Blocks.inlineHtml(m[5], urls) + '</u>';
+      else if (m[6] !== undefined) out += '<mark>' + Blocks.inlineHtml(m[6], urls) + '</mark>';
+      else if (m[7] !== undefined) out += '<a href="' + Blocks.attr(m[8]) + '">' + Blocks.inlineHtml(m[7], 'text') + '</a>';
+      else {
+        const url = Blocks.urlEnd(m[9]);
+        at = re.lastIndex = m.index + url.length; // la ponctuation finale reste du texte
+        out += urls === 'text' || !/^https?:\/\/./.test(url) ? Blocks.esc(url)
+          : `<a href="${Blocks.attr(url)}"${urls === 'mark' ? ' data-bq-url' : ''}>${Blocks.esc(url)}</a>`;
+      }
     }
     return out + Blocks.esc(md.slice(at));
   },
@@ -368,20 +378,20 @@ const Blocks = {
     }
     return out;
   },
-  listHtml(list) {
-    return `<${list.tag}>${list.items.map((x) => `<li>${Blocks.inlineHtml(x.text)}${x.subs.map(Blocks.listHtml).join('')}</li>`).join('')}</${list.tag}>`;
+  listHtml(list, urls = 'link') {
+    return `<${list.tag}>${list.items.map((x) => `<li>${Blocks.inlineHtml(x.text, urls)}${x.subs.map((sub) => Blocks.listHtml(sub, urls)).join('')}</li>`).join('')}</${list.tag}>`;
   },
 
   /** Lignes de Markdown → HTML d'un champ modifiable : lignes séparées par `<br>`, listes en `<ul><li>` / `<ol><li>` (imbriquées). */
   linesToHtml(lines) {
-    return Blocks.listTree(lines).map((n) => (n.list ? Blocks.listHtml(n.list) : Blocks.inlineHtml(n.line))).join('<br>');
+    return Blocks.listTree(lines).map((n) => (n.list ? Blocks.listHtml(n.list, 'mark') : Blocks.inlineHtml(n.line, 'mark'))).join('<br>');
   },
 
   /** Lignes de Markdown → HTML publié : paragraphes `<p>` (lignes jointes par `<br>`), listes `<ul>` / `<ol>` (imbriquées). */
   flowHtml(lines) {
     const out = [];
     let para = [];
-    const flush = () => { if (para.length) out.push(`<p>${para.map(Blocks.inlineHtml).join('<br>')}</p>`); para = []; };
+    const flush = () => { if (para.length) out.push(`<p>${para.map((l) => Blocks.inlineHtml(l)).join('<br>')}</p>`); para = []; };
     for (const n of Blocks.listTree(lines)) {
       if (n.list) { flush(); out.push(Blocks.listHtml(n.list)); }
       else if (n.line.trim() === '') flush();
@@ -398,14 +408,31 @@ const Blocks = {
     return full.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
   },
 
-  /** Texte tapé → Markdown : les signes qui changeraient le sens sont protégés par « \ ». */
+  /** Adresse nue lue dans un texte, sans sa ponctuation finale : « . , ; : ! ? ' " » », et « ) » qui n'a pas de « ( » dans l'adresse. */
+  urlEnd(u) {
+    while (/[.,;:!?'"»]$/.test(u) || (u.endsWith(')') && u.split(')').length > u.split('(').length)) u = u.slice(0, -1);
+    return u;
+  },
+  URL: /(?<!\w)https?:\/\/[^\s<>]+/g,
+
+  /** Texte tapé → Markdown : les signes qui changeraient le sens sont protégés par « \ », sauf dans une adresse nue (lue telle quelle). */
   escText(s) {
-    return s.replace(/\\/g, '\\\\').replace(/[*[\]`]/g, '\\$&').replace(/\+\+/g, '\\+\\+').replace(/==/g, '\\=\\=')
+    let out = '';
+    let at = 0;
+    for (const m of s.matchAll(Blocks.URL)) {
+      const url = Blocks.urlEnd(m[0]);
+      out += Blocks.escPlain(s.slice(at, m.index)) + url;
+      at = m.index + url.length;
+    }
+    return out + Blocks.escPlain(s.slice(at));
+  },
+  escPlain(s) {
+    return s.replace(/\\/g, '\\\\').replace(/[*[\]`]/g, '\\$&').replace(/\+\+/g, '\\+\\+').replace(/==/g, '\\=\\=').replace(/~~/g, '\\~\\~')
       .replace(/(^|\W)_|_(?=\W|$)/g, (x) => x.replace('_', '\\_'));
   },
 
   /** HTML d'un champ modifiable → Markdown (gère `<ul><li>`, `<ol><li>`, et protège les signes Markdown). */
-  htmlToMd(html, bullets = false) {
+  htmlToMd(html, bullets = false, inline = false) {
     const lines = [];
     let cur = '';
     let liPrefix = '';
@@ -421,7 +448,7 @@ const Blocks = {
         liPrefix = '';
         return;
       }
-      lines.push(cur.replace(start, '\\$1').replace(/^(\d+)([.)]) /, '$1\\$2 ').replace(/^(-{3,}\s*)$/, '\\$1'));
+      lines.push(inline ? cur : cur.replace(start, '\\$1').replace(/^(\d+)([.)]) /, '$1\\$2 ').replace(/^(-{3,}\s*)$/, '\\$1').replace(/^<!--/, '<\\!--'));
       cur = '';
     };
     const MARKS = { b: '**', strong: '**', i: '*', em: '*', u: '++', mark: '==', a: 'a', code: '`' };
@@ -438,11 +465,11 @@ const Blocks = {
       const tag = m[2].toLowerCase();
       if (MARKS[tag]) {
         if (!closing) {
-          frames.push({ mark: MARKS[tag], href: tag === 'a' ? Blocks.safeHref((/href\s*=\s*"([^"]*)"/i.exec(m[3]) || [])[1] || '') : '', tag, buf: '' });
+          frames.push({ mark: MARKS[tag], href: tag === 'a' ? Blocks.safeHref((/href\s*=\s*"([^"]*)"/i.exec(m[3]) || [])[1] || '') : '', tag, buf: '', auto: tag === 'a' && /\sdata-bq-url\b/i.test(m[3]) });
         } else if (frames.length) {
           const f = frames.pop();
           const [, lead, core, trail] = /^(\s*)([\s\S]*?)(\s*)$/.exec(f.buf);
-          if (core === '') put(lead + trail);
+          if (core === '' || f.auto) put(f.buf); // adresse nue du champ : son texte, relu en lien s'il est encore une adresse
           else if (f.tag === 'a') put(f.href ? `${lead}[${core}](${f.href})${trail}` : lead + core + trail);
           else if (f.tag === 'code') put(core.includes('`') ? lead + Blocks.escText(core) + trail : lead + '`' + core + '`' + trail);
           else put(lead + f.mark + core + f.mark + trail);
@@ -505,8 +532,8 @@ const Blocks = {
     let quotes = 0;
     let pre = null; // texte du bloc <pre> en cours
     let lastPhoto = null; // { i, src } : la photo qu'une <figcaption> peut légender
-    const photo = (alt, src) => `![${Blocks.htmlToMd(Blocks.esc(alt)).replace(/\n/g, ' ')}](${src})`;
-    const plain = () => Blocks.htmlToMd(Blocks.esc(Blocks.stripTags(buf))).replace(/\n+/g, ' ').trim();
+    const photo = (alt, src) => `![${Blocks.htmlToMd(Blocks.esc(alt), false, true).replace(/\n/g, ' ')}](${src})`;
+    const plain = () => Blocks.htmlToMd(Blocks.esc(Blocks.stripTags(buf)), false, true).replace(/\n+/g, ' ').trim();
     const flush = () => {
       while (open.length) buf += `</${open.pop()}>`;
       const lines = Blocks.htmlToMd(buf, kind === 'list' || kind === 'quote').split('\n')
@@ -829,7 +856,7 @@ const Blocks = {
     label, short: label.replace('Titre ', ''), icon: 'heading', convertible: true, single: true,
     tone: tone(`bq-tone bq-tone-strong ${border}`, 'bq-badge'),
     match: (t) => { const m = new RegExp(`^#{${level}} (.+)$`).exec(t); return m ? { html: Blocks.esc(Blocks.plain(m[1])) } : null; },
-    toMarkdown: (b) => { const x = Blocks.htmlToMd(Blocks.esc(Blocks.stripTags(b.html))).replace(/\n+/g, ' ').trim(); return x ? '#'.repeat(level) + ' ' + x : ''; },
+    toMarkdown: (b) => { const x = Blocks.htmlToMd(Blocks.esc(Blocks.stripTags(b.html)), false, true).replace(/\n+/g, ' ').trim(); return x ? '#'.repeat(level) + ' ' + x : ''; },
     toHtml: (b, ctx) => {
       const text = Blocks.stripTags(b.html).trim();
       let id = Blocks.slug(text);
@@ -930,7 +957,7 @@ const Blocks = {
     toMarkdown: (b) => {
       if (!b.src) return '';
       const opts = [b.size && 'size=' + b.size, b.ratio && 'ratio=' + b.ratio].filter(Boolean).join(' ');
-      return `![${Blocks.htmlToMd(Blocks.esc(b.alt)).replace(/\n/g, ' ')}](${b.src})` + (opts ? `{${opts}}` : '');
+      return `![${Blocks.htmlToMd(Blocks.esc(b.alt), false, true).replace(/\n/g, ' ')}](${b.src})` + (opts ? `{${opts}}` : '');
     },
     toHtml: (b, ctx) => {
       const cls = [b.size && 'bq-photo-' + b.size, b.ratio && 'bq-ratio-' + b.ratio.replace(':', 'x')].filter(Boolean).join(' ');
@@ -991,9 +1018,9 @@ const Blocks = {
       const href = Blocks.safeHref(b.href);
       const lines = [
         b.src && Blocks.types.photo.toMarkdown(b),
-        title && '### ' + Blocks.htmlToMd(Blocks.esc(title)),
+        title && '### ' + Blocks.htmlToMd(Blocks.esc(title), false, true),
         text.trim() && text,
-        label && href && `[${Blocks.htmlToMd(Blocks.esc(label))}](${href})`,
+        label && href && `[${Blocks.htmlToMd(Blocks.esc(label), false, true)}](${href})`,
       ].filter(Boolean);
       return lines.length ? [':::card', ...lines, ':::'].join('\n') : '';
     },

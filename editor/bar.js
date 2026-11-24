@@ -78,7 +78,7 @@ export function installBar(ed) {
       const a = range && linkOf(range);
       if (!a && (!range || range.collapsed)) return ed.toast('Sélectionnez du texte');
       input.value = a ? a.getAttribute('href') : '';
-      row.querySelector('[data-link-remove]').hidden = !a;
+      row.querySelector('[data-link-remove]').hidden = !a || a.hasAttribute('data-bq-url'); // adresse nue : le lien, c'est son texte
       toggleClip(false);
     }
     row.hidden = !show;
@@ -94,7 +94,7 @@ export function installBar(ed) {
     if (!remove && !href) return ed.toast('Adresse acceptée : https://…, /…, #…, mailto: ou tel:');
     backToField();
     if (remove) a?.replaceWith(...a.childNodes);
-    else if (a) a.setAttribute('href', href);
+    else if (a) { a.setAttribute('href', href); a.removeAttribute('data-bq-url'); }
     else document.execCommand('createLink', false, href);
     toggleLink(false);
     ed.setDirty(true);

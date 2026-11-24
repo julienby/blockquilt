@@ -21,7 +21,8 @@ final class BlockquiltRender
     private const PHOTO_OPTS_RE = '/^(.+)\{(?:size=(small|medium)|ratio=(16:9|4:3|1:1)|size=(small|medium) ratio=(16:9|4:3|1:1))\}$/';
     private const LINK_RE = '/^\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\\\])[^)\s]*)\)$/';
     private const LEAD_RE = '/^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)/';
-    private const INLINE_RE = '/\\\\([\\\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\\\])[^)\s]*)\)/u';
+    private const URL_RE = '/(?<![0-9A-Za-z_])https?:\/\/[^\s<>]+/u';
+    private const INLINE_RE = '/\\\\([\\\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\\\])[^)\s]*)\)|(?<![0-9A-Za-z_])(https?:\/\/[^\s<>]+)/u';
 
     private const ENTITIES = ['&nbsp;' => ' ', '&amp;' => '&', '&lt;' => '<', '&gt;' => '>', '&quot;' => '"', '&#39;' => "'"];
     private const SAFE_TAGS = [
@@ -85,33 +86,46 @@ final class BlockquiltRender
         return '';
     }
 
-    public static function inlineHtml(string $md): string
+    /** Blocks.inlineHtml. $urls : « link » (HTML publié), « mark » (champ : data-bq-url), « text » (dans le texte d'un lien). */
+    public static function inlineHtml(string $md, string $urls = 'link'): string
     {
         $out = '';
         $at = 0;
-        if (preg_match_all(self::INLINE_RE, $md, $matches, PREG_OFFSET_CAPTURE | PREG_SET_ORDER)) {
-            foreach ($matches as $m) {
-                $idx = $m[0][1];
-                $out .= self::esc(substr($md, $at, $idx - $at));
-                $at = $idx + strlen($m[0][0]);
-                if (isset($m[1]) && $m[1][1] !== -1) {
-                    $out .= self::esc($m[1][0]);
-                } elseif (isset($m[2]) && $m[2][1] !== -1) {
-                    $out .= '<code>' . self::esc($m[2][0]) . '</code>';
-                } elseif (isset($m[3]) && $m[3][1] !== -1) {
-                    $out .= '<strong>' . self::inlineHtml($m[3][0]) . '</strong>';
-                } elseif (isset($m[4]) && $m[4][1] !== -1) {
-                    $out .= '<em>' . self::inlineHtml($m[4][0]) . '</em>';
-                } elseif (isset($m[5]) && $m[5][1] !== -1) {
-                    $out .= '<u>' . self::inlineHtml($m[5][0]) . '</u>';
-                } elseif (isset($m[6]) && $m[6][1] !== -1) {
-                    $out .= '<mark>' . self::inlineHtml($m[6][0]) . '</mark>';
-                } else {
-                    $out .= '<a href="' . self::attr($m[8][0]) . '">' . self::inlineHtml($m[7][0]) . '</a>';
-                }
+        while (preg_match(self::INLINE_RE, $md, $m, PREG_OFFSET_CAPTURE, $at)) {
+            $idx = $m[0][1];
+            $out .= self::esc(substr($md, $at, $idx - $at));
+            $at = $idx + strlen($m[0][0]);
+            if (isset($m[1]) && $m[1][1] !== -1) {
+                $out .= self::esc($m[1][0]);
+            } elseif (isset($m[2]) && $m[2][1] !== -1) {
+                $out .= '<code>' . self::esc($m[2][0]) . '</code>';
+            } elseif (isset($m[3]) && $m[3][1] !== -1) {
+                $out .= '<strong>' . self::inlineHtml($m[3][0], $urls) . '</strong>';
+            } elseif (isset($m[4]) && $m[4][1] !== -1) {
+                $out .= '<em>' . self::inlineHtml($m[4][0], $urls) . '</em>';
+            } elseif (isset($m[5]) && $m[5][1] !== -1) {
+                $out .= '<u>' . self::inlineHtml($m[5][0], $urls) . '</u>';
+            } elseif (isset($m[6]) && $m[6][1] !== -1) {
+                $out .= '<mark>' . self::inlineHtml($m[6][0], $urls) . '</mark>';
+            } elseif (isset($m[7]) && $m[7][1] !== -1) {
+                $out .= '<a href="' . self::attr($m[8][0]) . '">' . self::inlineHtml($m[7][0], 'text') . '</a>';
+            } else {
+                $url = self::urlEnd($m[9][0]);
+                $at = $idx + strlen($url); // la ponctuation finale reste du texte
+                $out .= $urls === 'text' || !preg_match('/^https?:\/\/./', $url) ? self::esc($url)
+                    : '<a href="' . self::attr($url) . '"' . ($urls === 'mark' ? ' data-bq-url' : '') . '>' . self::esc($url) . '</a>';
             }
         }
         return $out . self::esc(substr($md, $at));
+    }
+
+    /** Blocks.urlEnd : adresse nue sans sa ponctuation finale. */
+    private static function urlEnd(string $u): string
+    {
+        while (preg_match('/[.,;:!?\'"»]$/uD', $u) || (str_ends_with($u, ')') && substr_count($u, ')') > substr_count($u, '('))) {
+            $u = (string) preg_replace('/.$/usD', '', $u);
+        }
+        return $u;
     }
 
     public static function plain(string $md): string
@@ -158,15 +172,15 @@ final class BlockquiltRender
         return $out;
     }
 
-    private static function listHtml(object $lst): string
+    private static function listHtml(object $lst, string $urls = 'link'): string
     {
         $items = '';
         foreach ($lst->items as $x) {
             $subs = '';
             foreach ($x->subs as $s) {
-                $subs .= self::listHtml($s);
+                $subs .= self::listHtml($s, $urls);
             }
-            $items .= '<li>' . self::inlineHtml($x->text) . $subs . '</li>';
+            $items .= '<li>' . self::inlineHtml($x->text, $urls) . $subs . '</li>';
         }
         return "<{$lst->tag}>{$items}</{$lst->tag}>";
     }
@@ -428,17 +442,32 @@ final class BlockquiltRender
     {
         $out = [];
         foreach (self::listTree($lines) as $n) {
-            $out[] = isset($n['list']) ? self::listHtml($n['list']) : self::inlineHtml($n['line']);
+            $out[] = isset($n['list']) ? self::listHtml($n['list'], 'mark') : self::inlineHtml($n['line'], 'mark');
         }
         return implode('<br>', $out);
     }
 
     /** Blocks.escText : les signes qui changeraient le sens sont protégés par « \ ». */
+    /** Blocks.escText : rien n'est échappé dans une adresse nue. */
     private static function escText(string $s): string
+    {
+        $out = '';
+        $at = 0;
+        if (preg_match_all(self::URL_RE, $s, $all, PREG_OFFSET_CAPTURE)) {
+            foreach ($all[0] as [$raw, $idx]) {
+                $url = self::urlEnd($raw);
+                $out .= self::escPlain(substr($s, $at, $idx - $at)) . $url;
+                $at = $idx + strlen($url);
+            }
+        }
+        return $out . self::escPlain(substr($s, $at));
+    }
+
+    private static function escPlain(string $s): string
     {
         $s = str_replace('\\', '\\\\', $s);
         $s = (string) preg_replace('/[*[\]`]/', '\\\\$0', $s);
-        $s = str_replace(['++', '=='], ['\\+\\+', '\\=\\='], $s);
+        $s = str_replace(['++', '==', '~~'], ['\\+\\+', '\\=\\=', '\\~\\~'], $s);
         return (string) preg_replace_callback('/(^|\W)_|_(?=\W|$)/D', static fn($m) => (string) preg_replace('/_/', '\\\\_', $m[0], 1), $s);
     }
 
@@ -457,7 +486,7 @@ final class BlockquiltRender
     }
 
     /** Blocks.htmlToMd : HTML d'un champ → Markdown (listes, mises en forme, signes protégés). */
-    private static function htmlToMd(string $html, bool $bullets = false): string
+    private static function htmlToMd(string $html, bool $bullets = false, bool $inline = false): string
     {
         $lines = [];
         $lists = [];
@@ -472,7 +501,7 @@ final class BlockquiltRender
                 $cur .= $x;
             }
         };
-        $flush = static function () use (&$lines, &$cur, &$liPrefix, $start): void {
+        $flush = static function () use (&$lines, &$cur, &$liPrefix, $start, $inline): void {
             if ($liPrefix !== '') {
                 $clean = trim((string) preg_replace('/\n+/', ' ', $cur));
                 if ($clean !== '') {
@@ -482,9 +511,15 @@ final class BlockquiltRender
                 $liPrefix = '';
                 return;
             }
+            if ($inline) {
+                $lines[] = $cur;
+                $cur = '';
+                return;
+            }
             $line = (string) preg_replace($start, '\\\\$1', $cur, 1);
             $line = (string) preg_replace('/^(\d+)([.)]) /', '$1\\\\$2 ', $line, 1);
-            $lines[] = (string) preg_replace('/^(-{3,}\s*)$/D', '\\\\$1', $line);
+            $line = (string) preg_replace('/^(-{3,}\s*)$/D', '\\\\$1', $line);
+            $lines[] = (string) preg_replace('/^<!--/', '<\\\\!--', $line);
             $cur = '';
         };
         preg_match_all('/<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:\s[^>]*)?)>|([^<]+)/', $html, $all, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
@@ -503,13 +538,14 @@ final class BlockquiltRender
                     if ($tag === 'a') {
                         $href = self::safeHref(preg_match('/href\s*=\s*"([^"]*)"/i', $m[3] ?? '', $hm) ? $hm[1] : '');
                     }
-                    $frames[] = ['mark' => self::MD_MARKS[$tag], 'href' => $href, 'tag' => $tag, 'buf' => ''];
+                    $auto = $tag === 'a' && preg_match('/\sdata-bq-url\b/i', $m[3] ?? '');
+                    $frames[] = ['mark' => self::MD_MARKS[$tag], 'href' => $href, 'tag' => $tag, 'buf' => '', 'auto' => $auto];
                 } elseif ($frames) {
                     $f = array_pop($frames);
                     preg_match('/^(\s*)([\s\S]*?)(\s*)$/D', $f['buf'], $parts);
                     [, $lead, $core, $trail] = $parts;
-                    if ($core === '') {
-                        $put($lead . $trail);
+                    if ($core === '' || $f['auto']) {
+                        $put($f['buf']); // adresse nue du champ : son texte, relu en lien s'il est encore une adresse
                     } elseif ($f['tag'] === 'a') {
                         $put($f['href'] !== '' ? $lead . '[' . $core . '](' . $f['href'] . ')' . $trail : $lead . $core . $trail);
                     } elseif ($f['tag'] === 'code') {
@@ -588,7 +624,7 @@ final class BlockquiltRender
             ($b['size'] ?? '') !== '' ? 'size=' . $b['size'] : '',
             ($b['ratio'] ?? '') !== '' ? 'ratio=' . $b['ratio'] : '',
         ]));
-        $alt = str_replace("\n", ' ', self::htmlToMd(self::esc($b['alt'])));
+        $alt = str_replace("\n", ' ', self::htmlToMd(self::esc($b['alt']), false, true));
         return '![' . $alt . '](' . $b['src'] . ')' . ($opts !== '' ? '{' . $opts . '}' : '');
     }
 
@@ -597,7 +633,7 @@ final class BlockquiltRender
     {
         $t = $b['type'];
         if (in_array($t, ['h1', 'h2', 'h3'], true)) {
-            $x = trim((string) preg_replace('/\n+/', ' ', self::htmlToMd(self::esc($b['text']))));
+            $x = trim((string) preg_replace('/\n+/', ' ', self::htmlToMd(self::esc($b['text']), false, true)));
             return $x !== '' ? str_repeat('#', (int) $t[1]) . ' ' . $x : '';
         }
         if ($t === 'text') {
@@ -638,9 +674,9 @@ final class BlockquiltRender
             $label = self::oneSpace($b['label']);
             $parts = array_values(array_filter([
                 self::photoMd($b),
-                $title !== '' ? '### ' . self::htmlToMd(self::esc($title)) : '',
+                $title !== '' ? '### ' . self::htmlToMd(self::esc($title), false, true) : '',
                 trim($x) !== '' ? $x : '',
-                $label !== '' && trim($b['href']) !== '' ? '[' . self::htmlToMd(self::esc($label)) . '](' . trim($b['href']) . ')' : '',
+                $label !== '' && trim($b['href']) !== '' ? '[' . self::htmlToMd(self::esc($label), false, true) . '](' . trim($b['href']) . ')' : '',
             ], static fn($p) => $p !== ''));
             return $parts ? implode("\n", [':::card', ...$parts, ':::']) : '';
         }

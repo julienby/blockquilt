@@ -326,6 +326,11 @@ Moteurs : tout changement du format se fait en JS, PHP et Python.
 4. `~~` échappé par l'éditeur ; `~~x~~` écrit à la main → « texte source ».
 5. `FORMAT.md` (formes réservées : `<!-- … -->`, `~~…~~`), `RENDER.md`, une fixture par point.
 
+Étape 2 faite le 2026-11-24 (§4o compris). Écarts :
+- `### 1. Clé` : même défaut pour `## - x`, `# > x`, `### 2) x`, la légende d'une photo et le titre et le bouton d'une carte. Correction : `htmlToMd(…, inline)` n'échappe pas les débuts de ligne d'un texte écrit dans une autre syntaxe. Le test « tiret protégé dans un titre » attendait `## \- tiret` : changé en `## - tiret`.
+- « Retirer » est caché sur une adresse nue : le texte resterait une adresse, donc un lien. « OK » enlève la marque `data-bq-url`.
+- Deux tests instables vus une fois chacun : `/demo/notes : deux éditeurs indépendants` et `/demo/admin : … Ctrl+S enregistre la fiche` (l'état du bouton est lu juste après la frappe).
+
 **Étape 3 — Cycle de vie**
 1. `CHANGELOG.md`.
 2. `bin/blockquilt-install <version> <dossier de l'application>` : copie les fichiers d'un tag dans `assets/blockquilt/<version>/` et `lib/blockquilt/<version>/`, écrit `VERSION`. Rien d'autre.

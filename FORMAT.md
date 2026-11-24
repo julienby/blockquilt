@@ -96,7 +96,9 @@ Clés réservées à blockquilt : `title`, `icon`, `lang`, `description`, `image
 
 **Mise en forme dans le texte** : `**gras**`, `*italique*`, `++souligné++`, `==surligné==`, `` `code` ``, `[lien](https://…)`. Liens acceptés : `https://`, `http://`, `mailto:`, `tel:`, une adresse du site `/…` (pas `//…`) et une ancre `#…`.
 
-**Pour écrire un caractère qui a un sens** (`*`, `[`, `` ` ``, `#` en début de ligne…), le précéder de `\`.
+**Adresse nue** : `https://…` ou `http://…` dans un texte devient un lien, jusqu'à la première espace. La ponctuation finale (`. , ; : ! ? ' " »`) n'en fait pas partie, ni une `)` sans `(` dans l'adresse : `(voir https://exemple.fr).` → lien vers `https://exemple.fr`. Dans une adresse, rien n'est mis en forme (`_`, `*` restent des caractères). Une adresse YouTube ou Vimeo seule sur sa ligne reste une vidéo.
+
+**Pour écrire un caractère qui a un sens** (`*`, `[`, `` ` ``, `~~`, `#` en début de ligne…), le précéder de `\`. Une ligne qui commence par `<!--` s'écrit `<\!--`.
 
 ## Ce qu'il ne faut pas écrire
 
@@ -118,6 +120,8 @@ Ces formes sont du texte source aujourd'hui. Elles sont gardées pour un usage f
 | `- [ ] tâche`, `- [x] fait` | Liste de tâches. |
 | `> [!note]` et autres types d'encadré | Encadrés supplémentaires. |
 | `[^1]` | Note de bas de page. |
+| Ligne `<!-- … -->` autre qu'une largeur | Commentaire ou consigne. |
+| `~~texte~~` | Texte barré. |
 | `![…](…)` dans une phrase, `####` | — |
 
 Le texte simple d'un bloc reconnu ne change jamais de sens : `#mot` ou `@nom` dans une phrase restent du texte.

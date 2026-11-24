@@ -11,7 +11,7 @@ const FIX = path.join(__dirname, 'fixtures');
 const expected = {
   'h1.md': 'h1', 't.md': 't1,t2,t3', 'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'photo-options.md': 'photo,photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
-  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'links.md': 'text,raw,card', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
+  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'links.md': 'text,raw,card', 'titles.md': 'h3,h2,h1,h3,photo,card', 'reserved.md': 'raw,raw,raw,raw,text', 'autolink.md': 'text,text,text,text,text,video,text,text', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
   // Cas limites : un bloc dont la réécriture ne redonne pas le texte reste « texte source » (raw), dans les trois moteurs.
   'edge.md': 'raw,raw,raw,text,raw,raw,text,raw,raw,raw,raw,raw,raw,raw,raw,raw,text,text,text,text,raw,text,text,raw,raw,tip,raw,raw,raw,raw,html,raw,raw,raw,text,text,quote,info,t2,warning,text,raw,h1,text,raw',
 };
@@ -129,7 +129,13 @@ ok(md('') === '' && md('<br>') === '' && Blocks.isEmpty({ type: 'tip', html: '<b
 ok(md('2 * 3 [x] _a_ b_c C++ a == b') === '2 \\* 3 \\[x\\] \\_a\\_ b_c C\\+\\+ a \\=\\= b', 'signes Markdown tapés : protégés');
 ok(md('# dièse<br>&gt; cite<br>1. num<br>:::carousel<br>---<br>| t').split('\n').every((l) => l.startsWith('\\') || /^\d/.test(l)) && md('1. num').startsWith('1\\.'), 'début de ligne qui changerait le sens : protégé');
 ok(Blocks.fromMarkdown(md('---<br>:::x')).type === 'text', 'ligne « --- » ou « ::: » tapée : reste du texte');
-ok(md('- tiret') === '- tiret' && Blocks.toMarkdown({ type: 'h2', html: '- tiret' }) === '## \\- tiret', 'tiret de début : gardé dans un texte, protégé dans un titre');
+ok(md('&lt;!-- x --&gt;') === '<\\!-- x -->' && Blocks.fromMarkdown(md('&lt;!-- x --&gt;')).type === 'text' && Blocks.plain(md('&lt;!-- x --&gt;')) === '<!-- x -->', 'ligne « <!-- » tapée : protégée, reste du texte');
+ok(md('Voir https://a.fr/_x*y*') === 'Voir https://a.fr/_x*y*' && md('a_b https://a.fr/_c') === 'a_b https://a.fr/_c', 'adresse tapée : rien n’est échappé dans l’adresse');
+ok(Blocks.linesToHtml(['Voir https://a.fr.']).includes('<a href="https://a.fr" data-bq-url>https://a.fr</a>.') && md(Blocks.linesToHtml(['Voir https://a.fr.'])) === 'Voir https://a.fr.', 'champ : adresse nue marquée, réécrite telle quelle');
+ok(md('<a href="https://a.fr" data-bq-url>https://b.fr</a>') === 'https://b.fr' && md(Blocks.linesToHtml(['[https://a.fr](https://a.fr)'])) === '[https://a.fr](https://a.fr)', 'champ : adresse nue modifiée → nouveau texte ; lien écrit à la main gardé');
+ok(!Blocks.toHtml('Voir https://a.fr\n\n- https://b.fr').includes('data-bq-url'), 'HTML publié : sans la marque du champ');
+ok(md('a ~~b~~') === 'a \\~\\~b\\~\\~' && Blocks.fromMarkdown(md('a ~~b~~')).type === 'text' && Blocks.plain(md('a ~~b~~')) === 'a ~~b~~', '« ~~ » tapé : protégé, reste du texte');
+ok(md('- tiret') === '- tiret' && Blocks.toMarkdown({ type: 'h2', html: '- tiret' }) === '## - tiret', 'tiret de début : gardé dans un texte et dans un titre (pas de début de ligne après « ## »)');
 ok(md('<a href="javascript:alert(1)">piège</a>') === 'piège' && md('<a href="www.exemple.fr">site</a>') === '[site](https://www.exemple.fr)' && md('<a href="https://a.fr/x(1)">l</a>') === '[l](https://a.fr/x%281%29)', 'liens : adresses sûres seulement');
 ok(md('<a href="/contact">c</a>') === '[c](/contact)' && md('<a href="#h">h</a>') === '[h](#h)' && md('<a href="/">a</a>') === '[a](/)'
   && md('<a href="//evil.fr">e</a>') === 'e' && md('<a href="/\\evil.fr">e</a>') === 'e' && md('<a href="../x">e</a>') === 'e', 'liens : « / » et « # » acceptés, « // », « /\\ » et « ../ » refusés');

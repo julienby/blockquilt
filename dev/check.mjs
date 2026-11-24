@@ -819,6 +819,18 @@ try {
   await ev(`document.querySelector('[data-link-remove]').click()`);
   ok((await mdNow()) === 'Bonjour monde\n', 'lien : « Retirer » enlève le lien, le texte reste');
 
+  // Adresses nues : tapées telles quelles, liens dans le champ ; « OK » change l'adresse, pas de « Retirer »
+  await ev(`editor.setMarkdown('Voir')`);
+  await ev(`(() => { const f = document.querySelector('[data-bq] [data-rich]'); f.focus(); getSelection().selectAllChildren(f); getSelection().collapseToEnd(); document.execCommand('insertText', false, ' https://a.fr/_x*y* ici'); })()`);
+  ok((await mdNow()) === 'Voir https://a.fr/_x*y* ici\n', `adresse nue tapée : écrite telle quelle (${JSON.stringify(await mdNow())})`);
+  await ev(`editor.setMarkdown('Voir https://a.fr ici')`);
+  ok(await ev(`!!document.querySelector('[data-bq] [data-rich] a[data-bq-url][href="https://a.fr"]')`), 'adresse nue : lien dans le champ');
+  await ev(`(() => { const t = document.querySelector('[data-bq] [data-rich] a').firstChild; const f = document.querySelector('[data-bq] [data-rich]'); f.focus(); getSelection().collapse(t, 3); f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); })()`);
+  await ev(`document.querySelector('[data-link-toggle]').click()`);
+  ok(await ev(`${linkUrl}.value === 'https://a.fr' && document.querySelector('[data-link-remove]').hidden`), 'adresse nue : le champ montre l’adresse, sans « Retirer »');
+  await ev(`(() => { ${linkUrl}.value = 'https://b.fr'; document.querySelector('[data-link-ok]').click(); })()`);
+  ok((await mdNow()) === 'Voir [https://a.fr](https://b.fr) ici\n', `adresse nue : « OK » change l’adresse du lien (${JSON.stringify(await mdNow())})`);
+
   // Plein écran déclenché par un vrai clic (geste de l'utilisateur) : le dialogue couvre la fenêtre, sans plein écran du navigateur (pas de message « Pour quitter… »)
   const realClick = async (selector) => {
     const pt = await ev(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);

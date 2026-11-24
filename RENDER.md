@@ -37,6 +37,7 @@ Tout document rendu produit un fragment autonome :
   * `++souligné++` → `<u>…</u>`
   * `==surligné==` → `<mark>…</mark>`
   * `[texte](url)` → `<a href="…">…</a>` (seulement `https://`, `http://`, `mailto:`, `tel:`, `/…` sauf `//` et `/\`, `#…`).
+  * Adresse nue `https://…` ou `http://…` (pas précédée d'une lettre, d'un chiffre ou de `_`) → `<a href="adresse">adresse</a>`, sans la ponctuation finale `. , ; : ! ? ' " »` ni une `)` de plus que de `(`. Le texte d'un lien n'a pas de lien. Dans le champ de l'éditeur seulement, ce lien porte `data-bq-url`.
 * **Paragraphes et listes (`flowHtml`)** :
   * Lignes simples regroupées en `<p>ligne1<br>ligne2</p>`, séparées par les lignes vides.
   * Listes `- ` (`<ul>`) et `1. ` (`<ol>`), imbrication par indentation (`indent > parent.indent`).

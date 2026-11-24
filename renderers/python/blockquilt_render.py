@@ -29,7 +29,9 @@ INLINE_RE = re.compile(
     r"|\+\+(\S(?:.*?\S)?)\+\+"
     r"|==(\S(?:.*?\S)?)==|"
     r"\[([^\]]+)\]\(((?:https?://|mailto:|tel:|#)[^)\s]+|/(?![/\\])[^)\s]*)\)"
+    r"|(?<![0-9A-Za-z_])(https?://[^\s<>]+)"
 )
+URL_RE = re.compile(r"(?<![0-9A-Za-z_])https?://[^\s<>]+")
 
 ENTITIES = {"&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'"}
 SAFE_TAGS = {
@@ -86,10 +88,18 @@ def embed_url(url: str) -> str:
     return ""
 
 
-def inline_html(md: str) -> str:
+def url_end(u: str) -> str:
+    """Blocks.urlEnd : adresse nue sans sa ponctuation finale."""
+    while re.search(r"[.,;:!?'\"»]\Z", u) or (u.endswith(")") and u.count(")") > u.count("(")):
+        u = u[:-1]
+    return u
+
+
+def inline_html(md: str, urls: str = "link") -> str:
+    """Blocks.inlineHtml. urls : « link » (HTML publié), « mark » (champ : data-bq-url), « text » (dans le texte d'un lien)."""
     out: list[str] = []
     at = 0
-    for m in INLINE_RE.finditer(md):
+    while (m := INLINE_RE.search(md, at)) is not None:
         out.append(esc(md[at:m.start()]))
         at = m.end()
         if m.group(1) is not None:
@@ -97,15 +107,22 @@ def inline_html(md: str) -> str:
         elif m.group(2) is not None:
             out.append(f"<code>{esc(m.group(2))}</code>")
         elif m.group(3) is not None:
-            out.append(f"<strong>{inline_html(m.group(3))}</strong>")
+            out.append(f"<strong>{inline_html(m.group(3), urls)}</strong>")
         elif m.group(4) is not None:
-            out.append(f"<em>{inline_html(m.group(4))}</em>")
+            out.append(f"<em>{inline_html(m.group(4), urls)}</em>")
         elif m.group(5) is not None:
-            out.append(f"<u>{inline_html(m.group(5))}</u>")
+            out.append(f"<u>{inline_html(m.group(5), urls)}</u>")
         elif m.group(6) is not None:
-            out.append(f"<mark>{inline_html(m.group(6))}</mark>")
+            out.append(f"<mark>{inline_html(m.group(6), urls)}</mark>")
+        elif m.group(7) is not None:
+            out.append(f'<a href="{attr(m.group(8))}">{inline_html(m.group(7), "text")}</a>')
         else:
-            out.append(f'<a href="{attr(m.group(8))}">{inline_html(m.group(7))}</a>')
+            url = url_end(m.group(9))
+            at = m.start() + len(url)  # la ponctuation finale reste du texte
+            if urls == "text" or not re.match(r"https?://.", url):
+                out.append(esc(url))
+            else:
+                out.append(f'<a href="{attr(url)}"{" data-bq-url" if urls == "mark" else ""}>{esc(url)}</a>')
     out.append(esc(md[at:]))
     return "".join(out)
 
@@ -146,9 +163,9 @@ def list_tree(lines: list[str]) -> list[dict[str, Any]]:
     return out
 
 
-def list_html(lst: dict[str, Any]) -> str:
+def list_html(lst: dict[str, Any], urls: str = "link") -> str:
     items = "".join(
-        f"<li>{inline_html(x['text'])}{''.join(list_html(s) for s in x['subs'])}</li>"
+        f"<li>{inline_html(x['text'], urls)}{''.join(list_html(s, urls) for s in x['subs'])}</li>"
         for x in lst["items"]
     )
     return f"<{lst['tag']}>{items}</{lst['tag']}>"
@@ -183,14 +200,25 @@ MD_MARKS = {"b": "**", "strong": "**", "i": "*", "em": "*", "u": "++", "mark": "
 
 def lines_to_html(lines: list[str]) -> str:
     """Blocks.linesToHtml : lignes séparées par <br>, listes en <ul> / <ol>."""
-    return "<br>".join(list_html(n["list"]) if "list" in n else inline_html(n["line"]) for n in list_tree(lines))
+    return "<br>".join(list_html(n["list"], "mark") if "list" in n else inline_html(n["line"], "mark") for n in list_tree(lines))
 
 
 def esc_text(s: str) -> str:
-    """Blocks.escText : les signes qui changeraient le sens sont protégés par « \\ ». \\W comme en JS : ASCII."""
+    """Blocks.escText : rien n'est échappé dans une adresse nue."""
+    out: list[str] = []
+    at = 0
+    for m in URL_RE.finditer(s):
+        url = url_end(m.group(0))
+        out.append(esc_plain(s[at:m.start()]) + url)
+        at = m.start() + len(url)
+    return "".join(out) + esc_plain(s[at:])
+
+
+def esc_plain(s: str) -> str:
+    """Les signes qui changeraient le sens sont protégés par « \\ ». \\W comme en JS : ASCII."""
     s = s.replace("\\", "\\\\")
     s = re.sub(r"[*[\]`]", lambda m: "\\" + m.group(0), s)
-    s = s.replace("++", "\\+\\+").replace("==", "\\=\\=")
+    s = s.replace("++", "\\+\\+").replace("==", "\\=\\=").replace("~~", "\\~\\~")
     return re.sub(r"(^|\W)_|_(?=\W|\Z)", lambda m: m.group(0).replace("_", "\\_", 1), s, flags=re.ASCII)
 
 
@@ -206,7 +234,7 @@ def safe_href(href: str) -> str:
     return full.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
 
 
-def html_to_md(html: str, bullets: bool = False) -> str:
+def html_to_md(html: str, bullets: bool = False, inline: bool = False) -> str:
     """Blocks.htmlToMd : HTML d'un champ → Markdown (listes, mises en forme, signes protégés)."""
     lines: list[str] = []
     lists: list[dict[str, Any]] = []
@@ -231,9 +259,14 @@ def html_to_md(html: str, bullets: bool = False) -> str:
             cur = ""
             li_prefix = ""
             return
+        if inline:
+            lines.append(cur)
+            cur = ""
+            return
         line = start.sub(r"\\\1", cur, count=1)
         line = re.sub(r"^(\d+)([.)]) ", r"\1\\\2 ", line, count=1)
-        lines.append(re.sub(r"^(-{3,}\s*)\Z", r"\\\1", line))
+        line = re.sub(r"^(-{3,}\s*)\Z", r"\\\1", line)
+        lines.append(re.sub(r"^<!--", r"<\\!--", line))
         cur = ""
 
     for m in HTML_TOKEN_RE.finditer(html):
@@ -250,12 +283,13 @@ def html_to_md(html: str, bullets: bool = False) -> str:
                 if tag == "a":
                     hm = re.search(r'href\s*=\s*"([^"]*)"', m.group(3), re.I)
                     href = safe_href(hm.group(1) if hm else "")
-                frames.append({"mark": MD_MARKS[tag], "href": href, "tag": tag, "buf": ""})
+                auto = tag == "a" and re.search(r"\sdata-bq-url\b", m.group(3) or "", re.I) is not None
+                frames.append({"mark": MD_MARKS[tag], "href": href, "tag": tag, "buf": "", "auto": auto})
             elif frames:
                 f = frames.pop()
                 lead, core, trail = re.match(r"^(\s*)([\s\S]*?)(\s*)\Z", f["buf"]).groups()
-                if core == "":
-                    put(lead + trail)
+                if core == "" or f["auto"]:
+                    put(f["buf"])  # adresse nue du champ : son texte, relu en lien s'il est encore une adresse
                 elif f["tag"] == "a":
                     put(f"{lead}[{core}]({f['href']}){trail}" if f["href"] else lead + core + trail)
                 elif f["tag"] == "code":
@@ -504,7 +538,7 @@ def _photo_md(b: dict[str, Any]) -> str:
     if not b["src"]:
         return ""
     opts = " ".join(x for x in [b.get("size") and "size=" + b["size"], b.get("ratio") and "ratio=" + b["ratio"]] if x)
-    alt = html_to_md(esc(b["alt"])).replace("\n", " ")
+    alt = html_to_md(esc(b["alt"]), False, True).replace("\n", " ")
     return f"![{alt}]({b['src']})" + (f"{{{opts}}}" if opts else "")
 
 
@@ -512,7 +546,7 @@ def _to_markdown(b: dict[str, Any]) -> str:
     """Les toMarkdown de blockquilt.js : le texte que l'éditeur écrirait pour ce bloc."""
     t = b["type"]
     if t in ("h1", "h2", "h3"):
-        x = re.sub(r"\n+", " ", html_to_md(esc(b["text"]))).strip()
+        x = re.sub(r"\n+", " ", html_to_md(esc(b["text"]), False, True)).strip()
         return "#" * int(t[1]) + " " + x if x else ""
     if t == "text":
         x = _body(b["lines"])
@@ -544,9 +578,9 @@ def _to_markdown(b: dict[str, Any]) -> str:
         label = re.sub(r"\s+", " ", b["label"]).strip()
         parts = [
             _photo_md(b),
-            "### " + html_to_md(esc(title)) if title else "",
+            "### " + html_to_md(esc(title), False, True) if title else "",
             x if x.strip() else "",
-            f"[{html_to_md(esc(label))}]({b['href'].strip()})" if label and b["href"].strip() else "",
+            f"[{html_to_md(esc(label), False, True)}]({b['href'].strip()})" if label and b["href"].strip() else "",
         ]
         parts = [p for p in parts if p]
         return "\n".join([":::card", *parts, ":::"]) if parts else ""
