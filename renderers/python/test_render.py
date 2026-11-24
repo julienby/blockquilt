@@ -50,6 +50,11 @@ class TestBlockquiltPythonRender(unittest.TestCase):
             self.assertNotIn("onclick", out.lower())
             self.assertNotIn("onerror", out.lower())
 
+    def test_sanitize_site_links(self) -> None:
+        self.assertEqual(bq.sanitize('<a href="/c">c</a><a href="#h">h</a>'), '<a href="/c">c</a><a href="#h">h</a>')
+        for p in ['<a href="//evil.fr">x</a>', '<a href="/\\evil.fr">x</a>', '<a href="/&#x9;/evil.fr">x</a>', '<a href="../x">x</a>']:
+            self.assertNotIn("href", bq.sanitize(p), p)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

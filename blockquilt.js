@@ -314,7 +314,7 @@ const Blocks = {
 
   /** Une ligne de Markdown → HTML : code, gras, italique, souligné, surligné, liens. Tout le reste reste du texte. */
   inlineHtml(md) {
-    const re = /\\([\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:)[^)\s]+)\)/g;
+    const re = /\\([\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\])[^)\s]*)\)/g;
     let out = '';
     let at = 0;
     let m;
@@ -394,7 +394,7 @@ const Blocks = {
   /** Adresse acceptée pour un lien (sinon : pas de lien). */
   safeHref(href) {
     const h = Blocks.unesc(href).trim();
-    const full = /^(https?:\/\/|mailto:|tel:)/i.test(h) ? h : /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(h) ? 'https://' + h : '';
+    const full = /^(https?:\/\/|mailto:|tel:|#.|\/(?![\/\\]))/i.test(h) ? h : /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(h) ? 'https://' + h : '';
     return full.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
   },
 
@@ -645,7 +645,7 @@ const Blocks = {
     const url = (v, allowed) => { const u = decode(v).replace(/[\u0000-\u0020\u007f-\u009f\u00ad\u200b-\u200f\u2028\u2029\ufeff]/g, ''); return allowed.test(u) ? u : null; };
     const allow = (tag, name, value) => {
       if (name === 'class') return value;
-      if (tag === 'a' && name === 'href') return url(value, /^(https?:\/\/|mailto:|tel:)/i);
+      if (tag === 'a' && name === 'href') return url(value, /^(https?:\/\/|mailto:|tel:|#.|\/(?![\/\\]))/i);
       if (tag === 'img' && name === 'src') { const u = url(value, /^(https:\/\/|media\/[\w.-]+$)/i); return u && Blocks.mediaUrl(u, media); }
       if (tag === 'img' && name === 'alt') return value;
       if ((tag === 'img' && (name === 'width' || name === 'height')) || ((tag === 'th' || tag === 'td') && (name === 'colspan' || name === 'rowspan'))) return /^\d{1,4}$/.test(value.trim()) ? value.trim() : null;
@@ -964,7 +964,7 @@ const Blocks = {
 
   // Carte : `:::card`, puis, chacun facultatif et dans cet ordre : une photo, un titre `### …`, du texte, un lien seul sur
   // la dernière ligne (rendu en bouton) ; puis `:::`. Le titre reste hors du plan de la page (pas d'ancre).
-  const LINK = /^\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:)[^)\s]+)\)$/;
+  const LINK = /^\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\])[^)\s]*)\)$/;
   Blocks.register('card', {
     label: 'Carte', short: 'Carte', icon: 'card', group: 'media',
     tone: tone('bq-tone', 'bq-badge'),
@@ -997,7 +997,7 @@ const Blocks = {
     toHtml: (b, ctx) => {
       const img = b.src ? `<img src="${Blocks.attr(Blocks.mediaUrl(b.src, ctx.media))}" alt="${Blocks.attr(b.alt)}" loading="lazy">` : '';
       const text = body(b.html);
-      const link = b.label && /^(https?:\/\/|mailto:|tel:)/i.test(b.href) ? `<p><a class="bq-card-link" href="${Blocks.attr(b.href)}">${Blocks.esc(b.label)}</a></p>` : '';
+      const link = b.label && /^(https?:\/\/|mailto:|tel:|#.|\/(?![\/\\]))/i.test(b.href) ? `<p><a class="bq-card-link" href="${Blocks.attr(b.href)}">${Blocks.esc(b.label)}</a></p>` : '';
       return `<div class="bq-card">${img}<div class="bq-card-body">${b.title ? `<h3 class="bq-card-title">${Blocks.esc(b.title)}</h3>` : ''}${text.trim() ? Blocks.flowHtml(text.split('\n')) : ''}${link}</div></div>`;
     },
     blank: () => ({ src: '', alt: '', title: '', html: '', label: '', href: '' }),

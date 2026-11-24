@@ -36,7 +36,7 @@ Tout document rendu produit un fragment autonome :
   * `*italique*` → `<em>…</em>`
   * `++souligné++` → `<u>…</u>`
   * `==surligné==` → `<mark>…</mark>`
-  * `[texte](url)` → `<a href="…">…</a>` (protocoles autorisés uniquement : `https://`, `http://`, `mailto:`, `tel:`).
+  * `[texte](url)` → `<a href="…">…</a>` (seulement `https://`, `http://`, `mailto:`, `tel:`, `/…` sauf `//` et `/\`, `#…`).
 * **Paragraphes et listes (`flowHtml`)** :
   * Lignes simples regroupées en `<p>ligne1<br>ligne2</p>`, séparées par les lignes vides.
   * Listes `- ` (`<ul>`) et `1. ` (`<ol>`), imbrication par indentation (`indent > parent.indent`).
@@ -82,7 +82,7 @@ Les blocs précédés de `<!-- 1/3 -->` (`2` sixièmes), `<!-- 1/2 -->` (`3` six
 * **Balises vides (`VOID_TAGS`)** : `br`, `hr`, `img`. Les balises non vides restées ouvertes sont fermées automatiquement.
 * **Attributs autorisés** :
   * `class` sur toutes les balises.
-  * `href` sur `a` (`https://`, `http://`, `mailto:`, `tel:` après décodage d'entités et suppression des caractères de contrôle/invisibles).
+  * `href` sur `a` (`https://`, `http://`, `mailto:`, `tel:`, `/…` sauf `//` et `/\`, `#…`, après décodage d'entités et suppression des caractères de contrôle/invisibles).
   * `src` (`https://` ou `media/[\w.-]+`), `alt` (forcé à `""` si absent), `width`, `height` (1 à 4 chiffres) sur `img`. Un `img` sans `src` valide est ignoré.
   * `colspan`, `rowspan` (1 à 4 chiffres) sur `th` et `td`.
 

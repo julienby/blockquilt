@@ -11,7 +11,7 @@ const FIX = path.join(__dirname, 'fixtures');
 const expected = {
   'h1.md': 'h1', 't.md': 't1,t2,t3', 'h2.md': 'h2', 'h3.md': 'h3', 'text.md': 'text,text,text,text,text', 'quote.md': 'quote,quote', 'info.md': 'info', 'tip.md': 'tip', 'success.md': 'success',
   'warning.md': 'warning', 'danger.md': 'danger', 'photo.md': 'photo,photo', 'photo-options.md': 'photo,photo,photo', 'video.md': 'video,video', 'hr.md': 'text,hr,text', 'code.md': 'code,code',
-  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
+  'raw.md': 'raw,raw,raw,raw', 'carousel.md': 'carousel', 'card.md': 'card,card', 'html.md': 'html', 'links.md': 'text,raw,card', 'frontmatter.md': 'text', 'document.md': 'h2,h3,text,text,tip,warning,quote,photo,video,hr,code',
   // Cas limites : un bloc dont la réécriture ne redonne pas le texte reste « texte source » (raw), dans les trois moteurs.
   'edge.md': 'raw,raw,raw,text,raw,raw,text,raw,raw,raw,raw,raw,raw,raw,raw,raw,text,text,text,text,raw,text,text,raw,raw,tip,raw,raw,raw,raw,html,raw,raw,raw,text,text,quote,info,t2,warning,text,raw,h1,text,raw',
 };
@@ -127,6 +127,9 @@ ok(md('# dièse<br>&gt; cite<br>1. num<br>:::carousel<br>---<br>| t').split('\n'
 ok(Blocks.fromMarkdown(md('---<br>:::x')).type === 'text', 'ligne « --- » ou « ::: » tapée : reste du texte');
 ok(md('- tiret') === '- tiret' && Blocks.toMarkdown({ type: 'h2', html: '- tiret' }) === '## \\- tiret', 'tiret de début : gardé dans un texte, protégé dans un titre');
 ok(md('<a href="javascript:alert(1)">piège</a>') === 'piège' && md('<a href="www.exemple.fr">site</a>') === '[site](https://www.exemple.fr)' && md('<a href="https://a.fr/x(1)">l</a>') === '[l](https://a.fr/x%281%29)', 'liens : adresses sûres seulement');
+ok(md('<a href="/contact">c</a>') === '[c](/contact)' && md('<a href="#h">h</a>') === '[h](#h)' && md('<a href="/">a</a>') === '[a](/)'
+  && md('<a href="//evil.fr">e</a>') === 'e' && md('<a href="/\\evil.fr">e</a>') === 'e' && md('<a href="../x">e</a>') === 'e', 'liens : « / » et « # » acceptés, « // », « /\\ » et « ../ » refusés');
+ok(Blocks.sanitize('<a href="/c">c</a><a href="#h">h</a>') === '<a href="/c">c</a><a href="#h">h</a>' && !/href/.test(Blocks.sanitize('<a href="//evil.fr">x</a><a href="/\\evil.fr">y</a><a href="/&#x9;/evil.fr">z</a>')), 'html filtré : liens « / » et « # » gardés, « // » refusé');
 ok(Blocks.toMarkdown({ type: 'h3', html: 'Titre  <b>long</b><br>suite' }) === '### Titre  long suite', 'titre : une seule ligne, sans mise en forme');
 ok(Blocks.toMarkdown({ type: 'quote', html: 'un<br><br>deux' }) === '> un\n>\n> deux', 'citation : ligne vide écrite « > »');
 ok(Blocks.toMarkdown({ type: 'photo', src: 'media/aabbccddeeff', alt: 'La [piscine]' }) === '![La \\[piscine\\]](media/aabbccddeeff)' && Blocks.toMarkdown({ type: 'photo', src: '', alt: 'x' }) === '' && Blocks.toMarkdown({ type: 'video', url: ' https://youtu.be/x ' }) === 'https://youtu.be/x', 'photo (légende protégée) et vidéo');

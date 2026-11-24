@@ -42,4 +42,9 @@ foreach ([
     $ok($clean, 'filtre XSS : ' . $p);
 }
 
+$ok(BlockquiltRender::sanitize('<a href="/c">c</a><a href="#h">h</a>') === '<a href="/c">c</a><a href="#h">h</a>', 'filtre : liens « / » et « # » gardés');
+foreach (['<a href="//evil.fr">x</a>', '<a href="/\\evil.fr">x</a>', '<a href="/&#x9;/evil.fr">x</a>', '<a href="../x">x</a>'] as $p) {
+    $ok(!str_contains(BlockquiltRender::sanitize($p), 'href'), 'filtre : lien refusé : ' . $p);
+}
+
 exit($failed ? 1 : 0);

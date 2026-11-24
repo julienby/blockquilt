@@ -19,7 +19,7 @@ VIDEO_RE = re.compile(r"^https?://(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com
 PHOTO_RE = re.compile(r"^!\[((?:\\.|[^\]\\])*)\]\(((?:media/|https://)[^)\s]+)\)$")
 # Taille et format d'une photo seule, sous une seule forme : {size=…}, {ratio=…} ou {size=… ratio=…}.
 PHOTO_OPTS_RE = re.compile(r"^(.+)\{(?:size=(small|medium)|ratio=(16:9|4:3|1:1)|size=(small|medium) ratio=(16:9|4:3|1:1))\}$")
-LINK_RE = re.compile(r"^\[([^\]]+)\]\(((?:https?://|mailto:|tel:)[^)\s]+)\)$")
+LINK_RE = re.compile(r"^\[([^\]]+)\]\(((?:https?://|mailto:|tel:|#)[^)\s]+|/(?![/\\])[^)\s]*)\)$")
 LEAD_RE = re.compile(r"^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)")
 INLINE_RE = re.compile(
     r"\\([\\`*_{}[\]()#+\-.!>=:|~])"
@@ -28,7 +28,7 @@ INLINE_RE = re.compile(
     r"|\*(\S(?:.*?\S)?)\*"
     r"|\+\+(\S(?:.*?\S)?)\+\+"
     r"|==(\S(?:.*?\S)?)==|"
-    r"\[([^\]]+)\]\(((?:https?://|mailto:|tel:)[^)\s]+)\)"
+    r"\[([^\]]+)\]\(((?:https?://|mailto:|tel:|#)[^)\s]+|/(?![/\\])[^)\s]*)\)"
 )
 
 ENTITIES = {"&nbsp;": " ", "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'"}
@@ -197,7 +197,7 @@ def esc_text(s: str) -> str:
 def safe_href(href: str) -> str:
     """Blocks.safeHref : adresse acceptée pour un lien, sinon chaîne vide."""
     h = unesc(href).strip()
-    if re.match(r"^(https?://|mailto:|tel:)", h, re.I):
+    if re.match(r"^(https?://|mailto:|tel:|#.|/(?![/\\]))", h, re.I):
         full = h
     elif re.match(r"^[\w-]+(\.[\w-]+)+(/\S*)?\Z", h, re.ASCII):
         full = "https://" + h
@@ -320,7 +320,7 @@ def sanitize(html: str, media: str = "media/") -> str:
         if name == "class":
             return value
         if tag == "a" and name == "href":
-            return check_url(value, re.compile(r"^(https?://|mailto:|tel:)", re.I))
+            return check_url(value, re.compile(r"^(https?://|mailto:|tel:|#.|/(?![/\\]))", re.I))
         if tag == "img" and name == "src":
             u = check_url(value, re.compile(r"^(https://|media/[\w.-]+$)", re.I))
             return media_url(u, media) if u else None
@@ -735,7 +735,7 @@ def _render_block(b: dict[str, Any], media: str, ids: set[str]) -> str:
         body_html = flow_html(b["lines"]) if b["lines"] else ""
         link_html = (
             f'<p><a class="bq-card-link" href="{attr(b["href"])}">{esc(b["label"])}</a></p>'
-            if b["label"] and re.match(r"^(https?://|mailto:|tel:)", b["href"], re.I)
+            if b["label"] and re.match(r"^(https?://|mailto:|tel:|#.|/(?![/\\]))", b["href"], re.I)
             else ""
         )
         return f'<div class="bq-card">{img}<div class="bq-card-body">{title_html}{body_html}{link_html}</div></div>'

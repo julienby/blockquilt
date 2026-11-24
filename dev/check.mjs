@@ -767,7 +767,7 @@ try {
   const selectIn = (from, to) => ev(`(() => { const f = document.querySelector('[data-bq] [data-rich]'); f.focus(); const t = f.firstChild; const r = document.createRange(); r.setStart(t, ${from}); r.setEnd(t, ${to}); getSelection().removeAllRanges(); getSelection().addRange(r); f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); })()`);
   await ev(`editor.setMarkdown('Bonjour monde')`);
   await selectIn(0, 7);
-  ok(await ev(`(() => { const r = document.querySelector('[data-bar]').getBoundingClientRect(); return r.height < 60 && r.right <= innerWidth && document.querySelector('[data-bar-clip]').hidden; })()`), 'barre : une seule ligne à 375 px, sous-menu fermé');
+  ok(await ev(`(() => { const r = document.querySelector('[data-bar]').getBoundingClientRect(); return r.height < 100 && r.right <= innerWidth && document.querySelector('[data-bar-clip]').hidden; })()`), 'barre : deux lignes au plus à 375 px, sous-menu fermé');
   await ev(`document.querySelector('[data-clip-toggle]').click()`);
   ok(await ev(`!document.querySelector('[data-bar-clip]').hidden && document.querySelector('[data-clip-toggle]').getAttribute('aria-expanded') === 'true'`), 'barre : le sous-menu presse-papiers s’ouvre');
   await ev(`document.querySelector('[data-clip="copy"]').click()`);
@@ -780,6 +780,32 @@ try {
   await ev(`(() => { const f = document.querySelector('[data-bq] [data-rich]'); getSelection().collapse(f.firstChild, 0); f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); document.querySelector('[data-clip-toggle]').click(); document.querySelector('[data-clip="paste"]').click(); })()`);
   await sleep(150);
   ok((await mdNow()) === ' mondeBonjour\n', 'barre : « Coller » insère au curseur');
+
+  // Barre : lien sur la sélection (ajouter, refuser une adresse non sûre, changer au clavier, retirer)
+  const linkRow = `document.querySelector('[data-bar-link]')`;
+  const linkUrl = `document.querySelector('[data-link-url]')`;
+  await ev(`editor.setMarkdown('Bonjour monde')`);
+  await selectIn(8, 13);
+  await ev(`document.querySelector('[data-link-toggle]').click()`);
+  ok(await ev(`!${linkRow}.hidden && document.activeElement === ${linkUrl} && document.querySelector('[data-link-remove]').hidden`), 'lien : le champ d’adresse s’ouvre, sans « Retirer »');
+  await ev(`(() => { ${linkUrl}.value = 'javascript:alert(1)'; document.querySelector('[data-link-ok]').click(); })()`);
+  ok((await mdNow()) === 'Bonjour monde\n' && !(await ev(`${linkRow}.hidden`)), 'lien : une adresse non sûre est refusée');
+  await ev(`(() => { ${linkUrl}.value = 'exemple.fr'; document.querySelector('[data-link-ok]').click(); })()`);
+  ok((await mdNow()) === 'Bonjour [monde](https://exemple.fr)\n' && await ev(`${linkRow}.hidden`), 'lien : « OK » pose le lien sur la sélection');
+  await ev(`(() => { const t = document.querySelector('[data-bq] [data-rich] a').firstChild; const f = document.querySelector('[data-bq] [data-rich]'); f.focus(); getSelection().collapse(t, 2); f.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); })()`);
+  await ev(`document.querySelector('[data-link-toggle]').click()`);
+  ok(await ev(`${linkUrl}.value === 'https://exemple.fr' && !document.querySelector('[data-link-remove]').hidden`), 'lien : curseur dans un lien, le champ montre son adresse');
+  await ev(`${linkUrl}.value = 'https://exemple.fr/plan'`);
+  await key('Enter', 'Enter', 13);
+  ok((await mdNow()) === 'Bonjour [monde](https://exemple.fr/plan)\n', 'lien : Entrée change l’adresse');
+  await ev(`(() => { const t = document.querySelector('[data-bq] [data-rich] a').firstChild; getSelection().collapse(t, 2); })()`);
+  await ev(`document.querySelector('[data-link-toggle]').click()`);
+  await ev(`(() => { ${linkUrl}.value = '/contact'; document.querySelector('[data-link-ok]').click(); })()`);
+  ok((await mdNow()) === 'Bonjour [monde](/contact)\n', 'lien : adresse du site « /… » acceptée');
+  await ev(`(() => { const t = document.querySelector('[data-bq] [data-rich] a').firstChild; getSelection().collapse(t, 2); })()`);
+  await ev(`document.querySelector('[data-link-toggle]').click()`);
+  await ev(`document.querySelector('[data-link-remove]').click()`);
+  ok((await mdNow()) === 'Bonjour monde\n', 'lien : « Retirer » enlève le lien, le texte reste');
 
   // Plein écran déclenché par un vrai clic (geste de l'utilisateur) : le dialogue couvre la fenêtre, sans plein écran du navigateur (pas de message « Pour quitter… »)
   const realClick = async (selector) => {

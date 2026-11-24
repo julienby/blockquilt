@@ -19,9 +19,9 @@ final class BlockquiltRender
     private const PHOTO_RE = '/^!\[((?:\\\\.|[^\]\\\\])*)\]\(((?:media\/|https:\/\/)[^)\s]+)\)$/';
     // Taille et format d'une photo seule, sous une seule forme : {size=…}, {ratio=…} ou {size=… ratio=…}.
     private const PHOTO_OPTS_RE = '/^(.+)\{(?:size=(small|medium)|ratio=(16:9|4:3|1:1)|size=(small|medium) ratio=(16:9|4:3|1:1))\}$/';
-    private const LINK_RE = '/^\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:)[^)\s]+)\)$/';
+    private const LINK_RE = '/^\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\\\])[^)\s]*)\)$/';
     private const LEAD_RE = '/^(#{1,6} |:::|>|\||```|~~~|-{3,}\s*$)/';
-    private const INLINE_RE = '/\\\\([\\\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:)[^)\s]+)\)/u';
+    private const INLINE_RE = '/\\\\([\\\\`*_{}[\]()#+\-.!>=:|~])|`([^`\n]+)`|\*\*(\S(?:.*?\S)?)\*\*|\*(\S(?:.*?\S)?)\*|\+\+(\S(?:.*?\S)?)\+\+|==(\S(?:.*?\S)?)==|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|tel:|#)[^)\s]+|\/(?![\/\\\\])[^)\s]*)\)/u';
 
     private const ENTITIES = ['&nbsp;' => ' ', '&amp;' => '&', '&lt;' => '<', '&gt;' => '>', '&quot;' => '"', '&#39;' => "'"];
     private const SAFE_TAGS = [
@@ -220,7 +220,7 @@ final class BlockquiltRender
                 return $value;
             }
             if ($tag === 'a' && $name === 'href') {
-                return $checkUrl($value, '/^(https?:\/\/|mailto:|tel:)/i');
+                return $checkUrl($value, '/^(https?:\/\/|mailto:|tel:|#.|\/(?![\/\\\\]))/i');
             }
             if ($tag === 'img' && $name === 'src') {
                 $u = $checkUrl($value, '/^(https:\/\/|media\/[\w.-]+$)/i');
@@ -446,7 +446,7 @@ final class BlockquiltRender
     private static function safeHref(string $href): string
     {
         $h = trim(self::unesc($href));
-        if (preg_match('/^(https?:\/\/|mailto:|tel:)/i', $h)) {
+        if (preg_match('/^(https?:\/\/|mailto:|tel:|#.|\/(?![\/\\\\]))/i', $h)) {
             $full = $h;
         } elseif (preg_match('/^[\w-]+(\.[\w-]+)+(\/\S*)?$/D', $h)) {
             $full = 'https://' . $h;
@@ -874,7 +874,7 @@ final class BlockquiltRender
             $img = $b['src'] !== '' ? '<img src="' . self::attr(self::mediaUrl($b['src'], $media)) . '" alt="' . self::attr($b['alt']) . '" loading="lazy">' : '';
             $titleHtml = $b['title'] !== '' ? '<h3 class="bq-card-title">' . self::esc($b['title']) . '</h3>' : '';
             $bodyHtml = $b['lines'] ? self::flowHtml($b['lines']) : '';
-            $linkHtml = ($b['label'] !== '' && preg_match('/^(https?:\/\/|mailto:|tel:)/i', $b['href']))
+            $linkHtml = ($b['label'] !== '' && preg_match('/^(https?:\/\/|mailto:|tel:|#.|\/(?![\/\\\\]))/i', $b['href']))
                 ? '<p><a class="bq-card-link" href="' . self::attr($b['href']) . '">' . self::esc($b['label']) . '</a></p>'
                 : '';
             return '<div class="bq-card">' . $img . '<div class="bq-card-body">' . $titleHtml . $bodyHtml . $linkHtml . '</div></div>';

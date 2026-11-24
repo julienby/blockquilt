@@ -1,6 +1,6 @@
 // Mise en forme du texte : barre fixe et centrée (en bas de l'écran visible au téléphone, sous l'en-tête à l'ordinateur),
 // ouverte par une sélection, un double clic, un appui long ou un clic droit, fermée à la perte du focus.
-// Au clavier : Ctrl+B / I / U, Alt+F10 (focus sur la barre), Tab / Maj+Tab dans une liste (niveaux).
+// Au clavier : Ctrl+B / I / U, Alt+F10 (focus sur la barre), Tab / Maj+Tab dans une liste (niveaux), Entrée dans le champ du lien.
 import { shared } from './shared.js';
 
 export function installBar(ed) {
@@ -25,7 +25,7 @@ export function installBar(ed) {
     bar.hidden = false;
     ed.placeBar();
   };
-  ed.hideBar = () => { bar.hidden = true; field = null; range = null; toggleClip(false); };
+  ed.hideBar = () => { bar.hidden = true; field = null; range = null; toggleClip(false); toggleLink(false); };
   const backToField = () => {
     if (!field || document.activeElement === field) return;
     field.focus({ preventScroll: true });
@@ -36,6 +36,7 @@ export function installBar(ed) {
   const toggleClip = (open) => {
     const row = bar.querySelector('[data-bar-clip]');
     const show = open ?? row.hidden;
+    if (show) toggleLink(false);
     row.hidden = !show;
     bar.querySelector('[data-clip-toggle]').setAttribute('aria-expanded', String(show));
     ed.placeBar();
@@ -61,6 +62,43 @@ export function installBar(ed) {
     ed.setDirty(true);
     ed.typed();
     toggleClip(false);
+  };
+
+  // ---- Sous-menu lien : ajouter, changer ou retirer le lien de la sélection ----
+  const linkOf = (r) => {
+    const n = r.commonAncestorContainer;
+    const a = (n.nodeType === 1 ? n : n.parentElement).closest('a');
+    return a && field?.contains(a) ? a : null;
+  };
+  const toggleLink = (open) => {
+    const row = bar.querySelector('[data-bar-link]');
+    const input = row.querySelector('[data-link-url]');
+    const show = open ?? row.hidden;
+    if (show) {
+      const a = range && linkOf(range);
+      if (!a && (!range || range.collapsed)) return ed.toast('Sélectionnez du texte');
+      input.value = a ? a.getAttribute('href') : '';
+      row.querySelector('[data-link-remove]').hidden = !a;
+      toggleClip(false);
+    }
+    row.hidden = !show;
+    bar.querySelector('[data-link-toggle]').setAttribute('aria-expanded', String(show));
+    ed.placeBar();
+    // Au toucher, pas de clavier d'office : le champ reste à un toucher.
+    if (show && !matchMedia('(pointer: coarse)').matches) input.focus();
+  };
+  const applyLink = (remove) => {
+    if (!field || !range) return;
+    const a = linkOf(range);
+    const href = Blocks.safeHref(bar.querySelector('[data-link-url]').value);
+    if (!remove && !href) return ed.toast('Adresse acceptée : https://…, /…, #…, mailto: ou tel:');
+    backToField();
+    if (remove) a?.replaceWith(...a.childNodes);
+    else if (a) a.setAttribute('href', href);
+    else document.execCommand('createLink', false, href);
+    toggleLink(false);
+    ed.setDirty(true);
+    ed.typed();
   };
 
   // ---- Ouverture et fermeture ----
@@ -89,11 +127,13 @@ export function installBar(ed) {
   ed.on(window.visualViewport, 'resize', ed.placeBar);
   ed.on(window.visualViewport, 'scroll', ed.placeBar);
   ed.on(window, 'resize', ed.placeBar);
-  ed.on(bar, 'mousedown', (e) => e.preventDefault());
+  ed.on(bar, 'mousedown', (e) => { if (!e.target.closest('input')) e.preventDefault(); });
   ed.on(bar, 'keydown', (e) => {
     const buttons = [...bar.querySelectorAll('button')].filter((b) => b.offsetParent);
     const i = buttons.indexOf(document.activeElement);
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); backToField(); }
+    if (e.key === 'Enter' && e.target.matches('[data-link-url]')) { e.preventDefault(); applyLink(false); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); toggleLink(false); backToField(); }
+    else if (e.target.matches('input')) return;
     else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); buttons[(i + (e.key === 'ArrowRight' ? 1 : buttons.length - 1)) % buttons.length].focus(); }
   });
 
@@ -103,7 +143,11 @@ export function installBar(ed) {
     scope.closest('.bq-edit')?.querySelectorAll('mark').forEach((m) => { if (r.intersectsNode(m)) m.replaceWith(...m.childNodes); });
   };
   ed.on(bar, 'click', (e) => {
+    if (e.target.closest('input')) return;
+    if (e.target.closest('[data-link-ok]')) return applyLink(false);
+    if (e.target.closest('[data-link-remove]')) return applyLink(true);
     backToField();
+    if (e.target.closest('[data-link-toggle]')) return toggleLink();
     const sel = getSelection();
     if (e.target.closest('[data-split]')) { if (sel.rangeCount) ed.split(sel.getRangeAt(0)); return; }
     if (e.target.closest('[data-clip-toggle]')) return toggleClip();

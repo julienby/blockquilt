@@ -50,11 +50,16 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
       <button type="button" data-clip="copy" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('copy', 'size-4')}Copier</button>
       <button type="button" data-clip="cut" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('cut', 'size-4')}Couper</button>
       <button type="button" data-clip="paste" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('paste', 'size-4')}Coller</button></div>
+    <div data-bar-link hidden role="group" aria-label="Lien" class="flex basis-full items-center gap-1 border-b border-white/15 p-1">
+      <input data-link-url type="url" inputmode="url" placeholder="https://…" aria-label="Adresse du lien" class="min-h-11 min-w-0 flex-1 rounded-xl bg-white/10 px-3 text-sm text-white placeholder:text-stone-400">
+      <button type="button" data-link-ok class="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold hover:bg-white/10">OK</button>
+      <button type="button" data-link-remove class="inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-stone-300 hover:bg-white/10">Retirer</button></div>
     <button type="button" data-fmt="bold" aria-label="Gras" class="bq-btn font-extrabold">B</button>
     <button type="button" data-fmt="italic" aria-label="Italique" class="bq-btn font-news italic">I</button>
     <button type="button" data-fmt="underline" aria-label="Souligner" class="bq-btn underline">U</button>
     <button type="button" data-fmt="highlight" aria-label="Surligner" class="bq-btn"><span class="size-4 rounded bg-amber-300"></span></button>
     <button type="button" data-fmt="insertUnorderedList" aria-label="Liste à puces" class="bq-btn">${ic('list')}</button>
+    <button type="button" data-link-toggle aria-label="Lien" aria-expanded="false" class="bq-btn aria-expanded:bg-white/15">${ic('link')}</button>
     <button type="button" data-emoji-insert aria-label="Insérer un emoji" class="bq-btn">${ic('smile')}</button>
     <button type="button" data-clip-toggle aria-label="Copier, couper, coller" aria-expanded="false" class="bq-btn text-stone-300 aria-expanded:bg-white/15 aria-expanded:text-white">${ic('paste')}</button>
     <button type="button" data-split aria-label="Scinder le bloc au curseur" class="bq-btn text-stone-300">${ic('split')}</button>
