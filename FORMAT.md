@@ -65,17 +65,20 @@ ssh maison.local
 
 ## Règles
 
+**Fichier.** Texte UTF-8, fins de ligne `\n`.
+
 **Frontmatter.** Facultatif, seulement en tête. Une ligne `---`, puis des lignes `clé: valeur` à plat (pas de listes, pas d'imbrication, une clé une seule fois), puis `---`. `title` et `icon` (un emoji) décrivent le document ; les autres clés sont gardées telles quelles, dans le même ordre. Au rendu, `title` devient le `<h1>` seulement si le corps n'a pas de bloc `# Titre`.
+Clés réservées à blockquilt : `title`, `icon`, `lang`, `description`, `image`. Toute autre clé appartient à l'application (`slug`, `date`, `tags`…). Une clé ajoutée plus tard par blockquilt commencera par `bq-`. blockquilt n'interprète pas la valeur d'une clé d'application : c'est une chaîne de caractères.
 
 **Blocs.** Un bloc par paragraphe, séparés par une ligne vide. Ne jamais mettre deux blocs sans ligne vide entre eux.
 
 | Bloc | Écriture |
 |---|---|
-| Titre H1 | `# Titre` sur une seule ligne (un seul par document, de préférence) |
+| Titre H1 | `# Titre` sur une seule ligne (un seul par document, de préférence). Chaque titre reçoit une ancre tirée de son texte, pour un lien `#…` (règle dans `RENDER.md`) : `## Les horaires d'été` → `#les-horaires-d-ete`. |
 | Titre H2 | `## Titre` sur une seule ligne |
 | Titre H3 | `### Titre` sur une seule ligne |
 | Texte en grand | `:::t1`, `:::t2` ou `:::t3`, le texte, puis `:::`. Taille d'un H1, H2 ou H3, sans être un titre (accroche, chiffre clé, phrase mise en avant). |
-| Texte | Lignes de texte. Un retour à la ligne simple reste dans le même paragraphe. |
+| Texte | Lignes de texte. Un retour à la ligne simple reste dans le même paragraphe et s'affiche comme un retour à la ligne (`<br>`), à la différence du Markdown standard (CommonMark) qui le remplace par une espace. |
 | Liste | Lignes `- élément` ou `1. élément`, dans un bloc texte. Sous-liste : indenter de la largeur de la puce du parent (2 espaces sous `- `, 3 sous `1. `). |
 | Citation | Chaque ligne commence par `> ` |
 | Encadré | Première ligne `> [!type]`, puis facultatifs un emoji et un titre : `> [!tip] 🔑 La clé`. Le texte suit, chaque ligne commençant par `> `. |
@@ -91,7 +94,7 @@ ssh maison.local
 
 **Types d'encadré** (en minuscules) : `info`, `tip` (astuce), `success`, `warning` (attention), `danger`.
 
-**Mise en forme dans le texte** : `**gras**`, `*italique*`, `++souligné++`, `==surligné==`, `` `code` ``, `[lien](https://…)`. Liens acceptés : `https://`, `http://`, `mailto:`, `tel:`.
+**Mise en forme dans le texte** : `**gras**`, `*italique*`, `++souligné++`, `==surligné==`, `` `code` ``, `[lien](https://…)`. Liens acceptés : `https://`, `http://`, `mailto:`, `tel:`, une adresse du site `/…` (pas `//…`) et une ancre `#…`.
 
 **Pour écrire un caractère qui a un sens** (`*`, `[`, `` ` ``, `#` en début de ligne…), le précéder de `\`.
 
@@ -101,6 +104,23 @@ ssh maison.local
 - Un encadré dans un autre.
 - Du HTML brut ou un tableau hors d'un bloc `:::html` : gardé tel quel, mais affiché comme du texte source.
 - Un bloc `:::` dans un autre bloc `:::`.
+
+## Texte source et formes réservées
+
+Un bloc non reconnu reste « texte source » : il est gardé intact, mais **son rendu n'est pas garanti**. Une version future de blockquilt peut lui donner un sens. Seuls les blocs reconnus ont un rendu stable d'une version à l'autre. De même, ce que le filtre retire d'un bloc `:::html` peut être gardé par une version future.
+
+Ces formes sont du texte source aujourd'hui. Elles sont gardées pour un usage futur :
+
+| Forme | Usage prévu |
+|---|---|
+| `[[…]]` | Lien vers un autre document de l'application (résolu par l'application). |
+| Tableau `\| a \| b \|` | Tableau. |
+| `- [ ] tâche`, `- [x] fait` | Liste de tâches. |
+| `> [!note]` et autres types d'encadré | Encadrés supplémentaires. |
+| `[^1]` | Note de bas de page. |
+| `![…](…)` dans une phrase, `####` | — |
+
+Le texte simple d'un bloc reconnu ne change jamais de sens : `#mot` ou `@nom` dans une phrase restent du texte.
 
 ## Contrôle
 

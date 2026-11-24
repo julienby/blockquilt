@@ -274,6 +274,61 @@ But : intégrer l'éditeur pour de vrai dans une application, pour comprendre et
 - [x] **D4 `/demo/admin`** (admin SaaS) : fiche produit, nom (champ simple), statut et catégorie (listes), prix, 2 éditeurs (« Description courte », « Page produit ») avec `save: false` ; un seul « Enregistrer » pour la fiche.
 - [x] **D5** Un essai Chromium par exemple (375 et 1280 px) : chargement, modification, enregistrement, relecture après rechargement, éditeurs indépendants. README « Exemples d'intégration ». Un commit par exemple.
 
+## 4o. Adresses nues en liens (décidé le 2026-11-24, plan à valider)
+
+But : `Voir https://exemple.fr.` → `Voir <a href="https://exemple.fr">https://exemple.fr</a>.`, dans les trois moteurs, et l'éditeur relit le texte sans le changer.
+
+Règles de lecture (`inlineHtml`) :
+- `http://` ou `https://` suivi de caractères sans espace, sans `<` ni `>`.
+- Fin d'adresse : on retire `. , ; : ! ? ' " »` en dernière position, et `)` si l'adresse a plus de `)` que de `(` (`https://fr.wikipedia.org/wiki/A_(b)` reste entier).
+- Dans l'adresse, aucune mise en forme : `_`, `*`, `==` restent des caractères.
+- Une adresse YouTube ou Vimeo seule sur sa ligne reste un bloc vidéo. Une autre adresse seule devient un texte avec un lien.
+
+Écriture (`htmlToMd`, `escText`) — deux pièges vérifiés le 2026-11-24 :
+1. Une adresse tapée sort échappée (`https://a.fr/\_x\*2\*`). Correction : `escText` n'échappe rien à l'intérieur d'une adresse.
+2. `<a href="X">X</a>` sort en `[X](X)` : le bloc ne redonnerait pas son texte et deviendrait « texte source ». Correction : le HTML du champ (`linesToHtml`, pas le HTML publié) marque le lien automatique par `data-bq-url`. `htmlToMd` écrit l'adresse nue pour un lien marqué dont le texte est encore l'adresse, sinon `[texte](adresse)`. Un `[X](X)` écrit à la main reste tel quel.
+
+Tests d'abord :
+- fixture `tests/fixtures/autolink.md` / `.html` (lue par les trois moteurs) : adresse dans une phrase, ponctuation finale, parenthèses, `_` et `*` dans l'adresse, adresse seule, `[https://a.fr](https://a.fr)` gardé ;
+- `blocks_test.cjs` : une adresse tapée dans le champ ressort identique ; texte du lien modifié → `[texte](adresse)`.
+
+Fichiers : `blockquilt.js` (`inlineHtml`, `escText`, `htmlToMd`, `linesToHtml`), `renderers/php/BlockquiltRender.php`, `renderers/python/blockquilt_render.py`, `FORMAT.md`, `RENDER.md`.
+
+À part, test d'abord : `### 1. Clé` devient « texte source » au lieu d'un titre H3.
+
+Avancement : rien de codé.
+
+## 4p. Vers la version 0.1.0 (décidé le 2026-11-24 : `REVUE-V1.md` §7, `CYCLE-DE-VIE.md`)
+
+Règle pour chaque étape : test qui reproduit d'abord, puis correction, puis `check`, `check-php`, `check-python` verts. Un commit par étape.
+Moteurs : tout changement du format se fait en JS, PHP et Python.
+
+**Étape 1 — Corrections (revue §2 et §3)**
+1. 2.1 `sanitize` : un code point hors de `1..0x10FFFF` donne `U+FFFD`, sans planter. Helper partagé avec `fromHtml`. Test : `<a href="&#999999999;">`.
+2. 2.2 Boutons de style de la barre : appeler `ed.typed()`. Test : clic sur « Gras », puis Annuler.
+3. 2.4 Ctrl+Z et Ctrl+S quand le focus est sur `body` : seulement le dernier éditeur actif. Test dans `check.mjs` sur `/demo/notes`. Puis vérifier si le test instable `/demo/notes : deux éditeurs indépendants` disparaît. Sinon, trouver sa cause.
+4. 2.5 Fermeture forcée du plein écran en vue source : si le bloc a disparu, ajouter les blocs de la source à la fin.
+5. 2.6.1 Lien d'une carte écrit par `Blocks.safeHref` (JS). 2.6.2 Vidéo de repli : `safeHref` avant le lien.
+6. 2.3 MCP : plafond du corps HTTP à 2 Mo (413), délai sur `fetch`, file de promesses en stdio.
+7. Relais IA : arrêter l'appel au modèle quand le navigateur ferme la demande (`AbortSignal.any`).
+8. Aperçu : ignorer une réponse de `previewUrl` plus ancienne que la dernière demande.
+
+**Étape 2 — Gel du format**
+1. §4o : adresses nues en liens.
+2. `### 1. Clé` → titre H3.
+3. Ligne `<!-- … -->` inconnue → « texte source ».
+4. `~~` échappé par l'éditeur ; `~~x~~` écrit à la main → « texte source ».
+5. `FORMAT.md` (formes réservées : `<!-- … -->`, `~~…~~`), `RENDER.md`, une fixture par point.
+
+**Étape 3 — Cycle de vie**
+1. `CHANGELOG.md`.
+2. `bin/blockquilt-install <version> <dossier de l'application>` : copie les fichiers d'un tag dans `assets/blockquilt/<version>/` et `lib/blockquilt/<version>/`, écrit `VERSION`. Rien d'autre.
+3. `bin/blockquilt-verify <dossier de .md>` : relecture identique de chaque contenu, et HTML comparé entre deux versions.
+4. `tests/contents_test.mjs` lançable contre une application (`BQ_URL`, `BQ_TOKEN`).
+5. Tag `v0.1.0`.
+
+Avancement : rien de codé.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)
