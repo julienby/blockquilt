@@ -99,7 +99,9 @@ export function installRender(ed) {
       <button type="button" data-insert="end" class="bq-add mt-3 flex min-h-12 w-full items-center justify-center gap-2 border border-dashed border-stone-300 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
     canvas.querySelectorAll('.bq-edit').forEach(ed.clean);
   };
+  let previewSeq = 0; // seule la dernière demande d'aperçu s'affiche
   const renderPreview = async () => {
+    const seq = ++previewSeq;
     ed.hideBar();
     const text = ed.markdown();
     canvas.innerHTML = '<p class="py-10 text-center text-sm text-stone-500">Chargement de l’aperçu…</p>';
@@ -110,12 +112,12 @@ export function installRender(ed) {
         if (!r.ok) throw new Error('Aperçu indisponible'); // la page d'erreur du serveur n'est pas un aperçu
         html = await r.text();
       }
-      if (ed.mode === 'preview') {
+      if (ed.mode === 'preview' && seq === previewSeq) {
         canvas.innerHTML = `<div class="bq-column p-1 sm:p-4">${html}</div>`;
         window.BlockquiltContent?.enhance(canvas); // flèches et puces des carrousels, si blockquilt-content.js est chargé
       }
     } catch {
-      if (ed.mode === 'preview') canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
+      if (ed.mode === 'preview' && seq === previewSeq) canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
     }
   };
   // Visuel à côté : le même choix en vue blocs et en vue source. 2 panneaux dès 1024 px par défaut.

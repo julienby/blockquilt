@@ -313,6 +313,12 @@ Moteurs : tout changement du format se fait en JS, PHP et Python.
 7. Relais IA : arrêter l'appel au modèle quand le navigateur ferme la demande (`AbortSignal.any`).
 8. Aperçu : ignorer une réponse de `previewUrl` plus ancienne que la dernière demande.
 
+Étape 1 faite le 2026-11-24. Écarts au plan :
+- 2.2 non reproduit : `execCommand` envoie un événement `input` (qui appelle `ed.typed()`), et `ed.undo()` prend lui-même un point d'historique. Aucun changement.
+- 2.3, file stdio : non reproduite ; JSON-RPC permet les réponses dans le désordre et `If-Match` protège les écritures. Aucun changement.
+- 2.5 : le bloc ne disparaît que si un autre document est chargé (`setMarkdown`, autre version). On ne modifie pas ce document (`if (i >= 0)`) ; ajouter les blocs à la fin y aurait mis le texte de l'ancien document.
+- Test instable `/demo/notes : deux éditeurs indépendants` : il ne vient pas de 2.4 (pas de Ctrl+Z dans ce test). Vu une fois sur 8 passages ; cause non trouvée.
+
 **Étape 2 — Gel du format**
 1. §4o : adresses nues en liens.
 2. `### 1. Clé` → titre H3.

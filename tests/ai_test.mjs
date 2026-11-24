@@ -14,6 +14,7 @@ const upstream = http.createServer(async (req, res) => {
   const parts = []; for await (const p of req) parts.push(p);
   last = { url: req.url, auth: req.headers.authorization, title: req.headers['x-title'], body: JSON.parse(Buffer.concat(parts).toString('utf8')) };
   if (answer.delay) await new Promise((r) => setTimeout(r, answer.delay));
+  last.dropped = res.destroyed;
   if (res.destroyed) return;
   res.writeHead(answer.status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(answer.body));
 });
@@ -148,6 +149,12 @@ try {
   answer = { ...answer, delay: 500 };
   const slow = await createAi({ baseUrl, apiKey: 'k', model: 'm', timeout: 100 }).complete({ scope: 'document', instruction: 'x', text: 'T' }).then(() => null, (e) => e);
   ok(slow?.status === 504 && slow.message.includes('trop lent'), 'fournisseur trop lent : 504 au délai maximal');
+  // Le navigateur abandonne (feuille IA fermée) : l'appel au modèle s'arrête aussi, sans attendre sa réponse.
+  answer = { ...answer, delay: 400 };
+  last = null;
+  await fetch(APP, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'document', instruction: 'x', text: 'T' }), signal: AbortSignal.timeout(100) }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 500));
+  ok(last?.dropped === true, 'demande abandonnée par le navigateur : appel au modèle arrêté');
   delete answer.delay;
   const huge = await fetch(APP, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'document', instruction: 'x', text: 'a'.repeat(2_100_000) }) });
   ok(huge.status === 413 && (await huge.json()).error.includes('trop gros'), 'corps reçu de plus de 2 Mo : 413, sans le lire en entier');

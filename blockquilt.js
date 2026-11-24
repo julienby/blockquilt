@@ -470,6 +470,9 @@ const Blocks = {
     return lines.join('\n').replace(/^\n+|\n+$/g, '').replace(/\*\*\*\*/g, '');
   },
 
+  /** Caractère d'une entité numérique ; hors Unicode (0, au-delà de U+10FFFF) : U+FFFD. */
+  codePoint(n) { return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '\ufffd'; },
+
   /**
    * HTML collé (page web, traitement de texte) → Markdown blockquilt, au mieux. Sans DOM.
    * Seul le texte est gardé : titres, paragraphes, listes, citations, code, photos https, vidéos YouTube et Vimeo, lignes.
@@ -477,10 +480,9 @@ const Blocks = {
    * La mise en forme du texte passe par htmlToMd. Ce que le noyau ne relit pas à l'identique deviendra un bloc « texte source ».
    */
   fromHtml(html) {
-    const char = (n) => (n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '�');
     const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', laquo: '«', raquo: '»', hellip: '…', ndash: '–', mdash: '—' };
     const decode = (s) => s.replace(/&#x([0-9a-f]+);?|&#(\d+);?|&([a-z]+);/gi, (m, hex, dec, name) =>
-      (hex ? char(parseInt(hex, 16)) : dec ? char(Number(dec)) : NAMED[name.toLowerCase()] ?? m));
+      (hex ? Blocks.codePoint(parseInt(hex, 16)) : dec ? Blocks.codePoint(Number(dec)) : NAMED[name.toLowerCase()] ?? m));
     const attrOf = (attrs, name) => {
       const m = new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(attrs);
       return m ? decode(m[1] ?? m[2] ?? m[3]).trim() : '';
@@ -639,8 +641,8 @@ const Blocks = {
 
   /** HTML quelconque → HTML sûr : balises de SAFE_TAGS, attributs permis seulement, adresses vérifiées. `media` réécrit « media/… ». */
   sanitize(html, media = 'media/') {
-    const decode = (v) => v.replace(/&#x([0-9a-f]+);?/gi, (_, h) => String.fromCodePoint(parseInt(h, 16) || 0xfffd))
-      .replace(/&#(\d+);?/g, (_, d) => String.fromCodePoint(Number(d) || 0xfffd))
+    const decode = (v) => v.replace(/&#x([0-9a-f]+);?/gi, (_, h) => Blocks.codePoint(parseInt(h, 16)))
+      .replace(/&#(\d+);?/g, (_, d) => Blocks.codePoint(Number(d)))
       .replace(/&(amp|lt|gt|quot|apos|colon|tab|newline|nbsp);?/gi, (_, n) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", colon: ':', tab: '\t', newline: '\n', nbsp: ' ' })[n.toLowerCase()]);
     const url = (v, allowed) => { const u = decode(v).replace(/[\u0000-\u0020\u007f-\u009f\u00ad\u200b-\u200f\u2028\u2029\ufeff]/g, ''); return allowed.test(u) ? u : null; };
     const allow = (tag, name, value) => {
@@ -986,11 +988,12 @@ const Blocks = {
       const text = body(b.html);
       const title = b.title.replace(/\s+/g, ' ').trim();
       const label = b.label.replace(/\s+/g, ' ').trim();
+      const href = Blocks.safeHref(b.href);
       const lines = [
         b.src && Blocks.types.photo.toMarkdown(b),
         title && '### ' + Blocks.htmlToMd(Blocks.esc(title)),
         text.trim() && text,
-        label && b.href.trim() && `[${Blocks.htmlToMd(Blocks.esc(label))}](${b.href.trim()})`,
+        label && href && `[${Blocks.htmlToMd(Blocks.esc(label))}](${href})`,
       ].filter(Boolean);
       return lines.length ? [':::card', ...lines, ':::'].join('\n') : '';
     },
@@ -1010,9 +1013,9 @@ const Blocks = {
     toMarkdown: (b) => b.url.trim(),
     toHtml: (b) => {
       const src = Blocks.embedUrl(b.url);
-      return src
-        ? `<figure class="bq-video"><iframe src="${Blocks.attr(src)}" title="Vidéo" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></figure>`
-        : `<p><a href="${Blocks.attr(b.url)}">${Blocks.esc(b.url)}</a></p>`;
+      const href = Blocks.safeHref(b.url);
+      if (src) return `<figure class="bq-video"><iframe src="${Blocks.attr(src)}" title="Vidéo" loading="lazy" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></figure>`;
+      return href ? `<p><a href="${Blocks.attr(href)}">${Blocks.esc(b.url)}</a></p>` : `<p>${Blocks.esc(b.url)}</p>`;
     },
     blank: () => ({ url: '' }),
   });

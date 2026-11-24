@@ -463,6 +463,17 @@ try {
       const canvas = a.el.querySelector('[data-canvas]');
       out.preview = canvas.textContent.includes('Aperçu indisponible') && !canvas.textContent.includes('Fatal');
       a.close();
+      // Aperçu, retour au texte, aperçu : la première réponse (lente) n'écrase pas la seconde.
+      let calls = 0;
+      window.fetch = async () => { const n = ++calls; if (n === 1) await wait(200); return new Response(n === 1 ? '<p>ANCIEN</p>' : '<p>NOUVEAU</p>'); };
+      a = mount({ source: 'Un', previewUrl: 'api/preview' });
+      a.el.querySelector('[data-preview]').click();
+      await wait(20);
+      a.el.querySelector('[data-preview]').click();
+      a.el.querySelector('[data-preview]').click();
+      await wait(300);
+      out.previewRace = a.el.querySelector('[data-canvas]').textContent.includes('NOUVEAU') && !a.el.querySelector('[data-canvas]').textContent.includes('ANCIEN');
+      a.close();
       window.fetch = offline;
       a = mount({ contentUrl: 'contents/n4' });
       await wait(50);
@@ -481,6 +492,7 @@ try {
   })()`);
   ok(n4.keep, `« Garder la mienne » sans réseau → message dans la feuille (${JSON.stringify(n4)})`);
   ok(n4.preview, `aperçu : réponse en erreur → « Aperçu indisponible », pas la page d'erreur (${JSON.stringify(n4)})`);
+  ok(n4.previewRace, 'aperçu : une réponse ancienne n’écrase pas la dernière');
   ok(n4.unread && n4.noSave && n4.stays && n4.reread, `texte de départ illisible : message dans l'éditeur, enregistrement impossible, « Réessayer » le lit (${JSON.stringify(n4)})`);
   ok(n1.stays && n1.closed && n1.cleared,`erreur d'enregistrement : reste affichée, « Fermer » la cache, un enregistrement réussi la retire (${JSON.stringify(n1)})`);
   // B3 : brouillon proposé par un bandeau, au montage
@@ -1673,6 +1685,11 @@ try {
         type('X\\n\\nY');
         full.close(); await tick();
         out.forced = e.getMarkdown();
+        $('[data-canvas] [data-id] [data-expand]').click();
+        await act('source');
+        type('P\\n\\nQ');
+        e.setMarkdown('Autre.\\n\\nNote.'); await tick();
+        out.replaced = { md: e.getMarkdown(), open: full.open };
         return out;
       } finally { e.destroy(); el.remove(); try { if (split === null) localStorage.removeItem('blockquilt.split'); else localStorage.setItem('blockquilt.split', split); } catch {} }
     })()`);
@@ -1684,6 +1701,7 @@ try {
     ok(!fs4.left.area && fs4.left.field === 'Simple.' && fs4.left.md === 'Simple.\n\nDeux.\n' && fs4.left.pressed === 'false' && fs4.undone === 'Un **texte**.\n\nDeux.\n', `${width} px, source d’un bloc : sortie → le champ ; un seul Annuler (${j([fs4.left, fs4.undone])})`);
     ok(fs4.next === 'Deux.' && !fs4.preview.area && fs4.preview.source === 'false' && fs4.preview.preview === 'true', `${width} px, source d’un bloc : gardée au bloc voisin ; l’aperçu la quitte (${j([fs4.next, fs4.preview])})`);
     ok(fs4.forced === 'Un **texte**.\n\nX\n\nY\n', `${width} px, source d’un bloc : fermeture forcée avec 2 blocs → rien n’est perdu (${j(fs4.forced)})`);
+    ok(fs4.replaced.md === 'Autre.\n\nNote.\n' && !fs4.replaced.open, `${width} px, source d’un bloc : un autre document chargé (setMarkdown) n’est pas modifié (${j(fs4.replaced)})`);
   }
   await viewport(375);
 
@@ -1935,6 +1953,16 @@ try {
     ok(await ev(`document.querySelector('[data-notes] [data-open]').textContent.trim() === 'Recette du pain'`), `${width} px, /demo/notes : la recherche cherche dans le texte`);
     await ev(`document.querySelector('[data-journal] [data-save]').click()`);
     await waitFor(async () => (record('notes', `journal-${new Date().toISOString().slice(0, 10)}`).markdown || '').includes(`Journal ${width}.`), 'journal enregistré');
+    // Ctrl+Z sans champ actif : seulement dans le dernier éditeur utilisé
+    await typeIn('[data-journal] .bq-edit', ` J${width}`);
+    await sleep(1200);
+    await typeIn('[data-note] .bq-edit', ` N${width}`);
+    await sleep(1200);
+    await ev(`document.activeElement.blur()`);
+    await key('z', 'KeyZ', 90, CTRL);
+    ok(await ev(`document.querySelector('[data-journal]').textContent.includes(' J${width}') && !document.querySelector('[data-note]').textContent.includes(' N${width}')`), `${width} px, /demo/notes : Ctrl+Z n’annule que dans le dernier éditeur utilisé`);
+    await ev(`document.querySelector('[data-journal] [data-save]').click()`);
+    await waitFor(async () => (record('notes', `journal-${new Date().toISOString().slice(0, 10)}`).markdown || '').includes(` J${width}`), 'journal enregistré');
 
     // Admin SaaS : champs + deux éditeurs (save: false), un seul Enregistrer pour la fiche.
     const status = width < 640 ? 'archived' : 'published';

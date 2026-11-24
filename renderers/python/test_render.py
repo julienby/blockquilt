@@ -42,6 +42,7 @@ class TestBlockquiltPythonRender(unittest.TestCase):
             "<svg onload=alert(1)><circle/></svg>",
             '<iframe src="https://evil.example"></iframe>',
             '<div onclick="alert(1)">x</div>',
+            '<a href="&#999999999;">x</a><a href="&#x110000;">y</a>',
         ]
         for p in payloads:
             out = bq.sanitize(p)

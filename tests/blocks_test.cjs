@@ -55,6 +55,10 @@ for (const p of PAYLOADS) {
 }
 const table = '<table class="w-full"><thead><tr><th colspan="2">Tarifs</th></tr></thead><tbody><tr><td>Nuit</td><td rowspan="1">80 €</td></tr></tbody></table>';
 ok(Blocks.sanitize(table) === table, 'filtre : un tableau passe intact');
+{ const md = Blocks.types.card.toMarkdown({ src: '', alt: '', title: 'T', html: '', label: 'Lire', href: ' https://a.fr/a b(1) ' });
+  ok(md === ':::card\n### T\n[Lire](https://a.fr/a%20b%281%29)\n:::' && types(md) === 'card', 'carte : adresse du lien écrite sûre (espace, parenthèses), relue en carte'); }
+ok(!/href/.test(Blocks.blockHtml({ type: 'video', url: 'javascript:alert(1)' }, { media: 'media/' })), 'vidéo non reconnue : pas de lien javascript:');
+ok((() => { try { return !/href/.test(Blocks.sanitize('<a href="&#999999999;">x</a><a href="&#x110000;">y</a>')) && Blocks.toHtml(':::html\n<a href="&#999999999;">x</a>\n:::').includes('<a>x</a>'); } catch { return false; } })(), 'filtre : entité hors Unicode, sans planter');
 const grid = '<div class="grid grid-cols-2 gap-4 md:grid-cols-[1fr_2fr]"><div class="p-4"><h3>A</h3><p>Texte <strong>gras</strong> <a href="https://exemple.fr">lien</a></p></div><figure><img src="https://exemple.fr/a.png" alt="A" width="40" height="40"><figcaption>B</figcaption></figure></div>';
 ok(Blocks.sanitize(grid) === grid, 'filtre : une grille de div passe intacte (classes Tailwind gardées)');
 ok(Blocks.sanitize('<img src="media/abc" alt="x">', '/m/') === '<img src="/m/abc" alt="x">' && Blocks.sanitize('<div><p>a') === '<div><p>a</p></div>', 'filtre : photo du document, balises fermées');

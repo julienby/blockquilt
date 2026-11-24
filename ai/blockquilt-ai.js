@@ -94,10 +94,10 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
   };
 
   /**
-   * Demande (et personne qui demande, ou null) → { markdown } ou { operations } (texte, « @@ rien » ou vide = rien à changer).
+   * Demande (et personne qui demande, ou null ; signal facultatif : arrête l'appel au modèle) → { markdown } ou { operations } (texte, « @@ rien » ou vide = rien à changer).
    * Erreur avec .status (400, 413, 429, 502 ou 504).
    */
-  const complete = async (req, who = null) => {
+  const complete = async (req, who = null, signal = null) => {
     const scope = req.scope === 'block' ? 'block' : 'document';
     const use = req.use ? byId.get(req.use) : null;
     const fail = (status, message) => Object.assign(new Error(message), { status });
@@ -137,7 +137,7 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey, ...headers },
         body: JSON.stringify({ model: use?.model || model, max_tokens: maxTokens, ...params, ...use?.params, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
-        signal: AbortSignal.timeout(timeout),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeout)]) : AbortSignal.timeout(timeout),
       });
     } catch (error) {
       if (error.name === 'TimeoutError') throw fail(504, `Modèle trop lent : pas de réponse en ${timeout / 1000} s. Réessayer.`);
@@ -184,8 +184,11 @@ function createAi({ baseUrl, apiKey, model, uses = [], headers = {}, params = {}
     const json = (code, data) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); };
     if (req.method === 'GET') return json(200, { uses: uses.map(({ id, label, scopes }) => ({ id, label, scopes: scopes || ['document', 'block'] })) });
     if (req.method !== 'POST') return json(405, { error: 'GET ou POST' });
+    // Le navigateur abandonne la demande (feuille IA fermée) : l'appel au modèle s'arrête, ses jetons ne sont plus dépensés.
+    const gone = new AbortController();
+    res.on('close', () => { if (!res.writableEnded) gone.abort(); });
     try {
-      json(200, await complete(await read(req), userOf(req)));
+      json(200, await complete(await read(req), userOf(req), gone.signal));
     } catch (error) {
       json(error.status || 400, { error: error.message });
     }

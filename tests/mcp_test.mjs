@@ -68,6 +68,7 @@ try {
   ok((await call('user2', 'write_content', { id: 'guide-1a', mode: 'append', markdown: 'Intrus.' })).error && !file('guide-1a').includes('Intrus'), 'write_content sur le contenu d’un autre : refusé');
   ok(Blocks.lint(file('guide-1a')).length === 0 && Blocks.lint(file('guide-1b')).length === 0, 'ce que l’IA a écrit : l’éditeur le relit sans bloc source');
   ok((await call('user1', 'lint', { markdown: ':::html\n<p>x</p>' })).text.includes('non fermé'), 'lint : problème signalé');
+  ok((await fetch(BASE + 'mcp', { method: 'POST', headers: { Authorization: 'Bearer demo-user1' }, body: 'x'.repeat(3 * 1024 * 1024) })).status === 413, 'HTTP : demande de plus de 2 Mo refusée (413)');
 
   // stdio (Claude Code en local) : BQ_URL + BQ_TOKEN, un message par ligne ; l'auteur prend le nom du client.
   const child = spawn('node', [path.join(ROOT, 'mcp/blockquilt-mcp.js')], { env: { ...process.env, BQ_URL: BASE, BQ_TOKEN: 'demo-user2' } });

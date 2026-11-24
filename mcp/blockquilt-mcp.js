@@ -66,7 +66,7 @@ class ToolError extends Error {}
 function createMcp({ base }) {
   const root = base.endsWith('/') ? base : base + '/';
   const api = async (ctx, p, init = {}) => {
-    const r = await fetch(new URL(p, root), { ...init, headers: { ...(ctx.token ? { Authorization: 'Bearer ' + ctx.token } : {}), ...init.headers } });
+    const r = await fetch(new URL(p, root), { ...init, signal: AbortSignal.timeout(30000), headers: { ...(ctx.token ? { Authorization: 'Bearer ' + ctx.token } : {}), ...init.headers } });
     if (r.status === 401) throw new ToolError('Jeton refusé par l’application');
     if (r.status === 403) throw new ToolError('Pas d’accès à ce contenu avec ce jeton');
     if (r.status === 404) throw new ToolError('Contenu introuvable');
@@ -168,6 +168,8 @@ function createMcp({ base }) {
   };
 }
 
+const MAX_BYTES = 2 * 1024 * 1024;
+
 /** Transport HTTP (MCP « streamable HTTP », réponses JSON, sans session) : POST du message, jeton dans Authorization. */
 function httpHandler({ base, via = 'MCP' }) {
   const handle = createMcp({ base });
@@ -176,7 +178,15 @@ function httpHandler({ base, via = 'MCP' }) {
     const token = /^Bearer (\S+)$/.exec(req.headers.authorization || '')?.[1];
     if (!token) { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8', 'WWW-Authenticate': 'Bearer' }); return res.end('Jeton attendu : Authorization: Bearer <jeton>\n'); }
     let msg;
-    try { const parts = []; for await (const p of req) parts.push(p); msg = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch {
+    // Corps arrêté dès qu'il dépasse 2 Mo (413) : jamais chargé en entier en mémoire.
+    const parts = [];
+    let size = 0;
+    for await (const p of req) {
+      size += p.length;
+      if (size > MAX_BYTES) { res.writeHead(413, { 'Content-Type': 'text/plain; charset=utf-8', Connection: 'close' }); return res.end('Demande trop grosse : 2 Mo au plus.\n'); }
+      parts.push(p);
+    }
+    try { msg = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch {
       res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'JSON invalide' } }));
     }
     const ctx = { token, via };

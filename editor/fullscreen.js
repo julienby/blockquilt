@@ -195,8 +195,9 @@ export function installFullscreen(ed) {
     app.append(ed.bar, ed.toastEl.parentElement);
     ed.hideBar();
     // Fermeture forcée (Annuler, autre version…) avec une source de plusieurs blocs : ils sont tous gardés, rien n'est perdu.
-    if (mode === 'source' && many) {
-      const i = ed.blocks.findIndex((x) => x.id === fullId());
+    // Bloc absent : un autre document a été chargé (setMarkdown, autre version) ; il n'est pas modifié.
+    const i = ed.blocks.findIndex((x) => x.id === fullId());
+    if (mode === 'source' && many && i >= 0) {
       ed.blocks.splice(i, 1, ...Blocks.parse(area().value).blocks.filter((x) => !Blocks.isEmpty(x)).map((x) => ({ id: ed.newId(), ...x })));
     }
     ed.checkpoint(); // lit le bloc dans le dialogue

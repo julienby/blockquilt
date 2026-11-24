@@ -1,5 +1,7 @@
 // Événements généraux : clics (un bouton = une action), saisie, focus, collage, clavier, raccourcis Ctrl+S / Z / Y.
 // Les écouteurs sont posés sur toute l'application (un bloc en plein écran est hors de la zone des blocs) ; les feuilles sont exclues.
+let last = null; // dernier éditeur de la page touché ou focalisé : il reçoit Ctrl+S / Z / Y quand aucun champ n'a le focus
+
 export function installEvents(ed) {
   const { o, app, canvas, sheets, titleEl, blockFull } = ed;
   const inSheet = (t) => !!t.closest?.('[data-sheet]');
@@ -136,7 +138,9 @@ export function installEvents(ed) {
   });
 
   // ---- Raccourcis : Ctrl+S, Ctrl+Z, Ctrl+Maj+Z, Ctrl+Y, Échap ----
-  const owns = () => app.contains(document.activeElement) || !document.activeElement || document.activeElement === document.body;
+  ed.on(app, 'focusin', () => { last = ed; });
+  ed.on(app, 'pointerdown', () => { last = ed; });
+  const owns = () => app.contains(document.activeElement) || ((!document.activeElement || document.activeElement === document.body) && (!last || last === ed || !last.app.isConnected));
   const inField = () => app.contains(document.activeElement) && document.activeElement.matches('[contenteditable="true"], input, textarea');
   ed.on(document, 'keydown', (e) => {
     if (e.key === 'Escape' && ed.dragging()) { e.preventDefault(); ed.dragEnd(false); return; }

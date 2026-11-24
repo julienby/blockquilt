@@ -36,6 +36,7 @@ foreach ([
     '<svg onload=alert(1)><circle/></svg>',
     '<iframe src="https://evil.example"></iframe>',
     '<div onclick="alert(1)">x</div>',
+    '<a href="&#999999999;">x</a><a href="&#x110000;">y</a>',
 ] as $p) {
     $out = BlockquiltRender::sanitize($p);
     $clean = !preg_match('/<(script|iframe|svg)/i', $out) && !preg_match('/(javascript:|onclick|onerror)/i', $out);
