@@ -1,6 +1,6 @@
 // Admin d'un SaaS : une fiche produit avec des champs (nom, statut, catégorie, prix) et deux éditeurs.
 // L'application enregistre la fiche entière : PUT /demo/api/admin/{id} (JSON). Les éditeurs ont save: false ;
-// l'application lit getMarkdown() et dirty, suit onDirty, et appelle markSaved() après son enregistrement.
+// l'application lit getMarkdown() et dirty, suit onDirty, et appelle markSaved(texte envoyé) après son enregistrement.
 import { mount } from '../blockquilt-editor.js';
 
 const $ = (s) => document.querySelector(s);
@@ -52,7 +52,8 @@ const save = async () => {
   const [summary, page] = editors.map((e) => e.getMarkdown());
   const r = await fetch(`api/admin/${current}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...record, summary, page }) });
   if (!r.ok) { $('[data-state]').textContent = 'Enregistrement impossible. Réessayez.'; return; }
-  editors.forEach((e) => e.markSaved());
+  editors[0].markSaved(summary);
+  editors[1].markSaved(page);
   fieldsChanged = false;
   $('[data-heading]').textContent = record.name || 'Nouveau produit';
   showState();

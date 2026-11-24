@@ -339,7 +339,9 @@ Moteurs : tout changement du format se fait en JS, PHP et Python.
 4. `tests/contents_test.mjs` lançable contre une application (`BQ_URL`, `BQ_TOKEN`).
 5. Tag `v0.1.0`.
 
-Avancement : rien de codé.
+Avancement :
+- 0 fait. Cause des deux tests : ils lisaient l'écran dès que le fichier était écrit, avant la réponse au navigateur. Ils attendent maintenant l'état de l'écran.
+  Le test admin a révélé un vrai défaut : `markSaved()` marquait enregistrée une frappe faite pendant l'enregistrement. Décidé : `markSaved(text)` (test dans `check.mjs`, 4n D1). 8 passages de `check` : les deux tests sont verts à chaque fois.
 
 ## 5. IA — fait (I1 à I6)
 

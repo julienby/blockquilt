@@ -1734,11 +1734,21 @@ try {
     $('[data-block-full]').close(); await new Promise((r) => setTimeout(r, 50));
     e.markSaved();
     out.saved = e.dirty; out.calls = calls.join(); out.md = e.getMarkdown();
+    // Frappe pendant l'enregistrement de l'application : markSaved(texte envoyé) la laisse à enregistrer.
+    const sent = e.getMarkdown();
+    const g = $('[data-canvas] [data-rich]'); // redessiné à la fermeture du plein écran
+    g.focus(); getSelection().selectAllChildren(g); getSelection().collapseToEnd(); document.execCommand('insertText', false, ' C');
+    out.typedLate = e.dirty;
+    e.markSaved(sent);
+    out.late = e.dirty;
+    e.markSaved(e.getMarkdown());
+    out.lateSaved = e.dirty;
     e.destroy(); el.remove();
     return out;
   })()`);
   ok(ns.head && ns.full && ns.start === false && ns.typed === true && ns.ctrlS === false, `save: false : pas de bouton Enregistrer (en-tête, plein écran), Ctrl+S laissé à l’application, dirty lisible (${JSON.stringify(ns)})`);
   ok(ns.saved === false && ns.calls === 'true,false' && ns.md === 'Un. AB\n\nDeux.\n', `save: false : markSaved() ; onDirty appelé à chaque changement d’état seulement (${ns.calls})`);
+  ok(ns.typedLate === true && ns.late === true && ns.lateSaved === false, `save: false : markSaved(texte) laisse à enregistrer une frappe faite pendant l’enregistrement (${JSON.stringify(ns)})`);
 
   // ---- Phase 10 : démo complète, accessibilité, parcours au clavier ----
   fs.rmSync(doc);
@@ -1955,6 +1965,7 @@ try {
     await typeIn('[data-note] .bq-edit', ` Note ${width}.`);
     await ev(`document.querySelector('[data-note] [data-save]').click()`);
     await waitFor(async () => (record('notes', noteId).markdown || '').includes(`Note ${width}.`), 'note enregistrée');
+    await waitFor(() => ev(`document.querySelector('[data-note] [data-save]').disabled`), 'réponse de l’enregistrement de la note'); // le fichier est écrit avant que la réponse arrive
     ok(await fitsPage() && await ev(`!document.querySelector('[data-journal] [data-save]').disabled && document.querySelector('[data-note] [data-save]').disabled`) && !(record('notes', `journal-${new Date().toISOString().slice(0, 10)}`).markdown || '').includes(`Journal ${width}.`),
       `${width} px, /demo/notes : deux éditeurs indépendants (la note enregistrée, le journal encore à enregistrer)`);
     await ev(`document.querySelector('[data-open="recette-pain"]').click()`);
@@ -1986,11 +1997,13 @@ try {
     ok(await ev(`!document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : un champ ou un éditeur modifié → Enregistrer actif`);
     await ev(`document.querySelector('[data-save-form]').click()`);
     await waitFor(async () => record('admin', productId).status === status && (record('admin', productId).page || '').includes(`Admin ${width}.`), 'fiche enregistrée');
+    await waitFor(() => ev(`document.querySelector('[data-state]').textContent === 'Enregistré'`), 'réponse de l’enregistrement de la fiche'); // le fichier est écrit avant que la réponse arrive
     ok(await ev(`document.querySelector('[data-save-form]').disabled && document.querySelector('[data-state]').textContent === 'Enregistré'`), `${width} px, /demo/admin : la fiche entière enregistrée (champs + 2 textes), bouton inactif`);
     await typeIn('[data-summary] .bq-edit', ` Résumé ${width}.`);
     const onlyEditor = await ev(`!document.querySelector('[data-save-form]').disabled`);
     await ev(`document.querySelector('[data-summary] .bq-edit').dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))`);
     await waitFor(async () => (record('admin', productId).summary || '').includes(`Résumé ${width}.`), 'Ctrl+S de la fiche');
+    await waitFor(() => ev(`document.querySelector('[data-save-form]').disabled`), 'réponse du Ctrl+S de la fiche');
     ok(onlyEditor && await ev(`document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : un éditeur seul modifié (onDirty) → Enregistrer actif ; Ctrl+S enregistre la fiche`);
     await go(BASE + '/demo/admin', `!!document.querySelector('[data-page] [data-id]') && document.querySelector('[name=name]').value !== ''`, 'fiche relue');
     ok(await ev(`document.querySelector('[name=status]').value === '${status}' && document.querySelector('[data-page]').textContent.includes('Admin ${width}.')`), `${width} px, /demo/admin : après rechargement, la fiche est relue`);

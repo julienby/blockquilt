@@ -27,7 +27,7 @@ import { installDraft, clearDrafts } from './editor/draft.js';
 import { installBar } from './editor/bar.js';
 import { installEvents } from './editor/events.js';
 
-/** Monte un éditeur dans `element`. Renvoie { getMarkdown(), setMarkdown(md), save(), dirty, markSaved(), undo(), redo(), checkRemote(), version, destroy() }. */
+/** Monte un éditeur dans `element`. Renvoie { getMarkdown(), setMarkdown(md), save(), dirty, markSaved(text), undo(), redo(), checkRemote(), version, destroy() }. */
 export function mount(element, options = {}) {
   const o = { media: 'media/', fields: {}, source: '', ...options };
   const ac = new AbortController();
@@ -82,7 +82,8 @@ export function mount(element, options = {}) {
     setMarkdown: (md) => { ed.load(md); ed.setDirty(false, { loaded: true }); ed.resetHistory(); },
     save: ed.save,
     get dirty() { return ed.dirty; }, // des modifications ne sont pas enregistrées
-    markSaved: () => ed.setDirty(false), // l'application a enregistré getMarkdown() elle-même (option save: false)
+    // L'application a enregistré `text` elle-même (option save: false). Une frappe faite depuis reste à enregistrer.
+    markSaved: (text) => { if (text === undefined || ed.markdown() === text) ed.setDirty(false); },
     undo: ed.undo,
     redo: ed.redo,
     checkRemote: () => ed.checkRemote(),
