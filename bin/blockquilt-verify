@@ -1,0 +1,46 @@
+#!/usr/bin/env node
+// bin/blockquilt-verify <dossier de .md> <ancien tag> [nouveau tag]
+// Sans nouveau tag : la copie de travail du dépôt. Pour chaque contenu .md du dossier (sous-dossiers compris) (CYCLE-DE-VIE.md, R6) :
+//   1. relecture par la nouvelle version : parse puis serialize doit redonner le texte identique ;
+//   2. HTML de l'ancienne et de la nouvelle version : chaque différence est à annoncer dans CHANGELOG.md.
+// Code de sortie : 0 relectures identiques, 1 une relecture au moins diffère, 2 erreur d'usage.
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const REPO = path.resolve(__dirname, '..');
+const fail = (message) => { console.error('blockquilt-verify : ' + message); process.exit(2); };
+
+// blockquilt.js d'un tag, ou de la copie de travail : un script qui finit par `module.exports = Blocks`.
+const load = (tag) => {
+  let source;
+  if (tag) {
+    try { source = execFileSync('git', ['-C', REPO, 'show', `${tag}:blockquilt.js`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch { fail(`tag inconnu : ${tag}`); }
+  } else source = fs.readFileSync(path.join(REPO, 'blockquilt.js'), 'utf8');
+  const module = { exports: {} };
+  new Function('module', 'exports', source)(module, module.exports);
+  return module.exports;
+};
+
+const [dir, oldTag, newTag] = process.argv.slice(2);
+if (!dir || !oldTag) fail('usage : bin/blockquilt-verify <dossier de .md> <ancien tag> [nouveau tag]');
+if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) fail(`dossier introuvable : ${dir}`);
+const before = load(oldTag);
+const after = load(newTag);
+const files = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith('.md')).sort();
+
+const reread = [];
+const html = [];
+for (const file of files) {
+  const text = fs.readFileSync(path.join(dir, file), 'utf8');
+  const doc = after.parse(text);
+  if (after.serialize(doc.meta, doc.blocks) !== text) reread.push(file);
+  if (before.toHtml(text) !== after.toHtml(text)) html.push(file);
+}
+
+const show = (title, list) => { if (list.length) console.log(`${title} (${list.length}) :\n` + list.map((f) => '  ' + f).join('\n')); };
+console.log(`blockquilt-verify : ${files.length} contenu${files.length > 1 ? 's' : ''}, ${oldTag} → ${newTag || 'copie de travail'}`);
+show('Relecture non identique', reread);
+show('HTML différent', html);
+if (!reread.length && !html.length) console.log('Aucune différence.');
+process.exit(reread.length ? 1 : 0);

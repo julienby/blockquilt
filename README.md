@@ -278,10 +278,13 @@ Facultatifs côté écran : `onInput(card, ui)` (appelé à chaque frappe dans l
 | `tests/blocks_test.cjs`, `tests/fixtures/` | Tests Node du noyau : un fichier par type, aller-retour exact. | |
 | `dev/server.js` | Serveur de démo et de test, Node seul. | |
 | `dev/app.js`, `dev/contents/` | Application de référence : utilisateurs, jetons, contenus en `.md`, contrat `/contents`, page `/app`. | |
-| `tests/contents_test.mjs` | Tests du contrat HTTP (droits, ETag / If-Match, auteur). | |
+| `tests/contents_test.mjs` | Tests du contrat HTTP (droits, ETag / If-Match, auteur). Contre une autre application : `BQ_URL=https://app.exemple/ BQ_TOKEN=… node tests/contents_test.mjs` (partie générique ; le premier contenu est modifié puis remis à l'identique). | |
 | `mcp/blockquilt-mcp.js`, `mcp/SKILL.md` | Serveur MCP générique (stdio et HTTP) et son skill. | |
 | `tests/mcp_test.mjs` | Tests du serveur MCP sur l'application de référence (HTTP et stdio). | |
 | `ai/blockquilt-ai.js`, `tests/ai_test.mjs` | Relais IA compatible OpenAI et ses tests (faux fournisseur). | |
+| `bin/blockquilt-install` | `bin/blockquilt-install <version> <dossier de l'application>` : copie les fichiers du tag `v<version>` dans `assets/blockquilt/<version>/` (navigateur) et `lib/blockquilt/<version>/` (moteurs PHP et Python), écrit `assets/blockquilt/VERSION`. Refuse une version déjà installée. | |
+| `bin/blockquilt-verify` | `bin/blockquilt-verify <dossier de .md> <ancien tag> [nouveau tag]` (défaut : la copie de travail) : liste les contenus dont la relecture n'est pas identique (code 1) et ceux dont le HTML change. | |
+| `tests/cycle_test.mjs` | Tests des deux scripts, sur un clone du dépôt avec des tags de test. | |
 | `dev/check.mjs`, `dev/Dockerfile.check` | Parcours complet dans Chromium headless piloté en CDP (375 px et 1280 px). | |
 | `dev/build-emoji.mjs` | Fabrique `emoji.json` depuis Unicode et CLDR (lancé une fois). | |
 | `dev/shot.mjs` | Capture d'écran de la démo (outil de développement). | |

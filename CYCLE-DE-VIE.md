@@ -74,7 +74,7 @@ Elle ne pointe jamais vers « la dernière version ».
 
 ```
 app/assets/blockquilt/1.3.0/      ← fichiers du navigateur (blockquilt.js, blockquilt-editor.js, editor/, *.css, fonts/, emoji.json)
-app/lib/blockquilt/1.3.0/         ← moteur PHP (BlockquiltRender.php)
+app/lib/blockquilt/1.3.0/         ← moteurs de rendu (BlockquiltRender.php, blockquilt_render.py)
 app/assets/blockquilt/VERSION     ← « 1.3.0 » : la version utilisée, lue par les pages et par le serveur
 ```
 
@@ -89,7 +89,7 @@ Pourquoi une copie, pas un CDN, un sous-module git ou un paquet Composer :
 - L'image Docker de l'application contient tout. Ce qui tourne en production, c'est ce qui est dans le repo de l'application.
 - Revenir en arrière, c'est changer `VERSION`.
 
-**À valider — outil de copie.** Recommandation : un script `bin/blockquilt-install <version>` dans blockquilt. Il copie les fichiers du tag dans une application, écrit `VERSION`, et ne touche à rien d'autre.
+**Outil de copie** : `bin/blockquilt-install <version> <dossier de l'application>`. Il copie les fichiers du tag, écrit `VERSION`, et ne touche à rien d'autre. Il copie aussi le moteur Python dans `lib/` (R4).
 
 ### R4. La parité des moteurs est une condition de version
 
@@ -113,19 +113,19 @@ Avant de déployer une nouvelle version dans une application, on passe sur **tou
 
 Les fichiers de `tests/fixtures/` couvrent les cas connus. Les contenus réels couvrent les cas que personne n'a imaginés.
 
-**À valider — outil.** Recommandation : un script `bin/blockquilt-verify <dossier ou export>` dans blockquilt. Il prend les contenus en Markdown et donne les deux résultats. Chaque application exporte ses contenus vers un dossier, puis lance le script.
+**Outil** : `bin/blockquilt-verify <dossier de .md> <ancien tag> [nouveau tag]`, depuis le dépôt blockquilt. Il donne les deux résultats ; code 1 si une relecture n'est pas identique. Chaque application exporte ses contenus vers un dossier, puis lance le script.
 
 ### R7. Le contrat `/contents` est vérifiable contre n'importe quelle application
 
 `tests/contents_test.mjs` vérifie aujourd'hui l'application de référence (`dev/app.js`).
 Chaque application PHP réécrit ce contrat. Elle doit passer les mêmes tests.
 
-**À valider.** Recommandation : rendre `tests/contents_test.mjs` utilisable avec l'adresse et le jeton d'une application (`BQ_URL`, `BQ_TOKEN`, comme le MCP).
+**Outil** : `BQ_URL=… BQ_TOKEN=… node tests/contents_test.mjs` lance la partie générique du contrat contre l'application. Le premier contenu de la liste est modifié, puis remis à l'identique.
 
 ## 3. Sortir une version de blockquilt
 
 1. Toutes les suites sont vertes : `docker compose run --rm check`, `check-php`, `check-python`.
-   Un test qui échoue « parfois » se corrige avant la version (aujourd'hui : `/demo/notes : deux éditeurs indépendants` à 375 px).
+   Un test qui échoue « parfois » se corrige avant la version.
 2. Choisir le numéro avec le tableau de R2.
 3. Écrire l'entrée de `CHANGELOG.md`.
 4. Commit, puis tag `vX.Y.Z`, puis push du tag.
@@ -133,8 +133,8 @@ Chaque application PHP réécrit ce contrat. Elle doit passer les mêmes tests.
 ## 4. Mettre à jour une application
 
 1. Lire les entrées de `CHANGELOG.md` entre la version actuelle et la nouvelle.
-2. `bin/blockquilt-install X.Y.Z` dans le repo de l'application.
-3. Vérifier les contenus réels (R6).
+2. `bin/blockquilt-install X.Y.Z <dossier de l'application>`, depuis le dépôt blockquilt.
+3. Vérifier les contenus réels (R6) : `bin/blockquilt-verify <export> vA.B.C vX.Y.Z`.
 4. Faire ce que le `CHANGELOG.md` demande (souvent : rien).
 5. Lancer les tests de l'application, puis déployer.
 6. Après le déploiement, supprimer l'ancien dossier de version.

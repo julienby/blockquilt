@@ -23,7 +23,7 @@ services:
     profiles: [check]
     volumes:
       - .:/app:ro
-    command: sh -c "node tests/blocks_test.cjs && node tests/contents_test.mjs && node tests/mcp_test.mjs && node tests/ai_test.mjs && node dev/check.mjs"
+    command: sh -c "node tests/blocks_test.cjs && node tests/contents_test.mjs && node tests/mcp_test.mjs && node tests/ai_test.mjs && node tests/cycle_test.mjs && node dev/check.mjs"
   check-python:
     image: python:3.12-alpine
     profiles: [check]

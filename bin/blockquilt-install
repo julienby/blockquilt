@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+// bin/blockquilt-install <version> <dossier de l'application>
+// Copie les fichiers du tag v<version> dans l'application, puis écrit VERSION. Ne touche à rien d'autre (CYCLE-DE-VIE.md, R3) :
+//   <app>/assets/blockquilt/<version>/   fichiers du navigateur
+//   <app>/lib/blockquilt/<version>/      moteurs de rendu PHP et Python
+//   <app>/assets/blockquilt/VERSION      « <version> »
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const REPO = path.resolve(__dirname, '..');
+const WEB = ['blockquilt.js', 'blockquilt-editor.js', 'blockquilt-content.js', 'blockquilt.css', 'blockquilt-content.css', 'emoji.json', 'editor', 'fonts'];
+const LIB = ['renderers/php/BlockquiltRender.php', 'renderers/python/blockquilt_render.py'];
+
+const fail = (message) => { console.error('blockquilt-install : ' + message); process.exit(1); };
+const git = (...args) => execFileSync('git', ['-C', REPO, ...args], { maxBuffer: 64 * 1024 * 1024 });
+
+const [version, app] = process.argv.slice(2);
+if (!version || !app) fail('usage : bin/blockquilt-install <version> <dossier de l\'application>');
+if (!fs.statSync(app, { throwIfNoEntry: false })?.isDirectory()) fail(`dossier introuvable : ${app}`);
+const tag = 'v' + version;
+try { git('rev-parse', '-q', '--verify', `refs/tags/${tag}`); } catch { fail(`tag inconnu : ${tag}`); }
+const web = path.join(app, 'assets/blockquilt', version);
+const lib = path.join(app, 'lib/blockquilt', version);
+for (const dir of [web, lib]) if (fs.existsSync(dir)) fail(`${dir} existe déjà`);
+
+const list = (paths) => git('ls-tree', '-r', '--name-only', tag, '--', ...paths).toString().split('\n').filter(Boolean);
+const copy = (file, to) => {
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.writeFileSync(to, git('show', `${tag}:${file}`));
+};
+for (const file of list(WEB)) copy(file, path.join(web, file));
+for (const file of list(LIB)) copy(file, path.join(lib, path.basename(file)));
+fs.writeFileSync(path.join(app, 'assets/blockquilt/VERSION'), version + '\n');
+console.log(`blockquilt ${version} installé dans ${app}`);

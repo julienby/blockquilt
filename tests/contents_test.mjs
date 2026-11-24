@@ -1,5 +1,8 @@
 // Contrat HTTP de l'application de référence (dev/app.js) : droits, représentations, ETag / If-Match.
 // Lance dev/server.js sur un dossier jetable. node tests/contents_test.mjs → exit 1 si une étape échoue.
+// Contre une autre application (CYCLE-DE-VIE.md, R7) : BQ_URL=https://app.exemple/ BQ_TOKEN=… node tests/contents_test.mjs
+// Seule la partie générique tourne alors : le premier contenu de la liste est modifié, puis remis à l'identique
+// (l'auteur de sa dernière version devient celui du jeton). Si un test échoue au milieu, vérifier ce contenu à la main.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -12,9 +15,42 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const Blocks = createRequire(import.meta.url)('../blockquilt.js');
 const PORT = 8097;
 const BASE = `http://127.0.0.1:${PORT}/`;
-const data = fs.mkdtempSync(path.join(os.tmpdir(), 'bqcontents-'));
 let failed = 0;
 const ok = (cond, label) => { console.log((cond ? 'ok   ' : 'FAIL ') + label); if (!cond) failed++; };
+
+// Partie générique du contrat, valable pour toute application.
+const contract = async (base, token) => {
+  const url = (p) => new URL(p, base);
+  const auth = { Authorization: 'Bearer ' + token };
+  const read = (p, accept, more = {}) => fetch(url(p), { headers: { ...auth, Accept: accept, ...more } });
+  const write = (p, body, ifMatch) => fetch(url(p), { method: 'PUT', headers: { ...auth, 'Content-Type': 'text/markdown; charset=utf-8', ...(ifMatch ? { 'If-Match': ifMatch } : {}) }, body });
+  ok((await fetch(url('contents'), { headers: { Accept: 'application/json' } })).status === 401, 'contrat : sans jeton → 401');
+  const list = await (await read('contents', 'application/json')).json();
+  ok(Array.isArray(list) && list.length > 0 && list.every((c) => c.id && typeof c.title === 'string' && c.href), 'contrat : liste JSON (id, titre, lien), au moins un contenu');
+  const href = list[0].href;
+  const r = await read(href, 'text/markdown');
+  const md = await r.text();
+  const tag = r.headers.get('etag');
+  ok(r.status === 200 && r.headers.get('content-type').startsWith('text/markdown') && /^"[^"]+"$/.test(tag), `contrat : GET ${href} en Markdown, avec un ETag`);
+  ok((await read(href, 'text/markdown', { 'If-None-Match': tag })).status === 304, 'contrat : If-None-Match inchangé → 304');
+  ok((await (await read(href, 'text/html', { 'HX-Request': 'true' })).text()).startsWith('<article class="bq-content">'), 'contrat : GET HTML, fragment');
+  ok((await write(href, md)).status === 428, 'contrat : PUT sans If-Match → 428');
+  ok((await write(href, md, '"00000000"')).status === 412, 'contrat : PUT avec un ETag périmé → 412');
+  const changed = md + '\nVérification du contrat.\n';
+  const w = await write(href, changed, tag);
+  const tag2 = w.headers.get('etag');
+  ok(w.status === 204 && tag2 && tag2 !== tag && (await (await read(href, 'text/markdown')).text()) === changed, 'contrat : PUT avec le bon ETag → 204, nouvel ETag, texte relu');
+  ok((await write(href, md, tag)).status === 412, 'contrat : second PUT avec l’ancien ETag → 412');
+  const back = await write(href, md, tag2);
+  ok(back.status === 204 && (await (await read(href, 'text/markdown')).text()) === md, 'contrat : contenu remis à l’identique');
+};
+
+if (process.env.BQ_URL) {
+  try { await contract(process.env.BQ_URL, process.env.BQ_TOKEN); } catch (error) { ok(false, error.message); }
+  process.exit(failed ? 1 : 0);
+}
+
+const data = fs.mkdtempSync(path.join(os.tmpdir(), 'bqcontents-'));
 const server = spawn('node', [path.join(ROOT, 'dev/server.js')], { env: { ...process.env, PORT: String(PORT), DATA_DIR: data }, stdio: 'ignore' });
 const as = (who, headers = {}) => ({ ...(who ? { Authorization: 'Bearer demo-' + who } : {}), ...headers });
 const get = (p, who, accept = 'text/markdown', more = {}) => fetch(BASE + p, { headers: as(who, { Accept: accept, ...more }) });
@@ -22,6 +58,7 @@ const put = (p, who, body, ifMatch, more = {}) => fetch(BASE + p, { method: 'PUT
 
 try {
   for (let i = 0; i < 40; i++) { try { await fetch(BASE); break; } catch { await new Promise((r) => setTimeout(r, 250)); } }
+  await contract(BASE, 'demo-user1'); // la partie générique passe aussi contre l'application de référence
 
   ok((await get('contents', null)).status === 401 && (await get('contents', null, 'text/markdown', { Authorization: 'Bearer faux' })).status === 401, 'sans jeton ou jeton inconnu : 401');
   const list = await (await get('contents', 'user1', 'application/json')).json();
