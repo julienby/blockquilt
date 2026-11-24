@@ -26,13 +26,17 @@ Blocks.editable = editable;
   for (const [k, cls, ph] of [['h1', 'text-2xl font-extrabold', 'Titre principal'], ['h2', 'text-xl font-bold', 'Titre de section'], ['h3', 'text-[17px] font-bold', 'Sous-titre']]) {
     Object.assign(Blocks.types[k], { edit: (b) => editable(`${cls} leading-snug tracking-tight`, b.html, ph, 'data-body data-plain aria-label="Titre"'), read: readHtml });
   }
+  // Photo d'un bloc photo ou d'une carte : « Ajouter une photo » si elle manque ; sinon l'image et « Retirer » (clic : ed.cardPhoto).
+  const addPhoto = `<button type="button" data-card-act="photo" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-current/20 text-sm font-bold opacity-70 hover:opacity-100">${ic('image', 'size-4')}Ajouter une photo</button>`;
+  const shownPhoto = (b, ui, height, label) => `<div class="relative"><img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="${height} w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">
+          <button type="button" data-card-act="remove" aria-label="${label}" class="bq-btn absolute right-1 top-1 bg-white/90 text-red-600">${ic('trash', 'size-4')}</button></div>`;
   // Photo : taille et format choisis dans une liste (valeur '' = par défaut, rien n'est écrit dans le texte).
   const PHOTO_SIZES = [['', 'Pleine largeur'], ['medium', 'Moyenne'], ['small', 'Petite']];
   const PHOTO_RATIOS = [['', 'Format d’origine'], ['16:9', '16:9'], ['4:3', '4:3'], ['1:1', '1:1 (carré)']];
   const options = (list, value) => list.map(([v, label]) => `<option value="${v}"${v === value ? ' selected' : ''}>${label}</option>`).join('');
   const pick = 'h-11 min-w-0 flex-1 rounded-xl border border-stone-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
   Object.assign(Blocks.types.photo, {
-    edit: (b, ui) => `<figure class="space-y-2">${b.src ? `<img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="max-h-72 w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">` : ''}
+    edit: (b, ui) => `<figure class="space-y-2">${b.src ? shownPhoto(b, ui, 'max-h-72', 'Retirer la photo') : addPhoto}
         ${editable('text-sm italic opacity-75', esc(b.alt), 'Légende (lue aux personnes malvoyantes)…', 'data-body data-plain aria-label="Légende de la photo"')}
         <div class="flex gap-2"><select data-photo-size aria-label="Taille de la photo" class="${pick}">${options(PHOTO_SIZES, b.size || '')}</select>
           <select data-photo-ratio aria-label="Format de la photo" class="${pick}">${options(PHOTO_RATIOS, b.ratio || '')}</select></div></figure>`,
@@ -63,10 +67,9 @@ Blocks.editable = editable;
   // Carte : la photo (ajouter, retirer), son texte alternatif, le titre, le texte, le bouton (texte et lien).
   const field = 'h-11 min-w-0 rounded-xl border border-stone-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
   Object.assign(Blocks.types.card, {
-    edit: (b, ui) => `<div class="grid gap-2">${b.src ? `<div class="relative"><img src="${attr(Blocks.mediaUrl(b.src, ui.media))}" alt="" class="max-h-48 w-full rounded-xl border border-stone-200 bg-stone-100 object-cover">
-          <button type="button" data-card-act="remove" aria-label="Retirer la photo de la carte" class="bq-btn absolute right-1 top-1 bg-white/90 text-red-600">${ic('trash', 'size-4')}</button></div>
+    edit: (b, ui) => `<div class="grid gap-2">${b.src ? `${shownPhoto(b, ui, 'max-h-48', 'Retirer la photo de la carte')}
         <input data-card-alt value="${attr(b.alt)}" placeholder="Description de la photo (lue aux personnes malvoyantes)…" aria-label="Description de la photo" class="${field} italic">`
-        : `<button type="button" data-card-act="photo" class="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-current/20 text-sm font-bold opacity-70 hover:opacity-100">${ic('image', 'size-4')}Ajouter une photo</button>`}
+        : addPhoto}
         <input data-card-title value="${attr(b.title)}" placeholder="Titre de la carte" aria-label="Titre de la carte" class="h-11 min-w-0 bg-transparent text-[17px] font-bold placeholder:font-medium placeholder:opacity-50 focus:outline-none">
         ${richEdit('text-[15px] leading-relaxed', 'Texte de la carte…')(b)}
         <div class="flex gap-2"><input data-card-label value="${attr(b.label)}" placeholder="Texte du bouton" aria-label="Texte du bouton" class="${field} w-1/3">

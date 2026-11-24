@@ -345,6 +345,19 @@ Avancement :
 - 1 à 4 faits : `CHANGELOG.md`, `bin/blockquilt-install`, `bin/blockquilt-verify` (tests : `tests/cycle_test.mjs`), `contents_test.mjs` avec `BQ_URL`. 5 fait : tag `v0.1.0` le 2026-11-24. Étape 3 terminée.
 - Choix validés pour 2 à 4 (2026-11-24) : scripts Node sans dépendance (`bin/*.mjs` exécutables) ; `blockquilt-verify <dossier> <ancien tag> [nouveau tag, défaut : copie de travail]`, `blockquilt.js` lu par `git show` ; `contents_test.mjs` avec `BQ_URL` + `BQ_TOKEN` = sous-ensemble générique (401, liste JSON, Markdown + ETag, 304, HTML, PUT + If-Match / 412 sur un contenu de test remis à l'identique), sans `BQ_URL` = suite actuelle.
 
+## 4q. Types permis et mode champ (validé le 2026-11-24, version 0.2.0)
+
+Besoin : contenus semi-structurés (blog : titre, couverture, résumé, contenu ; second cerveau). Valeurs courtes = champs de l'application ; textes longs = éditeurs restreints.
+
+1. Option `blocks: [clés du registre]` : types permis. Absente = tous. Filtre le menu « Insérer », la liste « Type du bloc » d'une carte, les photos déposées ou choisies (`photo`, `carousel`). `html: true` reste nécessaire pour le bloc HTML.
+   Un bloc non permis amené par coller, IA ou vue source est gardé tel quel : la restriction porte sur les menus, pas sur le contenu.
+2. Option `single: true` : un seul bloc, du type `blocks[0]` (`text` par défaut). Sans chrome : pas d'intervalles Insérer / Fusionner, pas de badge, pas de boutons ronds, pas de colonne de déplacement. Restent : barre de mise en forme, Annuler, Enregistrer, IA.
+   Source vide → un bloc vide de ce type. Plusieurs blocs dans la source → tous montrés, sans chrome.
+3. `/demo/admin` : description courte en `single: true`, page produit avec `blocks` restreint, image de couverture (`blocks: ['photo'], single: true`).
+4. README (options), CHANGELOG 0.2.0, DECISIONS.
+
+Avancement : 1 à 4 faits le 2026-11-24. En plus (vu sur capture) : en-tête réduit en mode champ (validé), « Ajouter une photo » / « Retirer la photo » sur le bloc photo, pas de grande marge sous un champ. Pas de tag 0.2.0 posé.
+
 ## 5. IA — fait (I1 à I6)
 
 ### Principes (décidés avec Julien)

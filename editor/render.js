@@ -21,7 +21,7 @@ export function installRender(ed) {
     return t.convertible
       ? `<label class="relative inline-flex items-center">${ic(t.icon, 'pointer-events-none absolute left-2 size-3.5 opacity-80')}
           <select data-convert aria-label="Type du bloc" class="h-7 cursor-pointer appearance-none rounded-full border py-0 pl-7 pr-6 text-[11px] font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${t.tone.badge}">
-          ${Blocks.TEXT_KEYS.map((k) => `<option value="${k}" ${k === b.type ? 'selected' : ''}>${esc(Blocks.types[k].label)}</option>`).join('')}</select>
+          ${Blocks.TEXT_KEYS.filter((k) => k === b.type || ed.allowed(k)).map((k) => `<option value="${k}" ${k === b.type ? 'selected' : ''}>${esc(Blocks.types[k].label)}</option>`).join('')}</select>
           ${ic('chevron_down', 'pointer-events-none absolute right-2 size-3 opacity-70')}</label>`
       : `<span class="inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-bold ${t.tone.badge}">${ic(t.icon, 'size-3.5')}${esc(t.label)}</span>`;
   };
@@ -71,19 +71,22 @@ export function installRender(ed) {
     return `<span data-col-grid role="img" aria-label="${label}" title="${label}" ${p.sum < 6 ? 'data-incomplete' : ''} class="ml-1.5 inline-flex shrink-0 ${p.sum < 6 ? 'text-amber-600' : 'text-brand-600'}">
       <svg width="28" height="16" viewBox="0 0 28 16" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${cells}</svg></span>`;
   };
+  // Option `single` (un champ) : la carte n'a que son contenu, sans ligne d'outils ni colonne de déplacement.
   const card = (b, i) => {
     const hidden = b.type === 'carousel' ? 0 : ed.hiddenLines(b);
-    return `<article data-id="${b.id}" data-view="${ed.viewOf(b)}" aria-label="${attr(ed.def(b).label)}" class="bq-card flex border ${ed.def(b).tone.card}">
-      <div class="flex min-w-0 flex-1 flex-col pb-3 pl-3 pr-1">
-        <div class="flex h-11 items-center">${badge(b)}${colGrid(b)}${ed.tools(b)}<span class="flex-1"></span>
+    const tools = `<div class="flex h-11 items-center">${badge(b)}${colGrid(b)}${ed.tools(b)}<span class="flex-1"></span>
           ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
           ${ed.def(b).fullscreen === false ? '' : round('data-expand', 'maximize', 'Plein écran')}
-          ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>
-        <div data-card-body ${hidden ? `data-fold="collapsed" style="--bq-fold:${ed.foldLimit}"` : ''} class="flex flex-1 flex-col justify-center">${ed.editorOf(b).edit(b, ed.ui)}</div>${hidden ? foldFooter(hidden) : ''}</div>
-      <div data-rail class="flex w-11 shrink-0 select-none flex-col items-center justify-between border-l border-black/5 py-1">
+          ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>`;
+    const rail = `<div data-rail class="flex w-11 shrink-0 select-none flex-col items-center justify-between border-l border-black/5 py-1">
         <button type="button" data-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="Monter ce bloc" class="bq-rail">${ic('chevron_up', 'size-4')}</button>
         <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-rail cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
-        <button type="button" data-move="1" ${i === ed.blocks.length - 1 ? 'disabled' : ''} aria-label="Descendre ce bloc" class="bq-rail">${ic('chevron_down', 'size-4')}</button></div></article>`;
+        <button type="button" data-move="1" ${i === ed.blocks.length - 1 ? 'disabled' : ''} aria-label="Descendre ce bloc" class="bq-rail">${ic('chevron_down', 'size-4')}</button></div>`;
+    return `<article data-id="${b.id}" data-view="${ed.viewOf(b)}" aria-label="${attr(ed.def(b).label)}" class="bq-card flex border ${ed.def(b).tone.card}">
+      <div class="flex min-w-0 flex-1 flex-col pb-3 pl-3 pr-1 ${o.single ? 'pt-3' : ''}">
+        ${o.single ? '' : tools}
+        <div data-card-body ${hidden ? `data-fold="collapsed" style="--bq-fold:${ed.foldLimit}"` : ''} class="flex flex-1 flex-col justify-center">${ed.editorOf(b).edit(b, ed.ui)}</div>${hidden ? foldFooter(hidden) : ''}</div>
+      ${o.single ? '' : rail}</article>`;
   };
 
   // Un champ vidé par le navigateur garde parfois un <br> : on le vide pour que le texte d'aide réapparaisse.
@@ -95,8 +98,10 @@ export function installRender(ed) {
       const sum = r.row.reduce((n, c) => n + Blocks.SIXTHS[c.width], 0);
       r.row.forEach((c, k) => place.set(c.id, { row: r.row, k, sum }));
     }
-    canvas.innerHTML = `<div class="bq-column relative">${ed.blocks.map((b, i) => gap(i) + card(b, i)).join('')}
-      <button type="button" data-insert="end" class="bq-add mt-3 flex min-h-12 w-full items-center justify-center gap-2 border border-dashed border-stone-300 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button></div>`;
+    const addEnd = `<button type="button" data-insert="end" class="bq-add mt-3 flex min-h-12 w-full items-center justify-center gap-2 border border-dashed border-stone-300 text-sm font-bold text-stone-500 hover:border-stone-400 hover:text-stone-800">${ic('plus', 'size-4')}Ajouter un bloc</button>`;
+    canvas.innerHTML = o.single
+      ? `<div class="bq-column relative space-y-2">${ed.blocks.map(card).join('')}</div>`
+      : `<div class="bq-column relative">${ed.blocks.map((b, i) => gap(i) + card(b, i)).join('')}${addEnd}</div>`;
     canvas.querySelectorAll('.bq-edit').forEach(ed.clean);
   };
   let previewSeq = 0; // seule la dernière demande d'aperçu s'affiche
@@ -120,11 +125,12 @@ export function installRender(ed) {
       if (ed.mode === 'preview' && seq === previewSeq) canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
     }
   };
-  // Visuel à côté : le même choix en vue blocs et en vue source. 2 panneaux dès 1024 px par défaut.
+  // Visuel à côté : le même choix en vue blocs et en vue source. 2 panneaux dès 1024 px par défaut. Jamais dans un champ (`single`).
   const splitKey = 'blockquilt.split';
   const wide = matchMedia('(min-width: 1024px)').matches;
   try { const saved = localStorage.getItem(splitKey); ed.sideBySide = saved === null ? wide : saved === 'true'; } catch { ed.sideBySide = wide; }
-  ed.showSplit = () => ed.app.querySelector('[data-visual-toggle]').setAttribute('aria-pressed', String(ed.sideBySide));
+  if (o.single) ed.sideBySide = false;
+  ed.showSplit = () => ed.app.querySelector('[data-visual-toggle]')?.setAttribute('aria-pressed', String(ed.sideBySide));
   ed.showSplit();
   ed.toggleSplit = () => {
     ed.sideBySide = !ed.sideBySide;

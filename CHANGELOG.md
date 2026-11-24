@@ -4,6 +4,15 @@
 Pour chaque version : ce qui change, puis ce que l'application doit faire (souvent : rien).
 Règles des numéros : `CYCLE-DE-VIE.md`, R2. En `0.x`, le contrat peut encore changer.
 
+## 0.2.0 — à venir
+
+Ajouts (rien ne casse) :
+- Option `blocks` de `mount` : les types de bloc proposés par les menus.
+- Option `single: true` : un champ (un seul bloc, sans outils de bloc, en-tête réduit).
+- Bloc photo vide : bouton « Ajouter une photo » ; photo présente : bouton « Retirer la photo ».
+
+À faire dans l'application : rien.
+
 ## 0.1.0 — 2026-11-24
 
 Première version numérotée. Elle fixe le contrat décrit dans `CYCLE-DE-VIE.md` §1 :

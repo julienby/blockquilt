@@ -21,13 +21,13 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
       : '<span class="flex-1"></span>'}
     <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn bq-muted">${ic('undo')}</button>
     <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn bq-muted hidden sm:inline-flex">${ic('redo')}</button>
-    <button type="button" data-source-mode aria-pressed="false" aria-label="Texte source (Markdown)" title="Texte source (Markdown)" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('code')}</button>
+    ${o.single ? '' : `<button type="button" data-source-mode aria-pressed="false" aria-label="Texte source (Markdown)" title="Texte source (Markdown)" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('code')}</button>
     <button type="button" data-preview aria-pressed="false" aria-label="Aperçu" title="Aperçu" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('eye')}</button>
-    <button type="button" data-visual-toggle aria-pressed="false" aria-label="Visuel à côté" title="Visuel à côté" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white disabled:opacity-40">${ic('columns')}</button>
+    <button type="button" data-visual-toggle aria-pressed="false" aria-label="Visuel à côté" title="Visuel à côté" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white disabled:opacity-40">${ic('columns')}</button>`}
     ${o.aiUrl ? `<button type="button" data-ai aria-label="Assistant IA" title="Assistant IA" class="bq-btn hidden text-amber-600 sm:inline-flex">${ic('wand')}</button>` : ''}
     <button type="button" data-save${o.save === false ? ' hidden' : ''} aria-label="Enregistré" title="Enregistrer (Ctrl+S)" class="bq-btn relative">${ic('save')}<span data-dot hidden class="absolute right-2 top-2 size-2 rounded-full bg-brand-600"></span></button>
     <button type="button" data-width hidden aria-label="Largeur du texte" title="Largeur du texte" class="bq-btn bq-muted max-sm:hidden">${ic('width')}</button>
-    <button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn bq-muted hidden sm:inline-flex">${ic('maximize')}</button>
+    ${o.single ? '' : `<button type="button" data-full aria-label="Plein écran" title="Plein écran" class="bq-btn bq-muted hidden sm:inline-flex">${ic('maximize')}</button>`}
     <button type="button" data-more aria-label="Plus d’actions" aria-haspopup="dialog" class="bq-btn bq-muted sm:hidden">${ic('more')}</button>
   </header>
   ${o.contentUrl ? `<div data-remote-bar hidden role="status" class="bq-remote-bar sticky z-10 mx-3 mt-2 flex items-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 py-0.5 pl-3 pr-1 text-sm text-amber-950 sm:mx-6">
@@ -44,7 +44,7 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
     <span data-pasted-text class="min-w-0 flex-1 font-semibold"></span>
     <button type="button" data-pasted-ai class="min-h-11 shrink-0 rounded-xl px-3 font-bold underline">IA sur ces blocs</button>
     <button type="button" data-pasted-close class="min-h-11 shrink-0 rounded-xl px-3 underline">Fermer</button></div>` : ''}
-  <div data-canvas class="flex-1 px-3 pb-[40dvh] pt-3 sm:px-6 sm:pb-16"></div>
+  <div data-canvas class="flex-1 px-3 pt-3 sm:px-6 ${o.single ? 'pb-3' : 'pb-[40dvh] sm:pb-16'}"></div>
   <div data-bar role="toolbar" aria-label="Mise en forme" hidden class="bq-bar fixed left-1/2 z-50 flex w-max max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center rounded-2xl border border-stone-700 bg-stone-900/95 text-white shadow-2xl">
     <div data-bar-clip hidden role="group" aria-label="Presse-papiers" class="flex basis-full justify-center gap-1 border-b border-white/15 py-1">
       <button type="button" data-clip="copy" class="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold hover:bg-white/10">${ic('copy', 'size-4')}Copier</button>
@@ -62,14 +62,14 @@ export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-ful
     <button type="button" data-link-toggle aria-label="Lien" aria-expanded="false" class="bq-btn aria-expanded:bg-white/15">${ic('link')}</button>
     <button type="button" data-emoji-insert aria-label="Insérer un emoji" class="bq-btn">${ic('smile')}</button>
     <button type="button" data-clip-toggle aria-label="Copier, couper, coller" aria-expanded="false" class="bq-btn text-stone-300 aria-expanded:bg-white/15 aria-expanded:text-white">${ic('paste')}</button>
-    <button type="button" data-split aria-label="Scinder le bloc au curseur" class="bq-btn text-stone-300">${ic('split')}</button>
+    ${o.single ? '' : `<button type="button" data-split aria-label="Scinder le bloc au curseur" class="bq-btn text-stone-300">${ic('split')}</button>`}
   </div>
   <div class="pointer-events-none fixed inset-x-0 top-16 z-[60] flex justify-center">
     <div data-toast role="status" class="rounded-full bg-stone-900/95 px-3.5 py-2 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-300"></div>
   </div>
   <input type="file" data-file accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden aria-label="Choisir une photo">
   ${sheet('add', 'Ajouter un bloc', '<div data-add-list></div>')}
-  ${menu('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${item('data-more-act="full"', 'maximize', 'Plein écran')}${o.aiUrl ? item('data-more-act="ai"', 'wand', 'Assistant IA') : ''}</div>`)}
+  ${menu('more', 'Actions', `<div class="grid gap-0.5">${item('data-more-act="redo"', 'redo', 'Rétablir')}${o.single ? '' : item('data-more-act="full"', 'maximize', 'Plein écran')}${o.aiUrl ? item('data-more-act="ai"', 'wand', 'Assistant IA') : ''}</div>`)}
   ${o.contentUrl ? sheet('remote', 'Modifié ailleurs', `<p data-remote-who class="text-sm"></p>
       <p class="mt-3 text-[11px] font-bold uppercase tracking-wider text-stone-400">Votre texte → l’autre version</p>
       <div data-remote-diff class="mt-1 max-h-72 overflow-auto rounded-xl border border-stone-200 py-2 font-mono text-xs leading-relaxed"></div>

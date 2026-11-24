@@ -66,7 +66,7 @@ ${Blocks.toHtml(r.markdown || '', { media: '../../media/' })}
       const list = fs.readdirSync(dir(name)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(dir(name), f), 'utf8')))
         .filter((r) => !q || `${title(r)}\n${r.markdown || ''}`.toLowerCase().includes(q))
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .map(({ markdown, summary, page, ...fields }) => ({ ...fields, title: title({ markdown, ...fields }) }));
+        .map(({ markdown, summary, page, cover, ...fields }) => ({ ...fields, title: title({ markdown, ...fields }) }));
       json(res, 200, list);
       return true;
     }

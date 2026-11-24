@@ -70,6 +70,8 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 | `backUrl` | Bouton retour (avec confirmation si des modifications ne sont pas enregistrées). |
 | `fields` | Champs ajoutés à chaque envoi (par exemple un jeton CSRF). |
 | `html` | `true` pour proposer le bloc HTML (désactivé par défaut). |
+| `blocks` | Types de bloc proposés par les menus (« Insérer », type d'une carte), par leur clé : `['h2', 'text', 'photo']`. Absent : tous. Un bloc d'un autre type déjà dans le texte (écrit à la main, collé, proposé par l'IA) est gardé tel quel. Un document vide reçoit un bloc du premier type. Le bloc HTML demande aussi `html: true`. |
+| `single` | `true` : un champ. Le texte est un seul bloc, du type `blocks[0]` (`text` par défaut), sans outils de bloc (insérer, fusionner, type, menu, plein écran, supprimer, déplacer). L'en-tête garde Annuler, Rétablir, IA et Enregistrer ; pas de vue source, d'aperçu, de visuel ni de plein écran. Si le texte a déjà plusieurs blocs, tous sont montrés, sans outils. Exemple : `{ single: true, blocks: ['photo'] }` pour une image de couverture ; voir `/demo/admin`. |
 | `width` | Largeur maximale du texte (CSS, `48rem` par défaut ; `100%` pour toute la largeur). L'éditeur prend la largeur de l'élément qui le contient : il s'intègre dans n'importe quelle mise en page. Aussi réglable en CSS : `--bq-width`. En plein écran, un bouton fait le tour de trois largeurs. |
 | `emojiUrl` | Adresse de `emoji.json` (par défaut, à côté de `blockquilt-editor.js`). Chargé au premier usage du sélecteur. |
 

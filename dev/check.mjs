@@ -1749,6 +1749,55 @@ try {
   ok(ns.head && ns.full && ns.start === false && ns.typed === true && ns.ctrlS === false, `save: false : pas de bouton Enregistrer (en-tête, plein écran), Ctrl+S laissé à l’application, dirty lisible (${JSON.stringify(ns)})`);
   ok(ns.saved === false && ns.calls === 'true,false' && ns.md === 'Un. AB\n\nDeux.\n', `save: false : markSaved() ; onDirty appelé à chaque changement d’état seulement (${ns.calls})`);
   ok(ns.typedLate === true && ns.late === true && ns.lateSaved === false, `save: false : markSaved(texte) laisse à enregistrer une frappe faite pendant l’enregistrement (${JSON.stringify(ns)})`);
+  // ---- 4q.1 : option blocks, types permis dans les menus ; un bloc d'un autre type déjà là est gardé ----
+  const tp = await ev(`(async () => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Un.\\n\\n## Deux\\n\\n\`\`\`\\ncode\\n\`\`\`', blocks: ['text', 'h2', 'photo'] });
+    const $ = (s) => el.querySelector(s);
+    $('[data-insert]').click();
+    const out = { picks: [...el.querySelectorAll('[data-add-list] [data-pick]')].map((b) => b.dataset.pick).join() };
+    el.querySelector('dialog[open]')?.close();
+    out.convert = [...$('[data-canvas] [data-id] [data-convert]').options].map((x) => x.value).join();
+    out.code = el.querySelectorAll('[data-canvas] [data-id]').length === 3 && e.getMarkdown().includes('\`\`\`\\ncode\\n\`\`\`');
+    e.destroy(); el.remove();
+    const all = document.createElement('div'); document.body.append(all);
+    const f = Blockquilt.mount(all, { source: 'Un.' });
+    all.querySelector('[data-insert]').click();
+    out.allPicks = all.querySelectorAll('[data-add-list] [data-pick]').length;
+    all.querySelector('dialog[open]')?.close();
+    f.destroy(); all.remove();
+    return out;
+  })()`);
+  ok(tp.picks === 'paste,h2,text,photo' && tp.convert === 'h2,text', `blocks : seuls les types permis dans « Insérer » et « Type du bloc » (${JSON.stringify(tp)})`);
+  ok(tp.code === true && tp.allPicks > 10, `blocks : un bloc d’un autre type déjà là est gardé ; sans l’option, tous les types (${JSON.stringify(tp)})`);
+  // ---- 4q.2 : single, un champ = un bloc sans chrome ----
+  const sg = await ev(`(async () => {
+    const field = (source, options) => { const el = document.createElement('div'); document.body.append(el); return { el, e: Blockquilt.mount(el, { source, single: true, ...options }) }; };
+    const chrome = '[data-insert], [data-merge], [data-convert], [data-menu], [data-expand], [data-delete], [data-rail], [data-split]';
+    const cover = field('', { blocks: ['photo'] });
+    const out = {
+      cards: cover.el.querySelectorAll('[data-canvas] [data-id]').length,
+      type: cover.el.querySelector('[data-canvas] [data-id]').getAttribute('aria-label') === Blocks.types.photo.label,
+      chrome: cover.el.querySelectorAll(chrome).length,
+      clean: cover.e.dirty === false && cover.e.getMarkdown() === '',
+      add: !!cover.el.querySelector('[data-canvas] [data-card-act="photo"]'),
+      low: cover.el.querySelector('[data-canvas]').offsetHeight < 400,
+      head: !cover.el.querySelector('[data-source-mode], [data-preview], [data-visual-toggle], [data-full], [data-more-act="full"], [data-visual]') && !!cover.el.querySelector('[data-undo]'),
+    };
+    const shown = field('![Toit](media/c1)', { blocks: ['photo'] });
+    shown.el.querySelector('[data-card-act="remove"]').click();
+    out.removed = shown.e.getMarkdown() === '' && !!shown.el.querySelector('[data-canvas] [data-card-act="photo"]');
+    shown.e.destroy(); shown.el.remove();
+    cover.e.destroy(); cover.el.remove();
+    const two = field('Un.\\n\\nDeux.', {});
+    out.two = two.el.querySelectorAll('[data-canvas] [data-id]').length === 2 && two.el.querySelectorAll(chrome).length === 0;
+    two.e.destroy(); two.el.remove();
+    return out;
+  })()`);
+  ok(sg.cards === 1 && sg.type && sg.chrome === 0 && sg.clean, `single : source vide → un bloc du type blocks[0], sans chrome, rien à enregistrer (${JSON.stringify(sg)})`);
+  ok(sg.head, `single : en-tête réduit (Annuler, Rétablir, IA, Enregistrer), pas de source, d’aperçu, de visuel ni de plein écran (${JSON.stringify(sg)})`);
+  ok(sg.add && sg.removed && sg.low, `single : photo vide → « Ajouter une photo » ; « Retirer la photo » la vide ; pas de grande marge sous le champ (${JSON.stringify(sg)})`);
+  ok(sg.two, `single : plusieurs blocs dans la source → tous montrés, sans chrome (${JSON.stringify(sg)})`);
 
   // ---- Phase 10 : démo complète, accessibilité, parcours au clavier ----
   fs.rmSync(doc);
@@ -1992,6 +2041,9 @@ try {
     await go(BASE + '/demo/admin', `!!document.querySelector('[data-summary] [data-id]') && !!document.querySelector('[data-page] [data-id]') && document.querySelector('[name=name]').value !== ''`, 'fiche produit');
     const productId = await ev(`document.querySelector('[data-products] [aria-current="true"]').dataset.open`);
     ok(await fitsPage() && await ev(`[...document.querySelectorAll('[data-save], [data-full-save]')].every((b) => b.offsetParent === null) && document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : pas de bouton Enregistrer dans les éditeurs, celui de la fiche est inactif`);
+    ok(await ev(`document.querySelectorAll('[data-cover] [data-canvas] [data-id], [data-summary] [data-canvas] [data-id]').length === 2 && document.querySelector('[data-cover] [data-canvas] [data-id]').getAttribute('aria-label') === Blocks.types.photo.label
+      && !document.querySelector('[data-cover] [data-rail], [data-summary] [data-rail], [data-cover] [data-insert], [data-summary] [data-insert]') && !!document.querySelector('[data-page] [data-rail]')`),
+      `${width} px, /demo/admin : couverture et description courte en champs (single), page produit en blocs`);
     await ev(`(() => { const s = document.querySelector('[name=status]'); s.value = '${status}'; s.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     await typeIn('[data-page] .bq-edit', ` Admin ${width}.`);
     ok(await ev(`!document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : un champ ou un éditeur modifié → Enregistrer actif`);

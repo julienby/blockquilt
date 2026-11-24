@@ -66,7 +66,7 @@ export function installActions(ed) {
     const groups = {};
     for (const k of Blocks.order) {
       const t = Blocks.types[k];
-      if (t.group === 'none' || t.hidden || (k === 'html' && !o.html)) continue;
+      if (t.group === 'none' || t.hidden || !ed.allowed(k)) continue;
       (groups[t.group] = groups[t.group] || []).push(k);
     }
     // « Coller » : la seule façon de coller dans un document vide, sans clavier (mobile).

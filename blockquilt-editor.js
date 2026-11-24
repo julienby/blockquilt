@@ -68,6 +68,10 @@ export function mount(element, options = {}) {
   ed.editing = () => ed.mode === 'edit';
   ed.newId = () => 'b' + ed.nextId++;
   ed.def = (b) => Blocks.def(b.type);
+  // Types proposés par les menus (option `blocks` ; le bloc HTML demande aussi `html: true`). Un bloc d'un autre type déjà là est gardé.
+  ed.allowed = (k) => (!o.blocks || o.blocks.includes(k)) && (k !== 'html' || !!o.html);
+  // Bloc d'un document vide : le premier type permis.
+  ed.blank = () => ({ id: ed.newId(), ...Blocks.blank(o.blocks?.[0] || 'text') });
 
   for (const install of [installViews, installDocument, installDraft, installSheets, installRender, installHistory, installActions, installMedia,
     installSource, installFullscreen, installDrag, installEmoji, installAi, installRemote, installBar, installEvents]) install(ed);

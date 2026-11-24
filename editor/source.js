@@ -4,7 +4,7 @@
 import { esc } from './shared.js';
 
 export function installSource(ed) {
-  const { $, canvas, titleEl } = ed;
+  const { o, $, canvas, titleEl } = ed;
   let sourceText = '';
   ed.sourceArea = () => canvas.querySelector('[data-source-text]');
   ed.renderSource = () => {
@@ -41,9 +41,11 @@ export function installSource(ed) {
     else if (ed.editing()) { ed.syncFromDom(); ed.checkpoint(); }
     if (next === 'source') sourceText = Blocks.serialize(ed.docMeta(), ed.blocks);
     ed.mode = next;
-    $('[data-preview]').setAttribute('aria-pressed', String(ed.mode === 'preview'));
-    $('[data-source-mode]').setAttribute('aria-pressed', String(ed.mode === 'source'));
-    $('[data-visual-toggle]').disabled = ed.mode === 'preview';
+    if (!o.single) { // un champ n'a ni source, ni aperçu, ni visuel
+      $('[data-preview]').setAttribute('aria-pressed', String(ed.mode === 'preview'));
+      $('[data-source-mode]').setAttribute('aria-pressed', String(ed.mode === 'source'));
+      $('[data-visual-toggle]').disabled = ed.mode === 'preview';
+    }
     titleEl.contentEditable = String(ed.editing());
     ed.render();
     if (ed.mode === 'source') ed.sourceArea()?.focus({ preventScroll: true });

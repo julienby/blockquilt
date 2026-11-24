@@ -129,7 +129,7 @@ export function installAiOps(ed, sheet) {
         const g = at.get(b.id);
         return g ? [...g.before, ...(g.with ?? [b]), ...g.after] : [b];
       })];
-      if (!ed.blocks.length) ed.blocks = [{ id: ed.newId(), ...Blocks.blank('text') }];
+      if (!ed.blocks.length) ed.blocks = [ed.blank()];
     });
     const skipped = wanted.length - chosen.length;
     ed.toast((chosen.length ? plural(chosen.length, 'proposition appliquée', 'propositions appliquées') : 'Rien appliqué')

@@ -49,12 +49,12 @@ export function installDocument(ed) {
     titleEl.textContent = meta.title || '';
     ed.showIcon();
   };
-  /** Remplace le document par { meta, blocks } (lu par Blocks.parse) ; un document vide reçoit un bloc texte. */
+  /** Remplace le document par { meta, blocks } (lu par Blocks.parse) ; un document vide reçoit un bloc du premier type permis. */
   ed.setDoc = ({ meta, blocks }) => {
     ed.setMeta(meta);
     const previous = ed.blocks.map((b) => ({ type: b.type, view: ed.views.get(b.id) }));
     ed.blocks = blocks.map((b) => ({ id: ed.newId(), ...b }));
-    if (!ed.blocks.length) ed.blocks = [{ id: ed.newId(), ...Blocks.blank('text') }];
+    if (!ed.blocks.length) ed.blocks = [ed.blank()];
     ed.carryViews(previous);
   };
 
