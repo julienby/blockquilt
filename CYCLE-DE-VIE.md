@@ -3,7 +3,7 @@
 Ce document dit comment blockquilt évolue et comment les applications le suivent.
 Il s'applique à toutes les applications qui l'utilisent : easyhomeguide, le second cerveau, et les suivantes.
 
-État au 2026-11-23 : aucune application n'utilise blockquilt. Pas de numéro de version, pas de tag.
+État au 2026-11-24 : version `0.1.0` (tag `v0.1.0`). Aucune application n'utilise encore blockquilt.
 C'est le bon moment pour fixer les règles. Après la première mise en production, chaque règle changée coûte une migration.
 
 Les points marqués **À valider** attendent une décision. Chacun a une recommandation.

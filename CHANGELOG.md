@@ -4,7 +4,7 @@
 Pour chaque version : ce qui change, puis ce que l'application doit faire (souvent : rien).
 Règles des numéros : `CYCLE-DE-VIE.md`, R2. En `0.x`, le contrat peut encore changer.
 
-## 0.1.0 — à venir
+## 0.1.0 — 2026-11-24
 
 Première version numérotée. Elle fixe le contrat décrit dans `CYCLE-DE-VIE.md` §1 :
 le format (`FORMAT.md`), le HTML rendu (`RENDER.md`), l'API de `mount` (`README.md`),

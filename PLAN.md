@@ -342,7 +342,7 @@ Moteurs : tout changement du format se fait en JS, PHP et Python.
 Avancement :
 - 0 fait. Cause des deux tests : ils lisaient l'écran dès que le fichier était écrit, avant la réponse au navigateur. Ils attendent maintenant l'état de l'écran.
   Le test admin a révélé un vrai défaut : `markSaved()` marquait enregistrée une frappe faite pendant l'enregistrement. Décidé : `markSaved(text)` (test dans `check.mjs`, 4n D1). 8 passages de `check` : les deux tests sont verts à chaque fois.
-- 1 à 4 faits : `CHANGELOG.md`, `bin/blockquilt-install`, `bin/blockquilt-verify` (tests : `tests/cycle_test.mjs`), `contents_test.mjs` avec `BQ_URL`. Reste 5 : tag `v0.1.0`, sur l'accord de Julien.
+- 1 à 4 faits : `CHANGELOG.md`, `bin/blockquilt-install`, `bin/blockquilt-verify` (tests : `tests/cycle_test.mjs`), `contents_test.mjs` avec `BQ_URL`. 5 fait : tag `v0.1.0` le 2026-11-24. Étape 3 terminée.
 - Choix validés pour 2 à 4 (2026-11-24) : scripts Node sans dépendance (`bin/*.mjs` exécutables) ; `blockquilt-verify <dossier> <ancien tag> [nouveau tag, défaut : copie de travail]`, `blockquilt.js` lu par `git show` ; `contents_test.mjs` avec `BQ_URL` + `BQ_TOKEN` = sous-ensemble générique (401, liste JSON, Markdown + ETag, 304, HTML, PUT + If-Match / 412 sur un contenu de test remis à l'identique), sans `BQ_URL` = suite actuelle.
 
 ## 5. IA — fait (I1 à I6)
