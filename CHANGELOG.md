@@ -4,7 +4,7 @@
 Pour chaque version : ce qui change, puis ce que l'application doit faire (souvent : rien).
 Règles des numéros : `CYCLE-DE-VIE.md`, R2. En `0.x`, le contrat peut encore changer.
 
-## 0.2.0 — à venir
+## 0.2.0 — 2026-11-25
 
 Ajouts :
 - `getMeta()` / `setMeta(meta)` et l'option `onMeta(meta)` : le frontmatter devient des champs de l'application (titre, slug…).
