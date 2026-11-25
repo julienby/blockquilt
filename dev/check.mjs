@@ -265,6 +265,16 @@ try {
     e.destroy(); el.remove();
     return before && after;
   })()`), 'option quiet : blocs sans cadre ; outils et « Insérer » (dessus, dessous) seulement autour du bloc actif, sans couvrir le bloc du dessus');
+  const noSource = await ev(`(() => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Un.\\n\\nDeux.', sourceView: false });
+    el.querySelector('[data-id] [data-expand]').click();
+    const d = el.querySelector('[data-block-full]');
+    const r = { open: d.open, buttons: el.querySelectorAll('[data-source-mode], [data-full-source], [data-full-act="source"]').length, preview: !!el.querySelector('[data-preview]') };
+    d.close(); e.destroy(); el.remove();
+    return r;
+  })()`);
+  ok(noSource.open && noSource.buttons === 0 && noSource.preview, `option sourceView: false : aucun bouton « Texte source » (en-tête, plein écran, menu ⋯), aperçu gardé ; un bloc s’ouvre en plein écran (${JSON.stringify(noSource)})`);
 
   // H1 et texte en grand
   await ev(`document.querySelector('[data-insert="end"]').click()`);

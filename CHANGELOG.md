@@ -4,6 +4,13 @@
 Pour chaque version : ce qui change, puis ce que l'application doit faire (souvent : rien).
 Règles des numéros : `CYCLE-DE-VIE.md`, R2. En `0.x`, le contrat peut encore changer.
 
+## 0.3.0 — 2026-11-25
+
+Ajout :
+- Option `sourceView: false` de `mount` : pas de vue « Texte source » (en-tête, plein écran d'un bloc, menu ⋯).
+
+À faire dans l'application : rien.
+
 ## 0.2.0 — 2026-11-25
 
 Ajouts :

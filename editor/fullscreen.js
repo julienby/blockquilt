@@ -113,8 +113,8 @@ export function installFullscreen(ed) {
     if (mode === 'source') showLint();
     window.BlockquiltContent?.enhance(body);
     for (const [k, on] of [['source', mode === 'source'], ['preview', mode === 'preview'], ['visual', ed.sideBySide]]) {
-      $(`[data-full-${k}]`, blockFull).setAttribute('aria-pressed', String(on));
-      $(`[data-full-act="${k}"]`, more).setAttribute('aria-pressed', String(on));
+      $(`[data-full-${k}]`, blockFull)?.setAttribute('aria-pressed', String(on)); // source absente avec sourceView: false
+      $(`[data-full-act="${k}"]`, more)?.setAttribute('aria-pressed', String(on));
     }
     $('[data-full-visual]', blockFull).disabled = mode === 'preview';
     $('[data-full-act="visual"]', more).disabled = mode === 'preview';
