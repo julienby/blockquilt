@@ -242,11 +242,14 @@ try {
     const ratio = (x) => { const a = lum(rgba(getComputedStyle(x).color)), b = lum(bg(x)); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
     const rounds = [...el.querySelectorAll('.bq-round')].map(ratio);
     const fields = [...el.querySelectorAll('[data-card-label], [data-card-href], [data-card-title]')].map(ratio);
+    const app = el.querySelector('.bq-app'), sheet = el.querySelector('.bq-sheet');
+    const light = { app: getComputedStyle(app).backgroundColor, sheet: getComputedStyle(sheet).backgroundColor, text: lum(rgba(getComputedStyle(app).color)) < 0.1 };
     e.destroy(); el.remove();
-    const low = { rounds: rounds.filter((r) => r < 3).map((r) => r.toFixed(1)), fields: fields.filter((r) => r < 4.5).map((r) => r.toFixed(1)) };
-    return rounds.length >= 9 && fields.length >= 2 && !low.rounds.length && !low.fields.length ? true : JSON.stringify(low);
+    const low = { rounds: rounds.filter((r) => r < 3).map((r) => r.toFixed(1)), fields: fields.filter((r) => r < 4.5).map((r) => r.toFixed(1)), light };
+    const white = light.app === 'rgb(255, 255, 255)' && light.sheet === 'rgb(255, 255, 255)' && light.text;
+    return white && rounds.length >= 9 && fields.length >= 2 && !low.rounds.length && !low.fields.length ? true : JSON.stringify(low);
   })()`);
-  ok(dark === true, `mode sombre : boutons ronds des blocs teintés et champs de la carte lisibles (contraste ≥ 3 et ≥ 4,5)${dark === true ? '' : ' ' + dark}`);
+  ok(dark === true, `page en mode sombre : l’éditeur et ses feuilles restent sur fond blanc, texte foncé ; boutons ronds et champs de la carte lisibles${dark === true ? '' : ' ' + dark}`);
   ok(await ev(`(() => {
     const el = document.createElement('div'); document.body.append(el);
     const e = Blockquilt.mount(el, { source: '## Titre\\n\\nUn.\\n\\nDeux.', quiet: true });
@@ -292,7 +295,7 @@ try {
   // Intégration neutre : l'éditeur reprend la police, l'accent, le fond et la barre de l'application qui l'accueille
   const themed = await ev(`(async () => {
     const box = document.createElement('div');
-    box.style.cssText = 'font-family: Georgia, serif; color: rgb(20, 40, 60); --bq-accent: rgb(200, 0, 0); --bq-surface: rgb(250, 245, 230); --bq-sticky-top: 50px; --bq-radius: 4px; width: 600px';
+    box.style.cssText = 'font-family: Georgia, serif; color: rgb(240, 240, 240); --bq-text: rgb(20, 40, 60); --bq-accent: rgb(200, 0, 0); --bq-surface: rgb(250, 245, 230); --bq-sticky-top: 50px; --bq-radius: 4px; width: 600px';
     document.body.append(box);
     const e = Blockquilt.mount(box, { source: 'Un texte\\n\\n> [!tip]\\n> Une astuce' });
     box.querySelector('[data-rich]').focus(); document.execCommand('insertText', false, '!');
@@ -312,7 +315,7 @@ try {
     e.destroy(); box.remove();
     return out;
   })()`);
-  ok(themed.font.startsWith('Georgia') && themed.text === 'rgb(20, 40, 60)' && themed.preview === 'Georgia, serif / rgb(20, 40, 60)', `intégration : police et couleur du texte de la page reprises, en édition et en aperçu (${themed.font}, ${themed.text})`);
+  ok(themed.font.startsWith('Georgia') && themed.text === 'rgb(20, 40, 60)' && themed.preview === 'Georgia, serif / rgb(20, 40, 60)', `intégration : police de la page et couleur --bq-text reprises (pas la couleur claire de la page), en édition et en aperçu (${themed.font}, ${themed.text})`);
   ok(themed.dot === 'rgb(200, 0, 0)' && themed.bg === 'rgb(250, 245, 230)' && themed.top === '50px' && themed.radius === '4px', `intégration : --bq-accent, --bq-surface, --bq-sticky-top, --bq-radius (${JSON.stringify(themed)})`);
 
   // ---- Deux éditeurs dans la même page, puis destroy() ----

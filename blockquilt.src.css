@@ -17,11 +17,11 @@
   .bq-btn { @apply inline-flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors hover:bg-black/5 active:bg-black/10 disabled:pointer-events-none disabled:opacity-30; }
   .bq-btn[aria-busy="true"] { @apply cursor-progress opacity-50; }
 }
-/* Intégration neutre : l'éditeur reprend la police et la couleur du texte de la page. Tout se règle par variables CSS,
-   posées sur l'élément de l'éditeur ou n'importe quel parent :
-   --bq-font, --bq-text (hérités), --bq-surface (fond : Canvas, la couleur de fond du système), --bq-border, --bq-accent,
+/* Intégration neutre : l'éditeur reprend la police de la page. Il reste en thème clair (fond blanc, texte foncé),
+   même sur une page en mode sombre. Tout se règle par variables CSS, posées sur l'élément de l'éditeur ou n'importe quel parent :
+   --bq-font (héritée), --bq-text (texte : foncé), --bq-surface (fond : blanc), --bq-border, --bq-accent,
    --bq-radius (cartes), --bq-width (colonne de texte), --bq-sticky-top (décalage de l'en-tête collant sous la barre de l'application). */
-.bq-app { font-family: var(--bq-font, inherit); color: var(--bq-text, inherit); background: var(--bq-surface, Canvas); }
+.bq-app { color-scheme: light; font-family: var(--bq-font, inherit); color: var(--bq-text, rgb(28 25 23)); background: var(--bq-surface, Canvas); }
 .bq-head { top: var(--bq-sticky-top, 0px); background: color-mix(in srgb, var(--bq-surface, Canvas) 94%, transparent); border-color: var(--bq-border, color-mix(in srgb, currentColor 12%, transparent)); backdrop-filter: blur(12px); }
 .bq-full-inner { --bq-sticky-top: 0px; }
 /* Bandeau « Modifié ailleurs » : collé sous l'en-tête. */

@@ -15,6 +15,7 @@ Ajouts :
 - Bloc photo vide : bouton « Ajouter une photo » ; photo présente : bouton « Retirer la photo ».
 
 Changements :
+- L'éditeur reste en thème clair (fond blanc, texte foncé), même sur une page en mode sombre. Il ne reprend plus la couleur du texte de la page : une application qui veut une autre couleur pose `--bq-text`.
 - Écran tactile : un bloc ajouté ou collé est amené à l'écran sans ouvrir le clavier ; on touche son texte pour taper. Le clavier ouvert, le point de saisie reste visible au-dessus de lui.
 
 Retrait (rupture, permise en 0.x) :

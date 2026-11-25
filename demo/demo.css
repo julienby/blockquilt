@@ -62,7 +62,6 @@ input, select { font-size: max(16px, 1rem); }
 .story-title { font-size: clamp(2rem, 1.5rem + 2.5vw, 2.75rem); font-weight: 600; line-height: 1.15; }
 .story-subtitle { font-size: 1.25rem; line-height: 1.4; color: var(--muted); field-sizing: content; }
 .story-title::placeholder, .story-subtitle::placeholder { color: var(--muted); opacity: 0.6; }
-.story [data-bq] { --bq-surface: var(--surface); }
 .story [data-bq] .bq-edit { font-family: var(--serif); }
 .story-read { padding-block: 2rem; }
 .story-read .bq-content { font-family: var(--serif); font-size: 1.25rem; line-height: 1.6; }

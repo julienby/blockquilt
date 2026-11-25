@@ -79,13 +79,13 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 
 ### Apparence
 
-L'éditeur est neutre : il reprend la police et la couleur du texte de la page qui l'accueille, son fond est la couleur de fond du système (`Canvas`), ses lignes et ses fonds de carte sont tirés de la couleur du texte (lisibles sur fond clair comme sombre). Seuls les encadrés (info, astuce…), la vidéo, le code et le HTML gardent une teinte qui porte leur sens. Tout se règle par variables CSS, sur l'élément de l'éditeur ou n'importe quel parent :
+L'éditeur est neutre : il reprend la police de la page qui l'accueille. Il reste en thème clair (fond blanc, texte foncé), même sur une page en mode sombre. Ses lignes et ses fonds de carte sont tirés de la couleur du texte. Seuls les encadrés (info, astuce…), la vidéo, le code et le HTML gardent une teinte qui porte leur sens. Tout se règle par variables CSS, sur l'élément de l'éditeur ou n'importe quel parent :
 
 | Variable | Rôle | Par défaut |
 |---|---|---|
 | `--bq-font` | Police | héritée |
-| `--bq-text` | Couleur du texte | héritée |
-| `--bq-surface` | Fond de l'éditeur, de l'en-tête et des feuilles | `Canvas` |
+| `--bq-text` | Couleur du texte | foncée (`rgb(28 25 23)`) |
+| `--bq-surface` | Fond de l'éditeur, de l'en-tête et des feuilles | blanc |
 | `--bq-border` | Lignes et bordures neutres | texte à 14 % |
 | `--bq-accent` | Couleur d'accent (enregistrer, focus, liens du rendu) | bleu `#0284c7` |
 | `--bq-radius` | Arrondi des cartes | `1rem` |
