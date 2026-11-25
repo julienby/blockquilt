@@ -1,11 +1,11 @@
 /* Habillage commun des exemples d'intégration : la page de l'application, pas l'éditeur (il a son propre style). */
 *, *::before, *::after { box-sizing: border-box; min-width: 0; }
 :root {
-  color-scheme: light dark;
-  --ink: light-dark(oklch(25% 0 none), oklch(93% 0 none));
-  --muted: light-dark(oklch(50% 0 none), oklch(70% 0 none));
-  --line: light-dark(oklch(88% 0 none), oklch(35% 0 none));
-  --surface: light-dark(oklch(98.5% 0 none), oklch(20% 0 none));
+  color-scheme: light;
+  --ink: oklch(25% 0 none);
+  --muted: oklch(50% 0 none);
+  --line: oklch(88% 0 none);
+  --surface: oklch(98.5% 0 none);
   --accent: oklch(55% 0.15 160);
   --accent-soft: color-mix(in oklch, var(--accent) 12%, transparent);
   font-family: system-ui, sans-serif;

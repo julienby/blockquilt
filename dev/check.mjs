@@ -2174,6 +2174,17 @@ try {
     ok(await fitsPage() && await ev(`document.querySelector('article h1').textContent === 'Écrire sans cadre (${width})' && document.querySelector('[data-subtitle]').textContent === 'Sous-titre ${width}' && document.querySelector('article').textContent.includes('Récit ${width}.')`),
       `${width} px, /demo/story/ecrire-sans-cadre : la page de lecture (titre, sous-titre, texte)`);
   }
+  // Démos simples et classiques : fond clair même quand le système est en mode sombre.
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
+  const darkBg = [];
+  for (const page of ['blog', 'notes', 'admin', 'story', 'story/ecrire-sans-cadre']) {
+    await go(`${BASE}/demo/${page}`, `document.readyState === 'complete'`, page);
+    const bg = await ev(`getComputedStyle(document.body).backgroundColor + ' ' + getComputedStyle(document.documentElement).backgroundColor`);
+    const light = (c) => c === 'rgba(0, 0, 0, 0)' || /^rgb\(2[45]\d, 2[45]\d, 2[45]\d\)$/.test(c) || /^oklch\(0\.9\d* /.test(c);
+    if (!bg.split(/ (?=rgb|oklch)/).every(light)) darkBg.push(`${page} : ${bg}`);
+  }
+  await send('Emulation.setEmulatedMedia', { features: [] });
+  ok(!darkBg.length, `démos en mode sombre du système : pages sur fond clair (${darkBg.join(' ; ') || 'toutes'})`);
 
   ws.close();
 } catch (error) {
