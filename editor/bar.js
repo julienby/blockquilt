@@ -24,6 +24,7 @@ export function installBar(ed) {
     field = f;
     bar.hidden = false;
     ed.placeBar();
+    ed.revealCaret();
   };
   ed.hideBar = () => { bar.hidden = true; field = null; range = null; toggleClip(false); toggleLink(false); };
   const backToField = () => {
@@ -124,7 +125,22 @@ export function installBar(ed) {
   ed.on(app, 'pointercancel', () => clearTimeout(press?.timer));
   ed.on(app, 'focusout', (e) => { if (field && e.target === field && !bar.contains(e.relatedTarget)) ed.hideBar(); });
   ed.on(bar, 'focusout', (e) => { if (!bar.contains(e.relatedTarget) && e.relatedTarget !== field) ed.hideBar(); });
-  ed.on(window.visualViewport, 'resize', ed.placeBar);
+  // Clavier virtuel ouvert (l'écran visible rétrécit) : le point de saisie remonte entre l'en-tête et le clavier (ou la barre).
+  ed.revealCaret = () => {
+    const f = document.activeElement;
+    if (!f?.matches('input, textarea, [contenteditable="true"]') || !ed.canvas.contains(f)) return;
+    const sel = getSelection();
+    const caret = sel.rangeCount && f.contains(sel.anchorNode) ? sel.getRangeAt(0).getBoundingClientRect() : null;
+    const box = f.getBoundingClientRect();
+    const top = caret?.height ? caret.top : box.top;
+    const bottom = caret?.height ? caret.bottom : Math.min(box.bottom, box.top + 48);
+    const vv = window.visualViewport;
+    const high = Math.max(vv ? vv.offsetTop : 0, head.getBoundingClientRect().bottom) + 8;
+    const low = (vv ? vv.offsetTop + vv.height : innerHeight) - (bar.hidden ? 0 : bar.offsetHeight + 8) - 8;
+    if (bottom > low) scrollBy(0, Math.min(bottom - low, top - high));
+    else if (top < high) scrollBy(0, top - high);
+  };
+  ed.on(window.visualViewport, 'resize', () => { ed.placeBar(); ed.revealCaret(); });
   ed.on(window.visualViewport, 'scroll', ed.placeBar);
   ed.on(window, 'resize', ed.placeBar);
   ed.on(bar, 'mousedown', (e) => { if (!e.target.closest('input')) e.preventDefault(); });

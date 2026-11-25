@@ -7,12 +7,13 @@
 //   PUT  /demo/api/{exemple}/{id}     → fiche JSON entière (champs + Markdown) → la fiche enregistrée
 //   POST /demo/api/{exemple}/{id}     → formulaire `text` (option saveUrl de l'éditeur) : le Markdown seul, les autres champs gardés
 //   GET  /demo/blog/{id}              → l'article rendu par le serveur (Blocks.toHtml), la page publique
+//   GET  /demo/story/{id}             → le récit rendu par le serveur : titre, sous-titre (frontmatter `description`), texte
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
 const Blocks = require('../blockquilt.js');
 
-const NAMES = ['blog', 'notes', 'admin'];
+const NAMES = ['blog', 'notes', 'admin', 'story'];
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const PAGES = path.join(__dirname, '..', 'demo');
 
@@ -36,28 +37,39 @@ module.exports = (DATA, { send, json, read, form }) => {
   // Titre d'une fiche : son champ `name`, sinon le titre du frontmatter de son Markdown.
   const title = (r) => r.name || Blocks.frontmatter(r.markdown || '').meta?.title || 'Sans titre';
 
-  const article = (r) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${Blocks.esc(title(r))}</title><link rel="stylesheet" href="../../blockquilt-content.css"><link rel="stylesheet" href="../demo.css"></head>
+  const head = (r) => `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${Blocks.esc(title(r))}</title><link rel="stylesheet" href="../../blockquilt-content.css"><link rel="stylesheet" href="../demo.css"></head>`;
+  const article = (r) => `${head(r)}
 <body><main class="page"><p><a href="../blog">← Tous les articles</a> · <a href="../blog#edit=${r.id}">Modifier</a></p>
 ${Blocks.toHtml(r.markdown || '', { media: '../../media/' })}
 <script src="../../blockquilt-content.js"></script></main></body></html>`;
+  // Récit : le sous-titre (frontmatter `description`) est placé sous le titre <h1>.
+  const story = (r) => {
+    const md = r.markdown || '';
+    const sub = Blocks.frontmatter(md).meta?.description;
+    const html = Blocks.toHtml(md, { media: '../../media/' }).replace('</h1>', sub ? `</h1>\n<p class="story-lead" data-subtitle>${Blocks.esc(sub)}</p>` : '</h1>');
+    return `${head(r)}
+<body><main class="story story-read"><p class="top"><a href="../story">Modifier</a></p>
+${html}
+<script src="../../blockquilt-content.js"></script></main></body></html>`;
+  };
 
   // Renvoie true si la requête est pour les exemples.
   return async (req, res, pathname) => {
-    let m = /^\/demo\/(blog|notes|admin)(\.js)?$/.exec(pathname);
+    let m = /^\/demo\/(blog|notes|admin|story)(\.js)?$/.exec(pathname);
     if (m && req.method === 'GET') {
       send(res, 200, m[2] ? 'text/javascript' : 'text/html; charset=utf-8', fs.readFileSync(path.join(PAGES, m[1] + (m[2] || '.html'))));
       return true;
     }
     if (pathname === '/demo/demo.css' && req.method === 'GET') { send(res, 200, 'text/css', fs.readFileSync(path.join(PAGES, 'demo.css'))); return true; }
-    m = /^\/demo\/blog\/([^/]+)$/.exec(pathname);
+    m = /^\/demo\/(blog|story)\/([^/]+)$/.exec(pathname);
     if (m && req.method === 'GET') {
-      const r = ID.test(m[1]) && load('blog', m[1]);
+      const r = ID.test(m[2]) && load(m[1], m[2]);
       if (!r) send(res, 404, 'text/plain; charset=utf-8', 'Article introuvable');
-      else send(res, 200, 'text/html; charset=utf-8', article(r));
+      else send(res, 200, 'text/html; charset=utf-8', m[1] === 'blog' ? article(r) : story(r));
       return true;
     }
-    m = /^\/demo\/api\/(blog|notes|admin)(?:\/([^/]+))?$/.exec(pathname);
+    m = /^\/demo\/api\/(blog|notes|admin|story)(?:\/([^/]+))?$/.exec(pathname);
     if (!m) return false;
     const [, name, id] = m;
     if (id !== undefined && !ID.test(id)) { json(res, 400, { error: 'Identifiant invalide' }); return true; }

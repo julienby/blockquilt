@@ -1,0 +1,5 @@
+{
+  "markdown": "---\ntitle: Écrire sans cadre\ndescription: Un éditeur qui se fait oublier, pour penser au texte et non aux outils.\n---\n\nQuand on écrit, on regarde le texte. Les outils peuvent attendre. Dans cette page, chaque bloc est nu : ses outils apparaissent seulement quand on écrit dedans.\n\n## Une page, pas un formulaire\n\nLe titre et le sous-titre sont dans la page, en grand. Ce sont des champs de l'application : ils vont dans le frontmatter du texte.\n\n> Écrire, c'est choisir ce qu'on enlève.\n\nCliquez dans un paragraphe pour voir ses outils. Sélectionnez des mots pour les mettre en forme. Puis publiez, et lisez le résultat.\n",
+  "id": "ecrire-sans-cadre",
+  "updatedAt": "2026-11-25T09:00:00.000Z"
+}

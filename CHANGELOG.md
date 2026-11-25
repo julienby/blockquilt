@@ -6,12 +6,21 @@ Règles des numéros : `CYCLE-DE-VIE.md`, R2. En `0.x`, le contrat peut encore c
 
 ## 0.2.0 — à venir
 
-Ajouts (rien ne casse) :
+Ajouts :
+- `getMeta()` / `setMeta(meta)` et l'option `onMeta(meta)` : le frontmatter devient des champs de l'application (titre, slug…).
 - Option `blocks` de `mount` : les types de bloc proposés par les menus.
 - Option `single: true` : un champ (un seul bloc, sans outils de bloc, en-tête réduit).
+- Option `quiet: true` : écriture épurée (blocs sans cadre, outils seulement autour du bloc actif). Démo `/demo/story`.
+- Barre de mise en forme sur téléphone : une seule ligne (boutons de 36 px de large).
 - Bloc photo vide : bouton « Ajouter une photo » ; photo présente : bouton « Retirer la photo ».
 
-À faire dans l'application : rien.
+Changements :
+- Écran tactile : un bloc ajouté ou collé est amené à l'écran sans ouvrir le clavier ; on touche son texte pour taper. Le clavier ouvert, le point de saisie reste visible au-dessus de lui.
+
+Retrait (rupture, permise en 0.x) :
+- Option `title` : plus de titre ni d'icône du document dans la barre. Le frontmatter est gardé tel quel.
+
+À faire dans l'application : si elle passe `title: true`, mettre un champ Titre dans son formulaire (`getMeta`, `setMeta`, `onMeta` ; exemple : `/demo/blog`), ou un bloc H1 dans le texte.
 
 ## 0.1.0 — 2026-11-24
 

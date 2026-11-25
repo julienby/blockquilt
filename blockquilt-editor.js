@@ -44,10 +44,6 @@ export function mount(element, options = {}) {
     canvas: $('[data-canvas]'),
     bar: $('[data-bar]'),
     head: $('[data-head]'),
-    // Titre et icône du document : seulement avec l'option `title` (l'éditeur peut ne remplir qu'une partie d'une page).
-    // Sans elle, ces deux éléments existent hors de la page (aucun écouteur n'y arrive) et le frontmatter est gardé tel quel.
-    titleEl: $('[data-title]') || document.createElement('div'),
-    iconBtn: $('[data-doc-icon]') || document.createElement('button'),
     saveBtn: $('[data-save]'),
     fileInput: $('[data-file]'),
     toastEl: $('[data-toast]'),
@@ -58,7 +54,6 @@ export function mount(element, options = {}) {
     ui: { ic, esc, attr, media: o.media, editable }, // passé aux cartes d'édition des types (edit(b, ui))
     // État du document
     meta: {},
-    icon: '',
     blocks: [],
     dirty: false,
     mode: 'edit', // 'edit' (blocs) | 'source' (texte Markdown) | 'preview' (rendu)
@@ -86,6 +81,9 @@ export function mount(element, options = {}) {
     setMarkdown: (md) => { ed.load(md); ed.setDirty(false, { loaded: true }); ed.resetHistory(); },
     save: ed.save,
     get dirty() { return ed.dirty; }, // des modifications ne sont pas enregistrées
+    // Frontmatter : un champ de l'application (titre, slug…) le lit et l'écrit. Écrire est une frappe : à enregistrer, annulable.
+    getMeta: () => ed.docMeta(),
+    setMeta: (meta) => { ed.meta = { ...meta }; ed.setDirty(true); ed.typed(); },
     // L'application a enregistré `text` elle-même (option save: false). Une frappe faite depuis reste à enregistrer.
     markSaved: (text) => { if (text === undefined || ed.markdown() === text) ed.setDirty(false); },
     undo: ed.undo,

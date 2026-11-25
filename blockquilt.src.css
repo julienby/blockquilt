@@ -35,8 +35,8 @@
 .bq-tone-quote { border-left-color: color-mix(in srgb, currentColor 40%, transparent); }
 /* Éléments d'interface neutres : icônes atténuées, boutons ronds, pastilles « Insérer / Fusionner ». */
 .bq-muted { color: color-mix(in srgb, currentColor 72%, transparent); }
-.bq-round { background: color-mix(in srgb, currentColor 4%, var(--bq-surface, Canvas)); border-color: color-mix(in srgb, currentColor 14%, transparent); }
-.group:hover .bq-round { background: color-mix(in srgb, currentColor 10%, var(--bq-surface, Canvas)); }
+.bq-round { background: color-mix(in srgb, currentColor 6%, transparent); border-color: color-mix(in srgb, currentColor 14%, transparent); } /* fond translucide : le bloc teinté reste dessous, même en mode sombre */
+.group:hover .bq-round { background: color-mix(in srgb, currentColor 12%, transparent); }
 .bq-pill { background: var(--bq-surface, Canvas); border-color: color-mix(in srgb, currentColor 14%, transparent); color: color-mix(in srgb, currentColor 65%, transparent); }
 .group:hover .bq-pill { color: inherit; border-color: color-mix(in srgb, currentColor 35%, transparent); }
 .bq-badge { background: color-mix(in srgb, currentColor 7%, var(--bq-surface, Canvas)); border-color: color-mix(in srgb, currentColor 16%, transparent); }
@@ -44,6 +44,22 @@
 .bq-app [tabindex="-1"]:focus-visible { outline: none; }
 .bq-bar .bq-btn:hover { background: rgb(255 255 255 / 0.1); }
 .bq-bar .bq-btn:active { background: rgb(255 255 255 / 0.2); }
+/* Option quiet (écriture épurée) : les blocs neutres n'ont ni bordure ni fond ; les encadrés, le code et la vidéo gardent leur teinte (elle a un sens).
+   Les outils et la colonne de déplacement n'apparaissent que sur le bloc actif, `.bq-active` (pas au survol : la page bougerait sous la souris).
+   Les outils ne prennent pas de place entre deux paragraphes : le bloc actif seul reçoit une marge haute pour eux, ils ne couvrent jamais un texte.
+   « Insérer / Fusionner » : seulement au-dessus et au-dessous du bloc actif (au-dessus du premier bloc : insérer au début). */
+.bq-quiet .bq-tone:not(.bq-tone-quote) { border-color: transparent; background: transparent; }
+.bq-quiet .bq-tone-quote { border-block-color: transparent; border-inline-end-color: transparent; background: transparent; }
+.bq-quiet .bq-card:not(.bq-active) :is([data-tools], [data-rail]) { visibility: hidden; }
+.bq-quiet .bq-card.bq-active { margin-block-start: 3rem; }
+.bq-quiet .bq-card { position: relative; }
+.bq-quiet .bq-card > div:first-child { padding-top: 0.5rem; padding-inline-end: 3rem; }
+.bq-quiet [data-rail] { position: absolute; z-index: 5; inset-block-start: 0; inset-inline-end: 0; min-block-size: 100%; border: 0; }
+.bq-quiet [data-tools] { position: absolute; z-index: 5; bottom: 100%; inset-inline: 0 2.75rem; padding-inline: 0.25rem; border-radius: 0.75rem; background: Canvas; box-shadow: 0 2px 8px rgb(0 0 0 / 0.12); }
+.bq-quiet .bq-gap { display: none; }
+.bq-quiet .bq-gap:has(+ .bq-active), .bq-quiet .bq-active + .bq-gap { display: flex; }
+/* Téléphone : les 9 boutons de la barre sur une ligne (9 × 36 px). La hauteur reste 44 px : cible tactile gardée. */
+@media (max-width: 639px) { .bq-bar > .bq-btn { width: 2.25rem; } }
 
 /* Champs modifiables */
 .bq-edit { -webkit-touch-callout: none; overflow-wrap: anywhere; }
@@ -61,6 +77,9 @@
 /* Menu flottant (grand écran) : la feuille devient un petit menu posé près du bouton. */
 dialog.bq-pop { position: fixed; margin: 0; width: 18rem; max-height: min(32rem, calc(100dvh - 1rem)); border-radius: 1rem; padding: 0.5rem; }
 dialog.bq-pop::backdrop { background: transparent; }
+
+/* Un bloc amené à l'écran garde une marge : il ne passe pas sous l'en-tête fixe, et l'animation d'arrivée (8 px) ne le coupe pas. */
+.bq-app [data-id] { scroll-margin-block: 4.5rem 1rem; }
 
 @media (prefers-reduced-motion: no-preference) {
   .bq-new { animation: bq-pop 0.2s ease-out; }

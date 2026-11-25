@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Écrire un récit</title>
+  <link rel="stylesheet" href="../blockquilt.css">
+  <link rel="stylesheet" href="../blockquilt-content.css">
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+  <!-- Exemple 4 : écrire un récit dans une page épurée. Titre et sous-titre en grand dans la page (frontmatter, getMeta / setMeta),
+       l'éditeur en quiet: true (blocs sans cadre, outils sur le bloc actif), un seul bouton Publier (save: false, puis save()). -->
+  <main class="story">
+    <div class="top"><span class="status" data-state>Publié</span><a data-read href="story/ecrire-sans-cadre">Lire</a>
+      <button type="button" class="btn primary" data-publish disabled>Publier</button></div>
+    <input data-story-title class="story-title" placeholder="Titre" aria-label="Titre" autocomplete="off">
+    <textarea data-story-subtitle class="story-subtitle" rows="2" placeholder="Sous-titre" aria-label="Sous-titre"></textarea>
+    <div data-editor></div>
+  </main>
+  <script src="../blockquilt.js"></script>
+  <script src="../blockquilt-content.js"></script>
+  <script type="module" src="story.js"></script>
+</body>
+</html>

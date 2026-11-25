@@ -2,7 +2,7 @@
 import { request, within } from './shared.js';
 
 export function installDocument(ed) {
-  const { o, $, saveBtn, titleEl, iconBtn, toastEl } = ed;
+  const { o, $, saveBtn, toastEl } = ed;
 
   ed.toast = (text) => {
     toastEl.textContent = text;
@@ -32,22 +32,12 @@ export function installDocument(ed) {
     if (changed) ed.o.onDirty?.(value); // l'application suit l'état (save: false : son propre bouton Enregistrer)
   };
 
-  // ---- Titre et icône : dans le frontmatter ; les autres clés sont gardées dans leur ordre ----
-  ed.showIcon = () => { iconBtn.textContent = ed.icon || '📄'; iconBtn.classList.toggle('grayscale', !ed.icon); };
-  ed.docMeta = () => {
-    const m = { ...ed.meta };
-    if (!o.title) return m;
-    const title = titleEl.textContent.replace(/\s+/g, ' ').trim();
-    if (title) m.title = title; else delete m.title;
-    if (ed.icon) m.icon = ed.icon; else delete m.icon;
-    return m;
-  };
-  /** Remplace le frontmatter (titre et icône compris). */
+  // ---- Frontmatter : gardé tel quel, clés dans leur ordre. L'éditeur ne l'affiche pas ; l'application en fait des champs (getMeta, setMeta). ----
+  ed.docMeta = () => ({ ...ed.meta });
+  /** Remplace le frontmatter depuis l'éditeur (chargement, Ctrl+Z, vue source, IA) : onMeta le signale à l'application. */
   ed.setMeta = (meta) => {
     ed.meta = meta;
-    ed.icon = meta.icon || '';
-    titleEl.textContent = meta.title || '';
-    ed.showIcon();
+    o.onMeta?.({ ...meta });
   };
   /** Remplace le document par { meta, blocks } (lu par Blocks.parse) ; un document vide reçoit un bloc du premier type permis. */
   ed.setDoc = ({ meta, blocks }) => {

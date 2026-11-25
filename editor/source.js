@@ -4,7 +4,7 @@
 import { esc } from './shared.js';
 
 export function installSource(ed) {
-  const { o, $, canvas, titleEl } = ed;
+  const { o, $, canvas } = ed;
   let sourceText = '';
   ed.sourceArea = () => canvas.querySelector('[data-source-text]');
   ed.renderSource = () => {
@@ -46,7 +46,6 @@ export function installSource(ed) {
       $('[data-source-mode]').setAttribute('aria-pressed', String(ed.mode === 'source'));
       $('[data-visual-toggle]').disabled = ed.mode === 'preview';
     }
-    titleEl.contentEditable = String(ed.editing());
     ed.render();
     if (ed.mode === 'source') ed.sourceArea()?.focus({ preventScroll: true });
   };

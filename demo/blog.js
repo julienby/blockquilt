@@ -13,12 +13,16 @@ const showList = async () => {
   $('[data-edit]').hidden = true;
 };
 
+// Le champ Titre : la clé `title` du frontmatter de l'article.
+const showName = (meta) => { $('[data-name]').value = meta.title || ''; };
+$('[data-name]').addEventListener('input', (e) => editor?.setMeta({ ...editor.getMeta(), title: e.target.value.trim() }));
+
 const showEditor = async (id) => {
   const r = await fetch(`api/blog/${id}`);
   const source = r.ok ? (await r.json()).markdown : '---\ntitle: Nouvel article\n---\n\n';
   editor = mount($('[data-editor]'), {
     source,
-    title: true, // titre et icône de l'article : dans le frontmatter
+    onMeta: showName, // chargement, Ctrl+Z, vue source : le champ Titre suit le frontmatter
     saveUrl: `api/blog/${id}`, // POST du formulaire `text` : le serveur garde le Markdown
     storageKey: `blog-${id}`, // brouillon et affichage choisis, propres à cet article
     uploadUrl: '../api/upload',

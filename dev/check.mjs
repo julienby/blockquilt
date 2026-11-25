@@ -111,7 +111,8 @@ try {
   })()`);
   ok(await ev(`!document.querySelector('[data-bar]').hidden`), 'clic droit : la barre de mise en forme s’ouvre');
   ok(await ev(`(() => { const r = document.querySelector('[data-bar]').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight; })()`), 'barre de mise en forme : tient dans un écran de 375 px');
-  ok(await ev(`[...document.querySelectorAll('[data-bar] button')].filter((b) => b.offsetParent).every((b) => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; })`), 'barre de mise en forme : boutons de 44 px');
+  ok(await ev(`[...document.querySelectorAll('[data-bar] > button')].filter((b) => b.offsetParent).every((b) => { const r = b.getBoundingClientRect(); return r.width >= 36 && r.height >= 44; })`), 'barre de mise en forme : boutons de 44 px de haut, 36 px de large au moins');
+  ok(await ev(`new Set([...document.querySelectorAll('[data-bar] > button')].filter((b) => b.offsetParent).map((b) => b.getBoundingClientRect().top)).size === 1`), 'barre de mise en forme : une seule ligne sur un écran de 375 px');
   await ev(`document.querySelector('[data-split]').click()`);
   c = await cards();
   ok(c.length === 6 && c.some((x) => x === 'text:Réseau : maison-wifi'), 'scission : la suite part dans un nouveau bloc');
@@ -217,7 +218,50 @@ try {
   await open();
   ok(await ev(`!document.querySelector('[data-bq] [data-title], [data-bq] [data-doc-icon], [data-bq] [data-label]')`), 'en-tête : pas de titre imposé (actions seulement)');
   ok(await ev(`editor.getMarkdown().startsWith('---\\ntitle: Arrivée\\nicon: 🏡\\n---')`), 'sans titre affiché : le frontmatter (title, icon) est gardé tel quel');
-  ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: '---\\ntitle: T\\n---\\n\\nx', title: true }); const ok = el.querySelector('[data-title]').textContent === 'T' && !!el.querySelector('[data-doc-icon]'); el.querySelector('[data-title]').textContent = 'Nouveau'; const md = e.getMarkdown(); e.destroy(); el.remove(); return ok && md.startsWith('---\\ntitle: Nouveau'); })()`), 'option title : titre et icône du document dans l’en-tête, écrits dans le frontmatter');
+  ok(await ev(`(() => { const el = document.createElement('div'); document.body.append(el); const e = Blockquilt.mount(el, { source: '---\\ntitle: T\\n---\\n\\nx', title: true }); const none = !el.querySelector('[data-title], [data-doc-icon]'); e.destroy(); el.remove(); return none; })()`), 'option title retirée : jamais de nom du document dans la barre');
+  ok(await ev(`(() => {
+    const el = document.createElement('div'); document.body.append(el);
+    const seen = [];
+    const e = Blockquilt.mount(el, { source: '---\\ntitle: T\\nicon: 🏡\\n---\\n\\nx', onMeta: (m) => seen.push(m.title) });
+    const read = e.getMeta().title === 'T' && seen.join() === 'T'; // le chargement est signalé
+    seen.length = 0;
+    e.setMeta({ ...e.getMeta(), title: 'Nouveau' });
+    const written = e.getMarkdown().startsWith('---\\ntitle: Nouveau\\nicon: 🏡\\n---') && e.dirty && !seen.length;
+    e.undo();
+    const undone = e.getMeta().title === 'T' && seen.at(-1) === 'T' && !e.dirty;
+    e.destroy(); el.remove();
+    return read && written && undone;
+  })()`), 'getMeta/setMeta : un champ de l’application lit et écrit le frontmatter ; Ctrl+Z le rétablit et onMeta le signale');
+  // Mode sombre : boutons ronds sur un bloc teinté (encadré, code) et champs du bloc Carte lisibles (contraste WCAG : 3 pour une icône, 4,5 pour un texte).
+  const dark = await ev(`(() => {
+    const el = document.createElement('div'); el.style.cssText = 'color-scheme: dark; color: CanvasText; background: Canvas'; document.body.append(el);
+    const e = Blockquilt.mount(el, { source: '> [!info] I\\n> T.\\n\\n> [!danger] D\\n> T.\\n\\n\\u0060\\u0060\\u0060js\\nlet a;\\n\\u0060\\u0060\\u0060\\n\\n:::card\\n### C\\nT.\\n[B](https://e.fr)\\n:::', storageKey: 'dark' });
+    const rgba = (s) => { const n = s.match(/[\\d.]+/g).map(Number); const k = s.startsWith('color(') ? 255 : 1; return [n[0] * k, n[1] * k, n[2] * k, n[3] ?? 1]; };
+    const bg = (x) => { for (; x; x = x.parentElement) { const c = rgba(getComputedStyle(x).backgroundColor); if (c[3] >= 0.5) return c; } return [0, 0, 0, 1]; };
+    const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+    const ratio = (x) => { const a = lum(rgba(getComputedStyle(x).color)), b = lum(bg(x)); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+    const rounds = [...el.querySelectorAll('.bq-round')].map(ratio);
+    const fields = [...el.querySelectorAll('[data-card-label], [data-card-href], [data-card-title]')].map(ratio);
+    e.destroy(); el.remove();
+    const low = { rounds: rounds.filter((r) => r < 3).map((r) => r.toFixed(1)), fields: fields.filter((r) => r < 4.5).map((r) => r.toFixed(1)) };
+    return rounds.length >= 9 && fields.length >= 2 && !low.rounds.length && !low.fields.length ? true : JSON.stringify(low);
+  })()`);
+  ok(dark === true, `mode sombre : boutons ronds des blocs teintés et champs de la carte lisibles (contraste ≥ 3 et ≥ 4,5)${dark === true ? '' : ' ' + dark}`);
+  ok(await ev(`(() => {
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: '## Titre\\n\\nUn.\\n\\nDeux.', quiet: true });
+    const cards = [...el.querySelectorAll('[data-id]')];
+    const cs = (x) => getComputedStyle(x);
+    const bare = (c) => cs(c).borderTopColor === 'rgba(0, 0, 0, 0)' && cs(c).backgroundColor === 'rgba(0, 0, 0, 0)';
+    const shown = (c) => cs(c.querySelector('[data-tools]')).visibility === 'visible' && cs(c.querySelector('[data-rail]')).visibility === 'visible';
+    const gaps = () => [...el.querySelectorAll('.bq-gap')].filter((g) => g.offsetParent);
+    const before = el.querySelector('[data-bq]').classList.contains('bq-quiet') && cards.every(bare) && !cards.some(shown) && !gaps().length;
+    cards[1].querySelector('.bq-edit').focus();
+    const covers = cards[1].querySelector('[data-tools]').getBoundingClientRect().top < cards[0].getBoundingClientRect().bottom;
+    const after = shown(cards[1]) && !shown(cards[0]) && !shown(cards[2]) && !covers && gaps().length === 2 && gaps()[0] === cards[1].previousElementSibling && gaps()[1] === cards[1].nextElementSibling;
+    e.destroy(); el.remove();
+    return before && after;
+  })()`), 'option quiet : blocs sans cadre ; outils et « Insérer » (dessus, dessous) seulement autour du bloc actif, sans couvrir le bloc du dessus');
 
   // H1 et texte en grand
   await ev(`document.querySelector('[data-insert="end"]').click()`);
@@ -889,6 +933,22 @@ try {
   ok(tOpen && tNext && tSource, `bloc en plein écran (tactile) : le clavier ne s’ouvre pas à l’ouverture, au bloc suivant ni en source (${[tOpen, tNext, tSource]})`);
   await ev(`document.querySelector('[data-block-full] [data-block-full-close]').click()`);
   await sleep(100);
+  // Ajout d'un bloc au toucher : 1/ le bloc est ajouté, 2/ il est visible, 3/ on le touche pour taper. Le clavier ne s'ouvre pas d'office.
+  await ev(`document.activeElement?.blur(); document.querySelector('[data-insert="end"]').click()`);
+  await ev(`document.querySelector('[data-sheet="add"] [data-pick="text"]').click()`);
+  await sleep(300);
+  const added = await ev(`(() => { const c = [...document.querySelectorAll('[data-bq] [data-id]')].at(-1); const r = c.getBoundingClientRect();
+    return { field: document.activeElement.matches('input, textarea, [contenteditable="true"]'), inCard: c.contains(document.activeElement), top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight }; })()`);
+  ok(!added.field && added.inCard && added.top >= 0 && added.bottom <= added.h, `ajout d’un bloc (tactile) : bloc visible, focus sur le bloc, pas dans un champ, le clavier ne s’ouvre pas (${JSON.stringify(added)})`);
+  // Clavier ouvert (écran visible plus bas) : le point de saisie remonte au-dessus du clavier.
+  await viewport(375, 900);
+  const lastRich = `[...document.querySelectorAll('[data-bq] [data-id] [data-rich]')].at(-1)`;
+  await ev(`(() => { const f = ${lastRich}; f.scrollIntoView({ block: 'end' }); scrollBy(0, 200); f.focus({ preventScroll: true }); })()`);
+  await viewport(375, 400);
+  await sleep(300);
+  const kb = await ev(`(() => { const r = ${lastRich}.getBoundingClientRect(); const vv = visualViewport; return { top: Math.round(r.top), bottom: Math.round(r.top + 24), visible: Math.round(vv.offsetTop + vv.height) }; })()`);
+  ok(kb.top >= 0 && kb.bottom <= kb.visible, `clavier ouvert : le champ actif reste visible au-dessus du clavier (${JSON.stringify(kb)})`);
+  await viewport(375);
   await send('Emulation.setTouchEmulationEnabled', { enabled: false });
   await viewport(1280);
   await ev(`[...document.querySelectorAll('[data-bq] [data-id]')].find((c) => c.querySelector('[data-convert]')?.value === 'tip').querySelector('[data-callout-icon]').click()`);
@@ -904,18 +964,6 @@ try {
   ok(true, 'icône d’encadré : enregistrée dans document.md');
   await open();
   ok(await ev(`[...document.querySelectorAll('[data-callout-icon]')].some((b) => b.textContent === '🔑')`), 'icône d’encadré : revient à l’ouverture');
-  ok(await ev(`(async () => {
-    const el = document.createElement('div'); document.body.append(el);
-    const e = Blockquilt.mount(el, { source: '---\\ntitle: Doc\\n---\\n\\nTexte', title: true });
-    el.querySelector('[data-doc-icon]').click();
-    await new Promise((r) => setTimeout(r, 100));
-    const sheet = el.querySelector('[data-sheet="icon"]');
-    const recents = [...sheet.querySelectorAll('[data-emoji-grid] button')].map((b) => b.dataset.iconPick);
-    sheet.querySelector('[data-icon-pick="🔑"]').click();
-    const ok = recents[0] === '🔑' && el.querySelector('[data-doc-icon]').textContent === '🔑' && e.getMarkdown().startsWith('---\\ntitle: Doc\\nicon: 🔑\\n---');
-    e.destroy(); el.remove();
-    return ok;
-  })()`), 'icône du document (option title) : choisie dans « Récents » (localStorage), écrite dans le frontmatter');
   ok(await ev(`(async () => {
     const f = document.querySelector('[data-bq] [data-rich]'); f.focus();
     getSelection().selectAllChildren(f); getSelection().collapseToEnd();
@@ -1025,6 +1073,46 @@ try {
   })()`);
   ok(fold.view === 'collapsed' && fold.list && fold.count === '3 photos' && fold.body <= 48 && fold.pressed === 'true', `carrousel replié : une seule ligne, « 3 photos » (${JSON.stringify(fold)})`);
   ok(fold.kept && fold.back, 'carrousel replié : gardé d’un dessin à l’autre et après Ctrl+Z, se déplie au même bouton');
+  // Option quiet : un bloc sans champ (carrousel replié) devient actif au clic, et ses outils (bouton Déplier) apparaissent.
+  const quietCar = await ev(`(() => {
+    scrollTo(0, 0);
+    const el = document.createElement('div'); el.id = 'quiet-car'; document.body.prepend(el);
+    window.quietEd = Blockquilt.mount(el, { source: 'Texte.\\n\\n:::carousel\\n![A](media/a.jpg)\\n![B](media/b.jpg)\\n:::', quiet: true, storageKey: 'quiet-car' });
+    const car = () => el.querySelectorAll('[data-id]')[1];
+    car().querySelector('[data-car-alt]').focus();
+    car().querySelector('[data-toggle-view]').click();
+    document.activeElement?.blur();
+    const r = car().querySelector('.bq-view-collapsed [data-car-count]').getBoundingClientRect();
+    return { view: car().dataset.view, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  })()`);
+  await mouse('mousePressed', quietCar.x, quietCar.y);
+  await mouse('mouseReleased', quietCar.x, quietCar.y, 0);
+  const unfold = await ev(`(() => { const b = document.querySelectorAll('#quiet-car [data-id]')[1].querySelector('[data-toggle-view]'); const r = b.getBoundingClientRect(); return { shown: getComputedStyle(b).visibility === 'visible', x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+  if (unfold.shown) { await mouse('mousePressed', unfold.x, unfold.y); await mouse('mouseReleased', unfold.x, unfold.y, 0); }
+  ok(quietCar.view === 'collapsed' && unfold.shown && await ev(`(() => { const ok = document.querySelectorAll('#quiet-car [data-id]')[1].dataset.view !== 'collapsed'; quietEd.destroy(); document.getElementById('quiet-car').remove(); return ok; })()`),
+    `option quiet : un carrousel replié devient actif au clic et se déplie (${JSON.stringify({ view: quietCar.view, shown: unfold.shown })})`);
+  // Option quiet : « Insérer » autour du bloc actif (au début de la page aussi), au vrai clic (le focus quitte le bloc pendant le clic).
+  const quietIns = async (n) => {
+    const p = await ev(`(() => {
+      scrollTo(0, 0);
+      const el = document.getElementById('quiet-ins');
+      el.querySelectorAll('[data-id]')[${n}].querySelector('.bq-edit').focus();
+      const b = el.querySelector('[data-insert="${n}"]');
+      if (!b?.offsetParent) return null;
+      const r = b.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    })()`);
+    if (!p) return false;
+    await mouse('mousePressed', p.x, p.y);
+    await mouse('mouseReleased', p.x, p.y, 0);
+    return ev(`(() => { const s = document.querySelector('#quiet-ins [data-sheet="add"]'); const open = s.open; if (open) s.querySelector('[data-pick="text"]').click(); return open; })()`);
+  };
+  await ev(`(() => { const el = document.createElement('div'); el.id = 'quiet-ins'; document.body.prepend(el); window.quietInsEd = Blockquilt.mount(el, { source: 'Un.\\n\\nDeux.', quiet: true, storageKey: 'quiet-ins' }); })()`);
+  const between = await quietIns(1);
+  const atTop = await quietIns(0);
+  const top3 = await ev(`(() => { const t = [...document.querySelectorAll('#quiet-ins [data-id]')].map((c) => c.querySelector('.bq-edit').textContent.trim()); quietInsEd.destroy(); document.getElementById('quiet-ins').remove(); return t; })()`);
+  ok(between && atTop && top3.length === 4 && top3[0] === '' && top3[1] === 'Un.' && top3[3] === 'Deux.',
+    `option quiet : « Insérer » entre deux blocs et au début de la page, au vrai clic (${JSON.stringify({ between, atTop, top3 })})`);
   // F1 : un carrousel replié le reste quand on le déplace (flèche de la colonne, ou clavier sur la poignée)
   const moved = await ev(`(async () => {
     const car = () => document.querySelector('[data-car-count]')?.closest('[data-id]');
@@ -1995,14 +2083,17 @@ try {
   const fitsPage = () => ev(`document.documentElement.scrollWidth <= innerWidth`);
   for (const width of [375, 1280]) {
     await viewport(width);
-    // Mini blog : liste, édition (saveUrl, title: true), page publique rendue par le serveur.
+    // Mini blog : liste, édition (saveUrl, champ Titre de la page), page publique rendue par le serveur.
     await go(BASE + '/demo/blog', `document.querySelectorAll('[data-articles] li').length >= 2`, 'liste du blog');
-    ok(await fitsPage() && await ev(`document.querySelector('[data-articles]').textContent.includes('Bienvenue sur le mini blog')`), `${width} px, /demo/blog : la liste des articles, sans défilement horizontal`);
+    ok(await fitsPage() && await ev(`document.querySelector('[data-articles]').textContent.includes('Bienvenue')`), `${width} px, /demo/blog : la liste des articles, sans défilement horizontal`);
     await ev(`document.querySelector('a[href="#edit=bienvenue"]').click()`);
-    await waitFor(() => ev(`!!document.querySelector('[data-editor] [data-id]') && document.querySelector('[data-editor] [data-title]').textContent === 'Bienvenue sur le mini blog'`), 'éditeur du blog');
+    await waitFor(() => ev(`!!document.querySelector('[data-editor] [data-id]') && document.querySelector('[data-name]').value.startsWith('Bienvenue')`), 'éditeur du blog');
+    ok(await ev(`!document.querySelector('[data-title], [data-doc-icon]') && document.querySelector('label:has([data-name])').textContent.includes('Titre')`), `${width} px, /demo/blog : le titre est un champ du formulaire, pas un nom dans la barre`);
+    await ev(`(() => { const i = document.querySelector('[data-name]'); i.value = 'Bienvenue (${width})'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     await typeIn('[data-editor] [data-rich]', ` Modifié ${width}.`);
     await ev(`document.querySelector('[data-editor] [data-save]').click()`);
     await waitFor(async () => (record('blog', 'bienvenue').markdown || '').includes(`Modifié ${width}.`), 'article enregistré');
+    ok((record('blog', 'bienvenue').markdown || '').startsWith(`---\ntitle: Bienvenue (${width})\n`), `${width} px, /demo/blog : le champ Titre est enregistré dans le frontmatter`);
     ok(await fitsPage(), `${width} px, /demo/blog : édition et enregistrement d’un article (saveUrl)`);
     await go(BASE + '/demo/blog/bienvenue', `!!document.querySelector('article h1')`, 'article publié');
     ok(await ev(`document.querySelector('article h1').textContent.includes('Bienvenue') && document.querySelector('article').textContent.includes('Modifié ${width}.') && !document.querySelector('[data-bq]')`), `${width} px, /demo/blog/bienvenue : l’article rendu par le serveur, sans éditeur`);
@@ -2020,6 +2111,7 @@ try {
     await ev(`document.querySelector('[data-open="recette-pain"]').click()`);
     await waitFor(() => ev(`document.querySelector('[data-note]').textContent.includes('farine')`), 'autre note');
     ok(await ev(`document.querySelectorAll('[data-bq]').length === 2 && document.querySelector('[data-journal]').textContent.includes('Journal ${width}.')`), `${width} px, /demo/notes : changer de note sans recharger, le journal garde sa frappe`);
+    ok(await ev(`document.querySelector('[data-note-title]').value === 'Recette du pain' && !document.querySelector('[data-title], [data-doc-icon]')`), `${width} px, /demo/notes : le titre de la note est un champ du formulaire`);
     await ev(`(() => { const s = document.querySelector('[data-search]'); s.value = 'farine'; s.dispatchEvent(new Event('input', { bubbles: true })); })()`);
     await waitFor(() => ev(`document.querySelectorAll('[data-notes] [data-open]').length === 1`), 'recherche');
     ok(await ev(`document.querySelector('[data-notes] [data-open]').textContent.trim() === 'Recette du pain'`), `${width} px, /demo/notes : la recherche cherche dans le texte`);
@@ -2038,7 +2130,7 @@ try {
 
     // Admin SaaS : champs + deux éditeurs (save: false), un seul Enregistrer pour la fiche.
     const status = width < 640 ? 'archived' : 'published';
-    await go(BASE + '/demo/admin', `!!document.querySelector('[data-summary] [data-id]') && !!document.querySelector('[data-page] [data-id]') && document.querySelector('[name=name]').value !== ''`, 'fiche produit');
+    await go(BASE + '/demo/admin', `!!document.querySelector('[data-summary] [data-id]') && !!document.querySelector('[data-page] [data-id]') && document.querySelector('[name=name]').value !== '' && !!document.querySelector('[data-products] [aria-current="true"]')`, 'fiche produit'); // la liste arrive après la fiche
     const productId = await ev(`document.querySelector('[data-products] [aria-current="true"]').dataset.open`);
     ok(await fitsPage() && await ev(`[...document.querySelectorAll('[data-save], [data-full-save]')].every((b) => b.offsetParent === null) && document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : pas de bouton Enregistrer dans les éditeurs, celui de la fiche est inactif`);
     ok(await ev(`document.querySelectorAll('[data-cover] [data-canvas] [data-id], [data-summary] [data-canvas] [data-id]').length === 2 && document.querySelector('[data-cover] [data-canvas] [data-id]').getAttribute('aria-label') === Blocks.types.photo.label
@@ -2059,6 +2151,25 @@ try {
     ok(onlyEditor && await ev(`document.querySelector('[data-save-form]').disabled`), `${width} px, /demo/admin : un éditeur seul modifié (onDirty) → Enregistrer actif ; Ctrl+S enregistre la fiche`);
     await go(BASE + '/demo/admin', `!!document.querySelector('[data-page] [data-id]') && document.querySelector('[name=name]').value !== ''`, 'fiche relue');
     ok(await ev(`document.querySelector('[name=status]').value === '${status}' && document.querySelector('[data-page]').textContent.includes('Admin ${width}.')`), `${width} px, /demo/admin : après rechargement, la fiche est relue`);
+
+    // Écriture épurée : titre et sous-titre dans la page, éditeur quiet, un bouton Publier.
+    await go(BASE + '/demo/story', `!!document.querySelector('[data-editor] [data-id]') && document.querySelector('[data-story-title]').value !== ''`, 'récit');
+    ok(await fitsPage() && await ev(`document.querySelector('[data-editor] [data-bq]').classList.contains('bq-quiet') && document.querySelector('[data-publish]').disabled && [...document.querySelectorAll('[data-editor] [data-save]')].every((b) => !b.offsetParent)`),
+      `${width} px, /demo/story : éditeur épuré, sans bouton Enregistrer ; Publier inactif sans modification`);
+    await ev(`(() => {
+      const set = (s, v) => { const i = document.querySelector(s); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); };
+      set('[data-story-title]', 'Écrire sans cadre (${width})');
+      set('[data-story-subtitle]', 'Sous-titre ${width}');
+    })()`);
+    await typeIn('[data-editor] [data-rich]', ` Récit ${width}.`);
+    ok(await ev(`!document.querySelector('[data-publish]').disabled`), `${width} px, /demo/story : une modification active Publier`);
+    await ev(`document.querySelector('[data-publish]').click()`);
+    await waitFor(async () => (record('story', 'ecrire-sans-cadre').markdown || '').includes(`Récit ${width}.`), 'récit publié');
+    await waitFor(() => ev(`document.querySelector('[data-publish]').disabled`), 'réponse de la publication');
+    ok(record('story', 'ecrire-sans-cadre').markdown.startsWith(`---\ntitle: Écrire sans cadre (${width})\ndescription: Sous-titre ${width}\n---`), `${width} px, /demo/story : titre et sous-titre publiés dans le frontmatter`);
+    await go(BASE + '/demo/story/ecrire-sans-cadre', `!!document.querySelector('article h1')`, 'récit lu');
+    ok(await fitsPage() && await ev(`document.querySelector('article h1').textContent === 'Écrire sans cadre (${width})' && document.querySelector('[data-subtitle]').textContent === 'Sous-titre ${width}' && document.querySelector('article').textContent.includes('Récit ${width}.')`),
+      `${width} px, /demo/story/ecrire-sans-cadre : la page de lecture (titre, sous-titre, texte)`);
   }
 
   ws.close();

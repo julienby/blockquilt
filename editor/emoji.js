@@ -1,4 +1,4 @@
-// Sélecteur d'emoji : un seul sélecteur pour l'icône du document (null), l'icône d'un encadré (id du bloc)
+// Sélecteur d'emoji : un seul sélecteur pour l'icône d'un encadré (id du bloc)
 // et l'insertion dans le texte ({ field, range }). Bibliothèque emoji.json chargée au premier usage, « récents » en localStorage.
 import { shared, esc, attr } from './shared.js';
 
@@ -26,7 +26,6 @@ export function installEmoji(ed) {
   let tab = 0;
 
   const setIcon = (value) => {
-    if (target === null) { ed.checkpoint(); ed.icon = value; ed.showIcon(); ed.setDirty(true); ed.checkpoint(); return; }
     if (typeof target === 'object') {
       const { field, range } = target;
       if (!value) return;
@@ -42,7 +41,7 @@ export function installEmoji(ed) {
   };
   ed.openIcon = (t) => {
     target = t;
-    sheet.querySelector('h2').textContent = t === null ? 'Icône du document' : typeof t === 'object' ? 'Insérer un emoji' : 'Icône de l’encadré';
+    sheet.querySelector('h2').textContent = typeof t === 'object' ? 'Insérer un emoji' : 'Icône de l’encadré';
     $('[data-emoji-none]', sheet).hidden = typeof t === 'object';
     search.value = '';
     // Écran tactile : aucun champ ne garde le focus, le clavier se ferme et ne recouvre pas le sélecteur (la recherche reste à un toucher).

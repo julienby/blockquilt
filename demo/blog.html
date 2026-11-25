@@ -11,7 +11,7 @@
 </head>
 <body>
   <!-- Exemple 1 : un mini blog. Liste des articles, page publique rendue par le serveur (/demo/blog/{id}), éditeur pour écrire.
-       Intégration la plus simple : saveUrl (le serveur reçoit le Markdown), title: true (titre et icône dans le frontmatter). -->
+       Intégration la plus simple : saveUrl (le serveur reçoit le Markdown). Le titre est un champ du formulaire, écrit dans le frontmatter (getMeta, setMeta). -->
   <main class="page">
     <section data-list>
       <div class="top"><h1>Mini blog</h1><button type="button" class="btn primary" data-new>Nouvel article</button></div>
@@ -19,6 +19,7 @@
     </section>
     <section data-edit hidden>
       <div class="top"><button type="button" class="btn" data-back>← Articles</button><a data-read href="#">Lire l’article</a></div>
+      <div class="fields"><label>Titre <input data-name autocomplete="off"></label></div>
       <div data-editor></div>
     </section>
   </main>

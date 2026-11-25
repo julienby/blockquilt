@@ -65,7 +65,7 @@ Blocks.editable = editable;
     read: (card, b) => { card.querySelectorAll('[data-car-item]').forEach((el) => { b.items[Number(el.dataset.carItem)].alt = el.querySelector('[data-car-alt]').value; }); },
   });
   // Carte : la photo (ajouter, retirer), son texte alternatif, le titre, le texte, le bouton (texte et lien).
-  const field = 'h-11 min-w-0 rounded-xl border border-stone-200 bg-white/80 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
+  const field = 'h-11 min-w-0 rounded-xl border border-current/20 bg-transparent px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'; // couleurs du bloc : lisible en mode sombre
   Object.assign(Blocks.types.card, {
     edit: (b, ui) => `<div class="grid gap-2">${b.src ? `${shownPhoto(b, ui, 'max-h-48', 'Retirer la photo de la carte')}
         <input data-card-alt value="${attr(b.alt)}" placeholder="Description de la photo (lue aux personnes malvoyantes)…" aria-label="Description de la photo" class="${field} italic">`

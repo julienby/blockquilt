@@ -13,12 +13,10 @@ const sheet = (name, label, inner) => `<dialog data-sheet="${name}" aria-label="
 export const item = (data, icon, label, cls = '') => `<button type="button" ${data} class="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-medium hover:bg-stone-100 active:bg-stone-200 ${cls}">${ic(icon)}<span class="min-w-0 flex-1 truncate">${label}</span></button>`;
 
 const pressedCls = 'aria-pressed:bg-brand-50 aria-pressed:text-brand-800';
-export const template = (o) => `<div data-bq class="bq-app flex min-h-full w-full flex-col"${o.width ? ` style="--bq-width: ${attr(o.width)}"` : ''}>
+export const template = (o) => `<div data-bq class="bq-app${o.quiet ? ' bq-quiet' : ''} flex min-h-full w-full flex-col"${o.width ? ` style="--bq-width: ${attr(o.width)}"` : ''}>
   <header data-head class="bq-head sticky z-20 flex min-h-14 items-center gap-0.5 border-b px-1.5 pt-[env(safe-area-inset-top)] backdrop-blur-md sm:px-3">
     ${o.backUrl ? `<a href="${attr(o.backUrl)}" data-back aria-label="Retour" class="bq-btn bq-muted">${ic('chevron_left')}</a>` : ''}
-    ${o.title ? `<button type="button" data-doc-icon aria-label="Icône du document" class="bq-btn text-xl"></button>
-    <div data-title contenteditable="true" role="textbox" aria-label="Titre du document" data-placeholder="Sans titre" spellcheck="false" class="bq-edit min-w-0 flex-1 truncate px-1 text-base font-extrabold leading-snug text-stone-900 sm:text-lg"></div>`
-      : '<span class="flex-1"></span>'}
+    <span class="flex-1"></span>
     <button type="button" data-undo disabled aria-label="Annuler" title="Annuler (Ctrl+Z)" class="bq-btn bq-muted">${ic('undo')}</button>
     <button type="button" data-redo disabled aria-label="Rétablir" title="Rétablir (Ctrl+Y)" class="bq-btn bq-muted hidden sm:inline-flex">${ic('redo')}</button>
     ${o.single ? '' : `<button type="button" data-source-mode aria-pressed="false" aria-label="Texte source (Markdown)" title="Texte source (Markdown)" class="bq-btn bq-muted aria-pressed:bg-brand-600 aria-pressed:text-white">${ic('code')}</button>

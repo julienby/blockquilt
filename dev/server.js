@@ -143,7 +143,7 @@ const ai = createAi({
   },
 });
 
-// Exemples d'intégration (/demo/blog, /demo/notes, /demo/admin) : leurs pages et leurs fiches JSON.
+// Exemples d'intégration (/demo/blog, /demo/notes, /demo/admin, /demo/story) : leurs pages et leurs fiches JSON.
 const demos = require('./demos.js')(DATA, { send, json, read, form });
 
 const routes = {

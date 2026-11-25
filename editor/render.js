@@ -72,9 +72,10 @@ export function installRender(ed) {
       <svg width="28" height="16" viewBox="0 0 28 16" stroke="currentColor" stroke-width="1.5" aria-hidden="true">${cells}</svg></span>`;
   };
   // Option `single` (un champ) : la carte n'a que son contenu, sans ligne d'outils ni colonne de déplacement.
+  // Option `quiet` : la carte reçoit le focus (tabindex -1) ; un clic sur un bloc sans champ (carrousel replié, ligne) le rend actif et montre ses outils.
   const card = (b, i) => {
     const hidden = b.type === 'carousel' ? 0 : ed.hiddenLines(b);
-    const tools = `<div class="flex h-11 items-center">${badge(b)}${colGrid(b)}${ed.tools(b)}<span class="flex-1"></span>
+    const tools = `<div data-tools class="flex h-11 items-center">${badge(b)}${colGrid(b)}${ed.tools(b)}<span class="flex-1"></span>
           ${round('data-menu aria-haspopup="dialog"', 'more', 'Actions du bloc')}
           ${ed.def(b).fullscreen === false ? '' : round('data-expand', 'maximize', 'Plein écran')}
           ${round('data-delete', 'trash', 'Supprimer ce bloc', 'text-red-600')}</div>`;
@@ -82,12 +83,16 @@ export function installRender(ed) {
         <button type="button" data-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="Monter ce bloc" class="bq-rail">${ic('chevron_up', 'size-4')}</button>
         <button type="button" data-grip aria-label="Déplacer (glisser, ou flèches haut et bas)" class="bq-rail cursor-grab touch-none text-stone-400 active:cursor-grabbing">${ic('grip', 'size-4')}</button>
         <button type="button" data-move="1" ${i === ed.blocks.length - 1 ? 'disabled' : ''} aria-label="Descendre ce bloc" class="bq-rail">${ic('chevron_down', 'size-4')}</button></div>`;
-    return `<article data-id="${b.id}" data-view="${ed.viewOf(b)}" aria-label="${attr(ed.def(b).label)}" class="bq-card flex border ${ed.def(b).tone.card}">
+    return `<article data-id="${b.id}"${o.quiet ? ' tabindex="-1"' : ''} data-view="${ed.viewOf(b)}" aria-label="${attr(ed.def(b).label)}" class="bq-card flex border ${ed.def(b).tone.card}">
       <div class="flex min-w-0 flex-1 flex-col pb-3 pl-3 pr-1 ${o.single ? 'pt-3' : ''}">
         ${o.single ? '' : tools}
         <div data-card-body ${hidden ? `data-fold="collapsed" style="--bq-fold:${ed.foldLimit}"` : ''} class="flex flex-1 flex-col justify-center">${ed.editorOf(b).edit(b, ed.ui)}</div>${hidden ? foldFooter(hidden) : ''}</div>
       ${o.single ? '' : rail}</article>`;
   };
+
+  // Bloc actif (classe bq-active) : le dernier bloc où le focus est entré. Il le reste quand le focus part sur « Insérer », une feuille ou la barre.
+  // L'option `quiet` montre ses outils et ses « Insérer » ; :focus-within ne suffit pas (le focus quitte le bloc pendant le clic sur « Insérer »).
+  ed.markActive = () => canvas.querySelectorAll('[data-id]').forEach((c) => c.classList.toggle('bq-active', c.dataset.id === ed.activeId));
 
   // Un champ vidé par le navigateur garde parfois un <br> : on le vide pour que le texte d'aide réapparaisse.
   ed.clean = (el) => { if (el.innerHTML !== '' && el.textContent === '' && !el.querySelector('img, ul, ol, li')) el.innerHTML = ''; };
@@ -103,6 +108,7 @@ export function installRender(ed) {
       ? `<div class="bq-column relative space-y-2">${ed.blocks.map(card).join('')}</div>`
       : `<div class="bq-column relative">${ed.blocks.map((b, i) => gap(i) + card(b, i)).join('')}${addEnd}</div>`;
     canvas.querySelectorAll('.bq-edit').forEach(ed.clean);
+    ed.markActive();
   };
   let previewSeq = 0; // seule la dernière demande d'aperçu s'affiche
   const renderPreview = async () => {
@@ -125,10 +131,11 @@ export function installRender(ed) {
       if (ed.mode === 'preview' && seq === previewSeq) canvas.innerHTML = '<p role="alert" class="rounded-xl bg-red-100 p-3 text-red-800">Aperçu indisponible. Réessayez.</p>';
     }
   };
-  // Visuel à côté : le même choix en vue blocs et en vue source. 2 panneaux dès 1024 px par défaut. Jamais dans un champ (`single`).
+  // Visuel à côté : le même choix en vue blocs et en vue source. 2 panneaux dès 1024 px par défaut, sauf en écriture épurée (`quiet`). Jamais dans un champ (`single`).
   const splitKey = 'blockquilt.split';
   const wide = matchMedia('(min-width: 1024px)').matches;
-  try { const saved = localStorage.getItem(splitKey); ed.sideBySide = saved === null ? wide : saved === 'true'; } catch { ed.sideBySide = wide; }
+  const byDefault = wide && !o.quiet;
+  try { const saved = localStorage.getItem(splitKey); ed.sideBySide = saved === null ? byDefault : saved === 'true'; } catch { ed.sideBySide = byDefault; }
   if (o.single) ed.sideBySide = false;
   ed.showSplit = () => ed.app.querySelector('[data-visual-toggle]')?.setAttribute('aria-pressed', String(ed.sideBySide));
   ed.showSplit();
@@ -176,11 +183,14 @@ export function installRender(ed) {
     if (ed.sideBySide) addVisual();
   };
 
+  // Au toucher, le clavier ne s'ouvre pas d'office : le champ prend le focus seulement si un champ l'avait déjà (scinder un bloc).
+  // Sinon le bouton du menu du bloc prend le focus, et l'on touche le texte pour taper.
   ed.focusCard = (id) => {
     const el = canvas.querySelector(`[data-id="${id}"]`);
     if (!el) return;
-    el.scrollIntoView({ block: 'nearest' });
-    const field = el.querySelector('[contenteditable], input, textarea');
+    const typing = document.activeElement?.matches('input, textarea, [contenteditable="true"]');
+    const field = (typing || !matchMedia('(pointer: coarse)').matches) && el.querySelector('[contenteditable], input, textarea');
     if (field) field.focus({ preventScroll: true }); else el.querySelector('[data-menu]')?.focus({ preventScroll: true });
+    el.scrollIntoView({ block: 'nearest' });
   };
 }

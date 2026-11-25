@@ -1,5 +1,5 @@
 // Captures d'écran de la démo (outil de développement) : node dev/shot.mjs <sortie> [largeur] [script JS à exécuter avant]
-// SHOT_PATH=app?login=demo-user1 : une autre page que la démo.
+// SHOT_PATH=app?login=demo-user1 : une autre page que la démo. SHOT_DARK=1 : mode sombre.
 // docker compose run --rm -v /tmp/bq:/shots check node dev/shot.mjs /shots/a.png 375
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -23,6 +23,7 @@ try {
   const send = (method, params = {}) => new Promise((r) => { const id = ++n; pending[id] = r; ws.send(JSON.stringify({ id, method, params })); });
   await send('Emulation.setDeviceMetricsOverride', { width: Number(width), height: Number(width) < 640 ? 800 : 900, deviceScaleFactor: 1, mobile: Number(width) < 640 });
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  if (process.env.SHOT_DARK) await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] }); // SHOT_DARK=1 : mode sombre
   await send('Page.enable');
   await send('Page.navigate', { url: 'http://127.0.0.1:8098/' + (process.env.SHOT_PATH || '') });
   await sleep(1200);

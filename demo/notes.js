@@ -16,7 +16,7 @@ const read = async (id, fallback) => {
 // Options communes : chaque note s'enregistre à sa propre adresse et garde son propre brouillon.
 const options = (id, source) => ({
   source,
-  title: true,
+  onMeta: (meta) => { $('[data-note-title]').value = meta.title || ''; }, // le champ Titre suit le frontmatter (chargement, Ctrl+Z, vue source)
   saveUrl: `api/notes/${id}`,
   storageKey: `notes-${id}`,
   uploadUrl: '../api/upload',
@@ -43,8 +43,9 @@ const openNote = async (id, fallback = '---\ntitle: Note sans titre\n---\n\n') =
 $('[data-notes]').addEventListener('click', (e) => { const b = e.target.closest('[data-open]'); if (b) openNote(b.dataset.open); });
 $('[data-new]').addEventListener('click', () => openNote(`note-${Date.now().toString(36)}`, '---\ntitle: Nouvelle note\n---\n\n'));
 $('[data-search]').addEventListener('input', showList);
+$('[data-note-title]').addEventListener('input', (e) => note?.setMeta({ ...note.getMeta(), title: e.target.value.trim() }));
 
 $('[data-journal-label]').textContent = `Journal du ${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
-mount($('[data-journal]'), { ...options(journalId, await read(journalId, `---\ntitle: Journal du ${today}\n---\n\n`)), title: false });
+mount($('[data-journal]'), { ...options(journalId, await read(journalId, `---\ntitle: Journal du ${today}\n---\n\n`)), onMeta: null });
 const first = (await (await fetch('api/notes')).json()).find((n) => !n.id.startsWith('journal-'));
 openNote(first ? first.id : `note-${Date.now().toString(36)}`);

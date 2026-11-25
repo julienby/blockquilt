@@ -3,7 +3,7 @@
 let last = null; // dernier éditeur de la page touché ou focalisé : il reçoit Ctrl+S / Z / Y quand aucun champ n'a le focus
 
 export function installEvents(ed) {
-  const { o, app, canvas, sheets, titleEl, blockFull } = ed;
+  const { o, app, canvas, sheets, blockFull } = ed;
   const inSheet = (t) => !!t.closest?.('[data-sheet]');
 
   ed.on(app, 'click', (e) => {
@@ -56,7 +56,6 @@ export function installEvents(ed) {
     if (hit('[data-source-mode]')) return ed.setMode('source');
     if (hit('[data-visual-toggle]')) return ed.toggleSplit();
     if (hit('[data-source-line]')) return ed.goToLine(Number(hit('[data-source-line]').dataset.sourceLine));
-    if (hit('[data-doc-icon]')) return ed.editing() ? ed.openIcon(null) : null;
     if (hit('[data-back]') && ed.dirty) { e.preventDefault(); return ed.openSheet('leave'); }
   });
   ed.on(sheets.more, 'click', (e) => {
@@ -91,9 +90,8 @@ export function installEvents(ed) {
     ed.editorOf(b).read(c, b);
     ed.refreshFold(c, b);
   });
-  ed.on(app, 'focusin', (e) => { const c = e.target.closest?.('[data-id]'); if (c) ed.activeId = c.dataset.id; });
+  ed.on(app, 'focusin', (e) => { const c = e.target.closest?.('[data-id]'); if (c) { ed.activeId = c.dataset.id; ed.markActive(); } });
   ed.on(app, 'focusout', (e) => { if (e.target.classList?.contains('bq-edit')) ed.clean(e.target); });
-  ed.on(titleEl, 'keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); titleEl.blur(); } });
   // Coller une page web (plusieurs blocs, ou un titre, une photo, une liste…) : des blocs sous le bloc en cours ; un bloc vide est remplacé.
   // Sinon, dans un champ : texte simple seulement (pas de styles venus d'ailleurs). Les autres champs (titre, légende, code) collent seuls.
   // En plein écran d'un bloc, tout reste dans le champ en texte simple : jamais de bloc créé hors de la vue.

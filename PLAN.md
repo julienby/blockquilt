@@ -356,7 +356,28 @@ Besoin : contenus semi-structurés (blog : titre, couverture, résumé, contenu 
 3. `/demo/admin` : description courte en `single: true`, page produit avec `blocks` restreint, image de couverture (`blocks: ['photo'], single: true`).
 4. README (options), CHANGELOG 0.2.0, DECISIONS.
 
-Avancement : 1 à 4 faits le 2026-11-24. En plus (vu sur capture) : en-tête réduit en mode champ (validé), « Ajouter une photo » / « Retirer la photo » sur le bloc photo, pas de grande marge sous un champ. Pas de tag 0.2.0 posé.
+5. Option `title` retirée (nom dans la barre) ; `getMeta` / `setMeta` / `onMeta` ; champ Titre dans `/demo/blog` et `/demo/notes`.
+
+Avancement : 1 à 5 faits le 2026-11-24. En plus (vu sur capture) : en-tête réduit en mode champ (validé), « Ajouter une photo » / « Retirer la photo » sur le bloc photo, pas de grande marge sous un champ. Pas de tag 0.2.0 posé.
+
+## 4r. Écriture épurée : option `quiet` et démo /demo/story (proposé le 2026-11-25, à valider)
+
+Besoin : écrire un article comme sur une plateforme de publication en ligne, sans cadre autour des blocs. La démo est originale : ni le nom, ni le logo, ni l'apparence exacte d'un site existant.
+
+1. Option `quiet: true` de `mount` :
+   - Les blocs n'ont ni bordure ni fond. Le texte se lit comme une page.
+   - La ligne d'outils (type, menu, plein écran, supprimer) et la colonne de déplacement n'apparaissent que sur le bloc actif (focus). Sur un ordinateur, elles apparaissent aussi au survol.
+   - Les intervalles « Insérer / Fusionner » sont cachés, sauf sous le bloc actif.
+   - L'en-tête ne change pas. `single` et `blocks` restent compatibles.
+2. Démo `/demo/story` :
+   - Une colonne de lecture (environ 680 px). Champ Titre en grand et champ Sous-titre, sans cadre, dans la page (frontmatter `title`, `description`, par `getMeta` / `setMeta` / `onMeta`).
+   - L'éditeur en `quiet: true`, police à empattements pour le texte (CSS de la démo seulement).
+   - Bouton « Publier » (`save: false`, l'application enregistre et appelle `markSaved`) ; lien « Lire » vers `/demo/story/{id}`, rendu par le serveur.
+   - Données : collection `stories` dans `dev/demos.js`, un article d'exemple.
+3. Tests (375 et 1280 px) : bloc non actif sans bordure ni outils ; outils sur le bloc actif ; pas de défilement horizontal ; titre et sous-titre dans le frontmatter ; « Publier » enregistre ; la page de lecture a le `<h1>`.
+4. README (option, démo), CHANGELOG 0.2.0, DECISIONS.
+
+Avancement : 1 à 4 faits le 2026-11-25 (validé : nom `quiet`). Changé après capture : les outils ne flottent pas sur le bloc du dessus ; le bloc actif reçoit une marge haute ; pas d'outils au survol ; visuel à côté fermé par défaut. Publier = `save()` (pas de `markSaved`).
 
 ## 5. IA — fait (I1 à I6)
 
@@ -420,3 +441,5 @@ Hors périmètre : l'édition à plusieurs en temps réel (curseurs partagés).
 - Bloc HTML : un filtre maison ; garder la liste blanche courte, bloc désactivé par défaut (`html: true`).
 - Démo publique ouverte : jetons de démo publics, IA à la charge de la clé OpenRouter → limite de crédit sur la clé.
 - Modèles à réflexion : réglage `params` / `AI_REASONING` ; un autre modèle peut demander un autre réglage.
+
+- 2026-11-25 — Fait : ajout de bloc au toucher sans clavier d'office (focusCard), point de saisie gardé au-dessus du clavier (revealCaret), scroll-margin des blocs. Tests verts. Reste : essai sur un vrai téléphone.
