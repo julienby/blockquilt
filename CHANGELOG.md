@@ -4,6 +4,16 @@
 Pour chaque version : ce qui change, puis ce que l'application doit faire (souvent : rien).
 Règles des numéros : `CYCLE-DE-VIE.md`, R2. En `0.x`, le contrat peut encore changer.
 
+## 0.4.0 — 2026-11-26
+
+Ajout :
+- Option `visual: false` de `mount` : pas de « Visuel à côté » (en-tête, plein écran d'un bloc, menu ⋯), jamais deux colonnes.
+
+Correction :
+- Un clic dans l'éditeur n'est plus pris pour un bouton de la page : si un parent de l'éditeur portait `data-save`, `data-preview`, `data-id`…, tout clic dans l'éditeur valait Enregistrer ou Aperçu (Annuler, Aperçu, Plein écran semblaient ne plus marcher).
+
+À faire dans l'application : rien.
+
 ## 0.3.1 — 2026-11-25
 
 Correction :

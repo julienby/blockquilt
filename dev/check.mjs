@@ -287,6 +287,33 @@ try {
     return r;
   })()`);
   ok(scoped.root && scoped.head === 'flex' && scoped.outside === 'none' && !scoped.after, `CSS de l'éditeur limité à .bq-root : une règle de la page (.flex) ne change pas l'éditeur, et les classes de l'éditeur ne touchent pas la page ; destroy retire .bq-root (${JSON.stringify(scoped)})`);
+  const noVisual = await ev(`(() => {
+    try { localStorage.setItem('blockquilt.split', 'true'); } catch {}
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Un.\\n\\nDeux.', visual: false });
+    el.querySelector('[data-id] [data-expand]').click();
+    const r = { buttons: el.querySelectorAll('[data-visual-toggle], [data-full-visual], [data-full-act="visual"]').length, panes: !!el.querySelector('.bq-panes'), open: el.querySelector('[data-block-full]').open };
+    el.querySelector('[data-block-full]').close(); e.destroy(); el.remove();
+    try { localStorage.removeItem('blockquilt.split'); } catch {}
+    return r;
+  })()`);
+  ok(noVisual.buttons === 0 && !noVisual.panes && noVisual.open, `option visual: false : aucun bouton « Visuel à côté » (en-tête, plein écran, menu ⋯), jamais deux colonnes même si le choix gardé dit oui (${JSON.stringify(noVisual)})`);
+  const host = await ev(`(async () => {
+    // La page entoure l'éditeur d'un élément qui porte des attributs de blockquilt (cas réel : data-save, data-preview).
+    const wrap = document.createElement('div'); wrap.dataset.save = '/x'; wrap.dataset.preview = '/y'; wrap.dataset.id = 'page';
+    const el = document.createElement('div'); wrap.append(el); document.body.append(wrap);
+    let saved = 0;
+    const e = Blockquilt.mount(el, { source: 'Un.', onSave: () => { saved++; } });
+    const f = el.querySelector('[data-rich]'); f.focus(); document.execCommand('insertText', false, ' x'); // à enregistrer
+    await new Promise((r) => setTimeout(r, 200));
+    el.querySelector('[data-canvas]').click();
+    f.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const r = { preview: el.querySelector('[data-preview]').getAttribute('aria-pressed'), saved };
+    e.destroy(); wrap.remove();
+    return r;
+  })()`);
+  ok(host.preview === 'false' && host.saved === 0, `un parent de la page avec data-save / data-preview / data-id : un clic dans l'éditeur n'est ni Aperçu ni Enregistrer (${JSON.stringify(host)})`);
   ok(noSource.open && noSource.buttons === 0 && noSource.preview, `option sourceView: false : aucun bouton « Texte source » (en-tête, plein écran, menu ⋯), aperçu gardé ; un bloc s’ouvre en plein écran (${JSON.stringify(noSource)})`);
 
   // H1 et texte en grand

@@ -44,7 +44,8 @@ export function installSource(ed) {
     if (!o.single) { // un champ n'a ni source, ni aperçu, ni visuel
       $('[data-preview]').setAttribute('aria-pressed', String(ed.mode === 'preview'));
       $('[data-source-mode]')?.setAttribute('aria-pressed', String(ed.mode === 'source'));
-      $('[data-visual-toggle]').disabled = ed.mode === 'preview';
+      const visual = $('[data-visual-toggle]'); // absent avec visual: false
+      if (visual) visual.disabled = ed.mode === 'preview';
     }
     ed.render();
     if (ed.mode === 'source') ed.sourceArea()?.focus({ preventScroll: true });

@@ -136,7 +136,7 @@ export function installRender(ed) {
   const wide = matchMedia('(min-width: 1024px)').matches;
   const byDefault = wide && !o.quiet;
   try { const saved = localStorage.getItem(splitKey); ed.sideBySide = saved === null ? byDefault : saved === 'true'; } catch { ed.sideBySide = byDefault; }
-  if (o.single) ed.sideBySide = false;
+  if (o.single || o.visual === false) ed.sideBySide = false; // option visual: false : jamais, même si un choix est gardé
   ed.showSplit = () => ed.app.querySelector('[data-visual-toggle]')?.setAttribute('aria-pressed', String(ed.sideBySide));
   ed.showSplit();
   ed.toggleSplit = () => {

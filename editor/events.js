@@ -9,9 +9,10 @@ export function installEvents(ed) {
   ed.on(app, 'click', (e) => {
     const el = e.target;
     if (inSheet(el)) return;
-    const cardEl = el.closest('[data-id]');
+    // Seulement dans l'éditeur : un parent de la page peut porter le même attribut (data-save, data-preview, data-id…).
+    const hit = (sel) => { const h = el.closest(sel); return h && app.contains(h) ? h : null; };
+    const cardEl = hit('[data-id]');
     const id = cardEl?.dataset.id;
-    const hit = (sel) => el.closest(sel);
     if (hit('[data-insert]')) { const v = hit('[data-insert]').dataset.insert; return ed.openAdd(v === 'end' ? null : Number(v)); }
     if (hit('[data-merge]')) return ed.merge(Number(hit('[data-merge]').dataset.merge));
     if (hit('[data-menu]')) return ed.openMenu(id, hit('[data-menu]'));

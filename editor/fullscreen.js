@@ -116,8 +116,7 @@ export function installFullscreen(ed) {
       $(`[data-full-${k}]`, blockFull)?.setAttribute('aria-pressed', String(on)); // source absente avec sourceView: false
       $(`[data-full-act="${k}"]`, more)?.setAttribute('aria-pressed', String(on));
     }
-    $('[data-full-visual]', blockFull).disabled = mode === 'preview';
-    $('[data-full-act="visual"]', more).disabled = mode === 'preview';
+    for (const visual of [$('[data-full-visual]', blockFull), $('[data-full-act="visual"]', more)]) if (visual) visual.disabled = mode === 'preview'; // absents avec visual: false
     $('[data-full-prev]', blockFull).disabled = !neighbour(id, -1);
     $('[data-full-next]', blockFull).disabled = !neighbour(id, 1);
     for (const ai of [blockFull.querySelector('[data-full-ai]'), more.querySelector('[data-full-act="ai"]')]) if (ai) ai.hidden = !FIELD_AI.includes(b.type);
