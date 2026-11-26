@@ -80,7 +80,7 @@ Plein écran : l'éditeur entier (en-tête) ou un bloc seul (bouton sur la carte
 
 ### Apparence
 
-L'éditeur est neutre : il reprend la police de la page qui l'accueille. Il reste en thème clair (fond blanc, texte foncé), même sur une page en mode sombre. Ses lignes et ses fonds de carte sont tirés de la couleur du texte. Seuls les encadrés (info, astuce…), la vidéo, le code et le HTML gardent une teinte qui porte leur sens. Tout se règle par variables CSS, sur l'élément de l'éditeur ou n'importe quel parent :
+Le CSS de l'éditeur ne touche pas la page : ses classes ne valent que sous `.bq-root`, que `mount` pose sur l'élément reçu (une page qui a son propre Tailwind garde le sien). L'éditeur est neutre : il reprend la police de la page qui l'accueille. Il reste en thème clair (fond blanc, texte foncé), même sur une page en mode sombre. Ses lignes et ses fonds de carte sont tirés de la couleur du texte. Seuls les encadrés (info, astuce…), la vidéo, le code et le HTML gardent une teinte qui porte leur sens. Tout se règle par variables CSS, sur l'élément de l'éditeur ou n'importe quel parent :
 
 | Variable | Rôle | Par défaut |
 |---|---|---|

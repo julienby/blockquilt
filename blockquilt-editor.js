@@ -33,6 +33,7 @@ export function mount(element, options = {}) {
   const ac = new AbortController();
   const timers = new Set();
   element.innerHTML = template(o);
+  element.classList.add('bq-root'); // portée du CSS de l'éditeur (tailwind.config.js, important)
   const app = element.firstElementChild;
   const $ = (s, r = app) => r.querySelector(s);
 
@@ -97,6 +98,7 @@ export function mount(element, options = {}) {
       ed.dragEnd(false);
       [...Object.values(ed.sheets), ed.blockFull, ed.editorFull].forEach((d) => d.open && d.close());
       element.replaceChildren();
+      element.classList.remove('bq-root');
     },
   };
 }

@@ -1,4 +1,7 @@
 module.exports = {
+  // Les classes de l'éditeur ne valent que sous .bq-root (posée par mount sur l'élément reçu) : elles gagnent dans l'éditeur
+  // et ne touchent pas une page qui a son propre Tailwind (.hidden, sm:inline-flex… dans un autre ordre).
+  important: '.bq-root',
   content: ['./index.html', './blockquilt.js', './blockquilt-editor.js', './editor/*.js'],
   theme: {
     extend: {

@@ -4,6 +4,13 @@
 Pour chaque version : ce qui change, puis ce que l'application doit faire (souvent : rien).
 Règles des numéros : `CYCLE-DE-VIE.md`, R2. En `0.x`, le contrat peut encore changer.
 
+## 0.3.1 — 2026-11-25
+
+Correction :
+- Le CSS de l'éditeur (`blockquilt.css`, Tailwind) ne vaut plus que dans l'éditeur. `mount` pose la classe `bq-root` sur l'élément reçu ; `destroy` la retire. Avant, dans une page qui a son propre Tailwind, les deux feuilles se gênaient selon leur ordre (`.hidden` de l'une contre `md:block` de l'autre). Rendu de l'éditeur inchangé (styles calculés identiques sur la démo, 375 et 1280 px).
+
+À faire dans l'application : rien. Si elle comptait sur des classes de `blockquilt.css` pour sa propre page, les mettre dans sa feuille.
+
 ## 0.3.0 — 2026-11-25
 
 Ajout :

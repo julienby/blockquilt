@@ -6,11 +6,19 @@
   <title>blockquilt</title>
   <link rel="stylesheet" href="blockquilt.css">
   <link rel="stylesheet" href="blockquilt-content.css">
+  <!-- Apparence de la page de démo : sa propre feuille (les classes de blockquilt.css ne valent que dans l'éditeur).
+       L'éditeur reprend sa police et sa couleur de texte. -->
+  <style>
+    body { background: #f5f5f4; color: #1c1917; font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif; }
+    #editor { max-width: 48rem; min-height: 100dvh; margin-inline: auto; background: #fff; }
+    @media (min-width: 640px) {
+      #editor { min-height: 0; margin-block: 1.5rem; overflow: clip; border: 1px solid #e7e5e4; border-radius: 1.5rem; box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25); }
+    }
+  </style>
 </head>
-<!-- Apparence de la page de démo : l'éditeur reprend sa police et sa couleur de texte. -->
-<body class="bg-stone-100 font-jakarta text-stone-900">
+<body>
   <!-- Exemple d'intégration : un élément, deux scripts, un appel à Blockquilt.mount. -->
-  <div id="editor" class="mx-auto min-h-dvh max-w-3xl bg-white sm:my-6 sm:min-h-0 sm:overflow-clip sm:rounded-3xl sm:border sm:border-stone-200 sm:shadow-xl"></div>
+  <div id="editor"></div>
 
   <!-- Document de démo (remplacé par le dernier enregistrement par dev/server.js). -->
   <textarea id="source" hidden>---

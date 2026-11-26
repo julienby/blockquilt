@@ -274,6 +274,19 @@ try {
     d.close(); e.destroy(); el.remove();
     return r;
   })()`);
+  const scoped = await ev(`(() => {
+    // Une page qui a son propre Tailwind : ses règles arrivent après blockquilt.css, dans un autre ordre (ici .flex perd contre .block).
+    const style = document.createElement('style'); style.textContent = '.flex{display:block}'; document.head.append(style);
+    const outside = document.createElement('p'); outside.className = 'mx-auto max-w-3xl'; outside.textContent = 'page'; document.body.append(outside);
+    const el = document.createElement('div'); document.body.append(el);
+    const e = Blockquilt.mount(el, { source: 'Un.' });
+    const head = getComputedStyle(el.querySelector('[data-head]')).display; // classe flex
+    const r = { root: el.classList.contains('bq-root'), head, outside: getComputedStyle(outside).maxWidth };
+    e.destroy(); r.after = el.classList.contains('bq-root');
+    el.remove(); outside.remove(); style.remove();
+    return r;
+  })()`);
+  ok(scoped.root && scoped.head === 'flex' && scoped.outside === 'none' && !scoped.after, `CSS de l'éditeur limité à .bq-root : une règle de la page (.flex) ne change pas l'éditeur, et les classes de l'éditeur ne touchent pas la page ; destroy retire .bq-root (${JSON.stringify(scoped)})`);
   ok(noSource.open && noSource.buttons === 0 && noSource.preview, `option sourceView: false : aucun bouton « Texte source » (en-tête, plein écran, menu ⋯), aperçu gardé ; un bloc s’ouvre en plein écran (${JSON.stringify(noSource)})`);
 
   // H1 et texte en grand
